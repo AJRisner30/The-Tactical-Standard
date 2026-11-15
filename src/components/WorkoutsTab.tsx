@@ -1,0 +1,3297 @@
+import React, { useState, useMemo, useEffect } from 'react';
+import { 
+  Play, Pause, X, Dumbbell, Clock, Flame, 
+  ShieldCheck, Zap, ChevronDown, 
+  ChevronUp, Timer, TrendingUp, Calendar, 
+  ChevronLeft, ChevronRight, CheckCircle2,
+  SlidersHorizontal, ArrowRight, Activity, Award, RotateCcw,
+  LogOut, RefreshCw, BatteryCharging, Compass,
+  Layers, Edit3, Trash2, EyeOff, Plus, Sparkles
+} from 'lucide-react';
+import { WorkoutProgram, ExerciseTemplate, MuscleGroup, AthleteProfile, ProgramKey, WorkoutSessionLog, WorkoutFormat, isBodyweightExercise, isExerciseTimed } from '../types';
+import { PROTOCOL_DATA, COACH_RULES, ProtocolDay, getDefaultRestPeriod, parseExerciseString, getApexWeekData, getTacticalHypertrophyWeekData, getUniversalPatWeekData } from '../data/protocolData';
+import { soundManager } from '../utils/audio';
+import { useRestTimer } from '../hooks/useRestTimer';
+import { TacticalStandardCompanyEmblem } from './BrandingLogos';
+import { RequireTier } from './RequireTier';
+import { COACH_AJ_EMAIL, COACH_AJ_NAME } from '../data/coachLogsData';
+import { isMasterExemptAccount, isCoachSession } from '../utils/athleteAuth';
+import { auth } from '../firebase';
+import { isCircuitExercise } from '../utils/circuitParser';
+import { TacticalCircuitCard } from './TacticalCircuitCard';
+import {
+  getExerciseFormat,
+  getFormatLabel,
+  isSupersetExercise,
+  parseSupersetDetails,
+  parseEmomDetails,
+  parseAmrapDetails,
+  parseCircuitDetails,
+} from '../utils/workoutFormats';
+
+// Custom Running Shoe SVG icon
+const ShoeIcon = () => (
+  <svg 
+    xmlns="http://www.w3.org/2000/svg" 
+    width="16" 
+    height="16" 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth="2" 
+    strokeLinecap="round" 
+    strokeLinejoin="round"
+  >
+    <path d="M4 16v-2.38C4 11.5 5.97 10 8 10h12.5c1.1 0 2 .9 2 2v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/>
+    <path d="M20 18v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2"/>
+    <path d="M8 10V7c0-1.66-1.34-3-3-3s-3 1.34-3 3v6"/>
+  </svg>
+);
+
+interface WorkoutsTabProps {
+  programs?: WorkoutProgram[];
+  onStartWorkout: (program: WorkoutProgram) => void;
+  onSelectWarmup: (warmupId: string) => void;
+  onSavePrograms?: (programs: WorkoutProgram[]) => void;
+  currentAthlete?: AthleteProfile;
+  activeProgramKey?: ProgramKey | 'custom_ai';
+  onSelectProgram?: (programKey: ProgramKey | 'custom_ai') => void;
+  onOpenQuestionnaire?: () => void;
+  onOpenAthleteModal?: () => void;
+  onOpenAIGenerator?: (baseProgramKey?: ProgramKey) => void;
+  onOpenSingleDayWorkout?: () => void;
+  onOpenGuidedTour?: () => void;
+  activeCustomProgram?: WorkoutProgram | null;
+  onClearCustomProgram?: () => void;
+  readinessScore?: number;
+  readinessTier?: string;
+  latestCoachLog?: WorkoutSessionLog | null;
+  onNavigateToLogs?: () => void;
+  coachPublishedPrograms?: WorkoutProgram[];
+  onAdaptCustomProgram?: (program: WorkoutProgram) => void;
+  onOpenCoachBuilder?: (programToEdit?: WorkoutProgram | null) => void;
+  onDeleteCoachProgram?: (programId: string) => Promise<void>;
+}
+
+export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
+  onStartWorkout,
+  onSelectWarmup,
+  currentAthlete,
+  activeProgramKey,
+  onSelectProgram,
+  onOpenQuestionnaire,
+  onOpenAthleteModal,
+  onOpenAIGenerator,
+  onOpenSingleDayWorkout,
+  onOpenGuidedTour,
+  activeCustomProgram,
+  onClearCustomProgram,
+  readinessScore,
+  readinessTier,
+  latestCoachLog,
+  onNavigateToLogs,
+  coachPublishedPrograms = [],
+  onAdaptCustomProgram,
+  onOpenCoachBuilder,
+  onDeleteCoachProgram,
+}) => {
+  const isMasterExempt = Boolean(
+    (currentAthlete?.email && isMasterExemptAccount(currentAthlete.email)) ||
+    (auth.currentUser?.email && isMasterExemptAccount(auth.currentUser.email)) ||
+    isCoachSession()
+  );
+
+  const hasCompletedQuestionnaire = Boolean(
+    currentAthlete?.questionnaire && currentAthlete.questionnaire.completedAt
+  );
+
+  // Primary program selector: 'apex_protocol' vs 'tactical_hypertrophy' vs 'hybrid_protocol' vs 'universal_pat' vs 'custom_ai'
+  const normalizeProgramKey = (key?: ProgramKey | 'custom_ai'): ProgramKey | 'custom_ai' => {
+    if (!key) return 'apex_protocol';
+    if (key === 'hybrid_db') return 'hybrid_protocol';
+    return key;
+  };
+
+  const [selectedProgram, setSelectedProgram] = useState<ProgramKey | 'custom_ai'>(() => {
+    if (activeProgramKey) return normalizeProgramKey(activeProgramKey);
+    if (activeCustomProgram) return 'custom_ai';
+    if (!isMasterExempt && currentAthlete?.questionnaire?.recommendedProgramKey) {
+      return normalizeProgramKey(currentAthlete.questionnaire.recommendedProgramKey);
+    }
+    return normalizeProgramKey(currentAthlete?.questionnaire?.recommendedProgramKey || 'apex_protocol');
+  });
+
+  useEffect(() => {
+    if (activeProgramKey) {
+      setSelectedProgram(normalizeProgramKey(activeProgramKey));
+    }
+  }, [activeProgramKey]);
+
+  useEffect(() => {
+    if (activeCustomProgram && (!activeProgramKey || activeProgramKey === 'custom_ai')) {
+      setSelectedProgram('custom_ai');
+    }
+  }, [activeCustomProgram, activeProgramKey]);
+
+  useEffect(() => {
+    if (!isMasterExempt && currentAthlete?.questionnaire?.recommendedProgramKey) {
+      setSelectedProgram(normalizeProgramKey(currentAthlete.questionnaire.recommendedProgramKey));
+    }
+  }, [currentAthlete?.questionnaire?.recommendedProgramKey, isMasterExempt]);
+
+  const handleProgramSwitch = (progKey: ProgramKey | 'custom_ai') => {
+    const normalized = normalizeProgramKey(progKey);
+    setSelectedProgram(normalized);
+    onSelectProgram?.(normalized);
+    setDayViewMode('all');
+  };
+  
+  // Active phase & week inside 12-Week Tactical Bodybuilding Program (Phases 1–3, Weeks 1–12)
+  const [activeTacticalPhaseKey, setActiveTacticalPhaseKey] = useState<'tb_phase1' | 'tb_phase2' | 'tb_phase3'>('tb_phase1');
+  const [activeTacticalWeek, setActiveTacticalWeek] = useState<number>(1);
+
+  // Active week inside Universal PAT Protocol (Weeks 1 to 8)
+  const [activePatWeek, setActivePatWeek] = useState<number>(1);
+
+  // Active quarter inside Law Enforcement 52-Week Fitness & Readiness Program (4 Quarters)
+  const [activeApexPhaseKey, setActiveApexPhaseKey] = useState<
+    'apex_phase1' | 'apex_phase2' | 'apex_phase3' | 'apex_phase4'
+  >('apex_phase1');
+
+  // Active week inside Law Enforcement 52-Week Program (Weeks 1 to 52)
+  const [activeApexWeek, setActiveApexWeek] = useState<number>(1);
+
+  // Active phase inside Hybrid Protocol (condenses Phase 1, Phase 2, Phase 3 into 1 tab)
+  const [activeProtocolPhaseKey, setActiveProtocolPhaseKey] = useState<'phase1' | 'phase2' | 'phase3'>('phase1');
+  
+  const [showCoachNotes, setShowCoachNotes] = useState<boolean>(false);
+  const [showOverloadRules, setShowOverloadRules] = useState<boolean>(false);
+  const [dayViewMode, setDayViewMode] = useState<number | 'all'>('all');
+  const [customAiWeekFilter, setCustomAiWeekFilter] = useState<number | 'all'>('all');
+  const [coachDaySelection, setCoachDaySelection] = useState<Record<string, number>>({});
+  const [confirmDeleteCoachId, setConfirmDeleteCoachId] = useState<string | null>(null);
+  const [deletingCoachId, setDeletingCoachId] = useState<string | null>(null);
+
+  // Inline exercise countdown timer (synchronized with wall clock via useRestTimer)
+  const {
+    activeTimer: activeExerciseTimer,
+    startTimer: startExerciseTimer,
+    togglePauseResume: toggleActiveExerciseTimer,
+    adjustRemaining: adjustActiveTimerRemaining,
+    stopTimer: stopExerciseTimer,
+    updateTotalDuration: updateActiveTimerTotal,
+  } = useRestTimer();
+
+  // User-customizable rest periods per exercise (persisted in localStorage)
+  const [exerciseRestTimes, setExerciseRestTimes] = useState<Record<string, number>>(() => {
+    try {
+      const saved = localStorage.getItem('rpa_exercise_rest_times');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  // Current active phase data based on selected program
+  const currentPhase = useMemo(() => {
+    if (selectedProgram === 'apex_protocol') {
+      return getApexWeekData(activeApexWeek);
+    }
+    if (selectedProgram === 'tactical_hypertrophy') {
+      return getTacticalHypertrophyWeekData(activeTacticalWeek);
+    }
+    if (selectedProgram === 'universal_pat') {
+      return getUniversalPatWeekData(activePatWeek);
+    }
+    return PROTOCOL_DATA[activeProtocolPhaseKey] || PROTOCOL_DATA.phase1;
+  }, [selectedProgram, activeApexWeek, activeTacticalWeek, activePatWeek, activeProtocolPhaseKey]);
+
+  const getExerciseRest = (exerciseString: string): number => {
+    const cleanStr = exerciseString.replace(/\[.*?\]/g, '').trim();
+    if (exerciseRestTimes[cleanStr]) {
+      return exerciseRestTimes[cleanStr];
+    }
+    if (exerciseRestTimes[exerciseString]) {
+      return exerciseRestTimes[exerciseString];
+    }
+    const bracketMatch = exerciseString.match(/\[.*?rest:\s*(\d+)s?.*?\]/i);
+    if (bracketMatch) {
+      const parsed = parseInt(bracketMatch[1], 10);
+      if (!isNaN(parsed) && parsed > 0) return parsed;
+    }
+    return getDefaultRestPeriod(cleanStr);
+  };
+
+  const handleUpdateExerciseRest = (exerciseString: string, seconds: number) => {
+    const cleanStr = exerciseString.replace(/\[.*?\]/g, '').trim();
+    const validSecs = Math.max(15, seconds);
+    const updated = {
+      ...exerciseRestTimes,
+      [cleanStr]: validSecs,
+    };
+    setExerciseRestTimes(updated);
+    localStorage.setItem('rpa_exercise_rest_times', JSON.stringify(updated));
+
+    // If currently timing this exercise, update total/remaining
+    if (activeExerciseTimer && activeExerciseTimer.exerciseName === cleanStr) {
+      updateActiveTimerTotal(validSecs);
+    }
+  };
+
+  const handleToggleExerciseTimer = (exerciseString: string, defaultSecs?: number) => {
+    const cleanStr = exerciseString.replace(/\[.*?\]/g, '').trim();
+    const targetSecs = defaultSecs ?? getExerciseRest(cleanStr);
+
+    if (activeExerciseTimer && activeExerciseTimer.exerciseName === cleanStr) {
+      toggleActiveExerciseTimer(cleanStr, targetSecs);
+    } else {
+      startExerciseTimer(cleanStr, targetSecs);
+    }
+  };
+
+  const handleCancelExerciseTimer = () => {
+    stopExerciseTimer();
+  };
+
+  const handleAdjustActiveTimerRemaining = (secondsDelta: number) => {
+    adjustActiveTimerRemaining(secondsDelta);
+  };
+
+  // Helper to determine if a strength entry is a real exercise or a rest/recovery note
+  const isRealStrengthExercise = (str: string): boolean => {
+    if (!str) return false;
+    const clean = str.replace(/\[.*?\]/g, '').trim().toLowerCase();
+    if (!clean) return false;
+    if (
+      clean === 'rest' ||
+      clean.startsWith('rest ') ||
+      clean.startsWith('rest/') ||
+      clean.startsWith('rest /') ||
+      clean.startsWith('rest -') ||
+      clean.startsWith('rest:') ||
+      clean === 'complete rest' ||
+      clean.includes('complete rest') ||
+      clean.includes('nutrition replenishment') ||
+      clean.includes('meal prep') ||
+      clean.includes('sleep quality') ||
+      clean === 'none' ||
+      clean === 'n/a'
+    ) {
+      return false;
+    }
+    return true;
+  };
+
+  // Helper to determine if a run/conditioning entry is real conditioning or rest
+  const isRealConditioningRun = (runStr?: string): boolean => {
+    if (!runStr) return false;
+    const clean = runStr.replace(/\[.*?\]/g, '').trim().toLowerCase();
+    if (
+      clean === 'rest' ||
+      clean.startsWith('rest ') ||
+      clean.startsWith('rest/') ||
+      clean.startsWith('rest /') ||
+      clean.startsWith('rest -') ||
+      clean.startsWith('rest:') ||
+      clean.includes('complete rest') ||
+      clean.includes('rest from running') ||
+      clean.includes('cns recovery') ||
+      clean === 'none' ||
+      clean === 'n/a'
+    ) {
+      return false;
+    }
+    return true;
+  };
+
+  // Helper to determine if a day is purely a rest day
+  const isProtocolRestDay = (day: ProtocolDay): boolean => {
+    const focusLower = day.focus.toLowerCase();
+    if (
+      focusLower.includes('complete rest') ||
+      focusLower === 'rest' ||
+      focusLower.startsWith('rest /') ||
+      focusLower.startsWith('rest -')
+    ) {
+      return true;
+    }
+    const hasRealStrength = day.strength.some(isRealStrengthExercise);
+    const hasRealRun = isRealConditioningRun(day.run);
+    return !hasRealStrength && !hasRealRun;
+  };
+
+  // Helper to convert a ProtocolDay into a live WorkoutProgram for the tracker
+  const convertDayToProgram = (day: ProtocolDay): WorkoutProgram => {
+    const exercises: ExerciseTemplate[] = day.strength
+      .filter(isRealStrengthExercise)
+      .map((str, idx) => {
+        const parsed = parseExerciseString(str);
+        const name = parsed.name;
+        const defaultSets = parsed.defaultSets;
+        const targetReps = parsed.targetReps;
+
+        // Determine muscle group
+        let muscleGroup: MuscleGroup = 'Full Body';
+        const lowerName = name.toLowerCase();
+        if (lowerName.includes('squat') || lowerName.includes('lunge') || lowerName.includes('split squat') || lowerName.includes('leg press') || lowerName.includes('calf') || lowerName.includes('box jump') || lowerName.includes('sled')) {
+          muscleGroup = 'Quads';
+        } else if (lowerName.includes('deadlift') || lowerName.includes('rdl') || lowerName.includes('hip thrust') || lowerName.includes('leg curl') || lowerName.includes('hamstring') || lowerName.includes('swing')) {
+          muscleGroup = 'Hamstrings & Glutes';
+        } else if (lowerName.includes('bench') || lowerName.includes('floor press') || lowerName.includes('push-up') || lowerName.includes('pushup') || lowerName.includes('chest') || lowerName.includes('dip')) {
+          muscleGroup = 'Chest';
+        } else if (lowerName.includes('row') || lowerName.includes('pull-up') || lowerName.includes('pullup') || lowerName.includes('lat') || lowerName.includes('chin') || lowerName.includes('face pull') || lowerName.includes('shrug')) {
+          muscleGroup = 'Back';
+        } else if (lowerName.includes('overhead press') || lowerName.includes('ohp') || lowerName.includes('push press') || lowerName.includes('lateral raise') || lowerName.includes('shoulder') || lowerName.includes('delt')) {
+          muscleGroup = 'Shoulders';
+        } else if (lowerName.includes('curl') || lowerName.includes('tricep') || lowerName.includes('skull') || lowerName.includes('pushdown') || lowerName.includes('close-grip')) {
+          muscleGroup = 'Arms';
+        } else if (lowerName.includes('plank') || lowerName.includes('pallof') || lowerName.includes('twist') || lowerName.includes('woodchopper') || lowerName.includes('leg raise') || lowerName.includes('knee raise') || lowerName.includes('crunch') || lowerName.includes('core') || lowerName.includes('ab-wheel') || lowerName.includes('ab wheel')) {
+          muscleGroup = 'Core';
+        }
+
+        // Auto-Overload rules for all programs (Tactical Hypertrophy, Apex Protocol, Hybrid Protocol, Hybrid DB & Bodyweight)
+        let progressionRuleObj = undefined;
+        let defaultWeightLbs: number | undefined = undefined;
+
+        // Strict OHP & Press
+        if (lowerName.includes('overhead press') || lowerName.includes('ohp') || lowerName.includes('strict overhead')) {
+          progressionRuleObj = {
+            metric: 'weight_lbs' as const,
+            trigger: 'complete_max_reps' as const,
+            increment_value: 2.5,
+            action: '+2.5 to 5 lbs next session',
+          };
+          defaultWeightLbs = 75;
+        } else if (lowerName.includes('pull-up') || lowerName.includes('pullup') || lowerName.includes('chin-up')) {
+          progressionRuleObj = {
+            metric: 'weight_lbs' as const,
+            trigger: 'complete_max_reps' as const,
+            increment_value: 2.5,
+            action: '+2.5 to 5 lbs on belt',
+          };
+          defaultWeightLbs = 0;
+        } else if (lowerName.includes('deadlift') || lowerName.includes('trap bar')) {
+          progressionRuleObj = {
+            metric: 'weight_lbs' as const,
+            trigger: 'complete_max_reps' as const,
+            increment_value: 10,
+            action: '+10 lbs next session',
+          };
+          defaultWeightLbs = 185;
+        } else if (lowerName.includes('squat') && !lowerName.includes('split')) {
+          progressionRuleObj = {
+            metric: 'weight_lbs' as const,
+            trigger: 'complete_max_reps' as const,
+            increment_value: 10,
+            action: '+10 lbs next session',
+          };
+          defaultWeightLbs = 135;
+        } else if (lowerName.includes('hip thrust')) {
+          progressionRuleObj = {
+            metric: 'weight_lbs' as const,
+            trigger: 'complete_max_reps' as const,
+            increment_value: 10,
+            action: '+10 lbs next session',
+          };
+          defaultWeightLbs = 135;
+        } else if (lowerName.includes('rdl') || lowerName.includes('romanian')) {
+          progressionRuleObj = {
+            metric: 'weight_lbs' as const,
+            trigger: 'complete_max_reps' as const,
+            increment_value: 10,
+            action: '+10 lbs next session',
+          };
+          defaultWeightLbs = 115;
+        } else if (lowerName.includes('push press')) {
+          progressionRuleObj = {
+            metric: 'weight_lbs' as const,
+            trigger: 'complete_max_reps' as const,
+            increment_value: 5,
+            action: '+5 lbs next session',
+          };
+          defaultWeightLbs = 95;
+        } else if (lowerName.includes('z-press') || lowerName.includes('z press')) {
+          progressionRuleObj = {
+            metric: 'weight_lbs' as const,
+            trigger: 'complete_max_reps' as const,
+            increment_value: 5,
+            action: '+5 lbs next session',
+          };
+          defaultWeightLbs = 65;
+        } else if (lowerName.includes('dip')) {
+          progressionRuleObj = {
+            metric: 'reps' as const,
+            trigger: 'complete_max_reps' as const,
+            increment_value: 1,
+            action: '+1 rep or add weight vest',
+          };
+          defaultWeightLbs = 0;
+        } else if (lowerName.includes('curl')) {
+          progressionRuleObj = {
+            metric: 'weight_lbs' as const,
+            trigger: 'complete_max_reps' as const,
+            increment_value: 5,
+            action: '+5 lbs next session',
+          };
+          defaultWeightLbs = 25;
+        } else if (lowerName.includes('calf')) {
+          progressionRuleObj = {
+            metric: 'weight_lbs' as const,
+            trigger: 'complete_max_reps' as const,
+            increment_value: 5,
+            action: '+5 to 10 lbs next session',
+          };
+          defaultWeightLbs = 135;
+        } else if (lowerName.includes('lateral raise')) {
+          progressionRuleObj = {
+            metric: 'weight_lbs' as const,
+            trigger: 'complete_max_reps' as const,
+            increment_value: 2.5,
+            action: '+2.5 to 5 lbs next session',
+          };
+          defaultWeightLbs = 15;
+        } else if (lowerName.includes('face pull')) {
+          progressionRuleObj = {
+            metric: 'weight_lbs' as const,
+            trigger: 'complete_max_reps' as const,
+            increment_value: 5,
+            action: '+5 lbs next session',
+          };
+          defaultWeightLbs = 35;
+        } else if (lowerName.includes('close-grip') || lowerName.includes('close grip')) {
+          progressionRuleObj = {
+            metric: 'weight_lbs' as const,
+            trigger: 'complete_max_reps' as const,
+            increment_value: 5,
+            action: '+5 lbs next session',
+          };
+          defaultWeightLbs = 95;
+        } else if (lowerName.includes('bench') || lowerName.includes('floor press')) {
+          progressionRuleObj = {
+            metric: 'weight_lbs' as const,
+            trigger: 'complete_max_reps' as const,
+            increment_value: 5,
+            action: '+5 lbs next session',
+          };
+          defaultWeightLbs = lowerName.includes('barbell') || lowerName.includes('incline') ? 115 : 50;
+        } else if (lowerName.includes('row')) {
+          progressionRuleObj = {
+            metric: 'weight_lbs' as const,
+            trigger: 'complete_max_reps' as const,
+            increment_value: 5,
+            action: '+5 lbs next session',
+          };
+          defaultWeightLbs = lowerName.includes('barbell') || lowerName.includes('bent') ? 115 : 60;
+        } else if (lowerName.includes('split squat') || lowerName.includes('lunge')) {
+          progressionRuleObj = {
+            metric: 'weight_lbs' as const,
+            trigger: 'complete_max_reps' as const,
+            increment_value: 5,
+            action: '+5 lbs next session',
+          };
+          defaultWeightLbs = 30;
+        } else if (lowerName.includes('leg curl')) {
+          progressionRuleObj = {
+            metric: 'weight_lbs' as const,
+            trigger: 'complete_max_reps' as const,
+            increment_value: 5,
+            action: '+5 to 10 lbs next session',
+          };
+          defaultWeightLbs = 60;
+        } else if (lowerName.includes('carry') || lowerName.includes('farmer') || lowerName.includes('suitcase')) {
+          progressionRuleObj = {
+            metric: 'weight_lbs' as const,
+            trigger: 'complete_max_reps' as const,
+            increment_value: 5,
+            action: '+5 lbs next session',
+          };
+          defaultWeightLbs = 50;
+        } else if (lowerName.includes('wrist') || lowerName.includes('roller') || lowerName.includes('pinch')) {
+          progressionRuleObj = {
+            metric: 'weight_lbs' as const,
+            trigger: 'complete_max_reps' as const,
+            increment_value: 5,
+            action: '+5 lbs or +10s TUT',
+          };
+          defaultWeightLbs = 25;
+        } else if (lowerName.includes('sorensen') || lowerName.includes('hyperextension') || lowerName.includes('back extension')) {
+          progressionRuleObj = {
+            metric: 'reps' as const,
+            trigger: 'complete_max_reps' as const,
+            increment_value: 1,
+            action: '+1 rep next session',
+          };
+          defaultWeightLbs = 0;
+        } else if (lowerName.includes('leg raise') || lowerName.includes('knee raise') || lowerName.includes('hanging')) {
+          progressionRuleObj = {
+            metric: 'reps' as const,
+            trigger: 'complete_max_reps' as const,
+            increment_value: 1,
+            action: '+1 rep next session',
+          };
+          defaultWeightLbs = 0;
+        } else if (lowerName.includes('swing')) {
+          progressionRuleObj = {
+            metric: 'weight_lbs' as const,
+            trigger: 'complete_max_reps' as const,
+            increment_value: 5,
+            action: '+5 lbs next session',
+          };
+          defaultWeightLbs = 35;
+        } else if (lowerName.includes('pallof')) {
+          defaultWeightLbs = 20;
+        } else if (lowerName.includes('push-up') || lowerName.includes('pushup')) {
+          progressionRuleObj = {
+            metric: 'reps' as const,
+            trigger: 'every_session' as const,
+            increment_value: 1,
+            action: '+1 rep next session',
+          };
+          defaultWeightLbs = 0;
+        } else if (lowerName.includes('plank')) {
+          progressionRuleObj = {
+            metric: 'seconds' as const,
+            trigger: 'per_set' as const,
+            increment_value: 5,
+            action: '+5s hold',
+          };
+          defaultWeightLbs = 0;
+        }
+
+        if (isBodyweightExercise(name, day.focus)) {
+          defaultWeightLbs = 0;
+          if (progressionRuleObj?.metric === 'weight_lbs') {
+            progressionRuleObj = isExerciseTimed(name, undefined, targetReps)
+              ? { metric: 'seconds', trigger: 'per_set', increment_value: 5, action: '+5s hold' }
+              : { metric: 'reps', trigger: 'complete_max_reps', increment_value: 1, action: '+1 clean rep' };
+          }
+        }
+
+        const configuredRest = getExerciseRest(str);
+        const rawNotes = parsed.notes
+          ? parsed.notes
+          : `The Tactical Standard Protocol (${day.day} - ${day.focus}). Target Rest: ${configuredRest}s.`;
+
+        const isConditioningDrill =
+          /\b(sprint|sprints|pro\s+agility|t-drill|assault\s+bike|zone\s*2\s*run)\b/i.test(lowerName);
+
+        const candidateTemplate: ExerciseTemplate = {
+          id: `proto-ex-${idx}-${Date.now()}`,
+          name,
+          muscleGroup,
+          type: isConditioningDrill ? 'cardio' : muscleGroup === 'Core' ? 'core' : 'strength',
+          defaultSets,
+          targetReps,
+          targetRpe: parsed.targetRpe || 8.0,
+          weight_lbs: defaultWeightLbs,
+          restPeriodSeconds: configuredRest,
+          progression_rules: progressionRuleObj,
+          notes: rawNotes,
+        };
+
+        const detectedFormat = getExerciseFormat(candidateTemplate);
+        if (detectedFormat === 'superset') {
+          const ss = parseSupersetDetails(candidateTemplate);
+          return {
+            ...candidateTemplate,
+            format: 'superset',
+            type: 'superset',
+            defaultSets: ss.rounds,
+            supersetExercises: ss.movements,
+          };
+        }
+        if (detectedFormat === 'emom') {
+          const emom = parseEmomDetails(candidateTemplate);
+          return {
+            ...candidateTemplate,
+            format: 'emom',
+            type: 'emom',
+            emomMinutes: emom.totalMinutes,
+            emomIntervalSeconds: emom.intervalSeconds,
+            emomMovements: emom.movements,
+          };
+        }
+        if (detectedFormat === 'amrap') {
+          const amrap = parseAmrapDetails(candidateTemplate);
+          return {
+            ...candidateTemplate,
+            format: 'amrap',
+            type: 'amrap',
+            amrapDurationMinutes: amrap.durationMinutes,
+            amrapMovements: amrap.movements,
+          };
+        }
+        if (detectedFormat === 'circuit') {
+          const cir = parseCircuitDetails(candidateTemplate);
+          return {
+            ...candidateTemplate,
+            format: 'circuit',
+            type: 'circuit',
+            defaultSets: cir.rounds,
+            restPeriodSeconds: cir.restBetweenRoundsSeconds,
+            circuitExercises: cir.stations.map((st) => ({
+              name: st.name,
+              targetReps: st.detail || 'Prescribed',
+              muscleGroup: 'Full Body' as MuscleGroup,
+            })),
+          };
+        }
+
+        return candidateTemplate;
+      });
+
+    const alreadyHasMatchingRunInList = exercises.some(
+      (ex) =>
+        ex.type === 'cardio' &&
+        (ex.name.toLowerCase() === day.run.trim().toLowerCase() ||
+          (day.run.toLowerCase().includes('zone 2') && ex.name.toLowerCase().includes('zone 2')))
+    );
+
+    // If day has conditioning (run / pursuit / sprints) and is not already explicitly listed inside day.strength, append as trackable cardio
+    if (isRealConditioningRun(day.run) && !alreadyHasMatchingRunInList) {
+      const combined = `${day.run} ${day.pace} ${day.focus}`.toLowerCase();
+      const isIntervals = combined.includes('interval') || combined.includes('track') || combined.includes('sprint') || combined.includes('repeats');
+
+      // Accurate distance extraction from day.run title and pace (starting at low end of ranges)
+      let distance: number | undefined;
+      const rangeMatch = day.run.match(/(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)\s*mile/i);
+      if (rangeMatch) {
+        distance = parseFloat(rangeMatch[1]);
+      } else {
+        const singleMatch = day.run.match(/(\d+(?:\.\d+)?)\s*mile/i);
+        if (singleMatch) {
+          distance = parseFloat(singleMatch[1]);
+        } else {
+          // Check meter ranges (e.g., 4,000–5,000m or 3,000m or 2,400m) — start at low end
+          const meterRangeMatch = day.run.match(/(\d[\d,]*)\s*[-–]\s*(\d[\d,]*)\s*m\b/i);
+          const singleMeterMatch = day.run.match(/(\d[\d,]{3,})\s*m\b/i);
+          if (meterRangeMatch) {
+            const lowMeters = parseInt(meterRangeMatch[1].replace(/,/g, ''), 10);
+            if (!isNaN(lowMeters) && lowMeters >= 400) {
+              distance = parseFloat((lowMeters / 1609.34).toFixed(1));
+            }
+          } else if (singleMeterMatch) {
+            const meters = parseInt(singleMeterMatch[1].replace(/,/g, ''), 10);
+            if (!isNaN(meters) && meters >= 800) {
+              distance = parseFloat((meters / 1609.34).toFixed(1));
+            }
+          } else {
+            const paceRangeMatch = day.pace.match(/(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)\s*mile/i);
+            if (paceRangeMatch) {
+              distance = parseFloat(paceRangeMatch[1]);
+            } else {
+              const paceSingleMatch = day.pace.match(/(\d+(?:\.\d+)?)\s*mile/i);
+              if (paceSingleMatch) {
+                distance = parseFloat(paceSingleMatch[1]);
+              }
+            }
+          }
+        }
+      }
+
+      // Duration in minutes (only when explicitly prescribed in minutes in day.run or day.pace)
+      let durationMins: number | undefined;
+      const minMatch = day.run.match(/(\d+(?:\.\d+)?)\s*(?:[-–]\s*(\d+(?:\.\d+)?))?\s*min(?!\s*hip|\s*between)/i);
+      if (minMatch) {
+        durationMins = Math.round(parseFloat(minMatch[1]));
+      } else {
+        const paceMinMatch = day.pace.match(/(\d+(?:\.\d+)?)\s*(?:[-–]\s*(\d+(?:\.\d+)?))?\s*min(?!\s*rest|\s*between)/i);
+        if (paceMinMatch) {
+          durationMins = Math.round(parseFloat(paceMinMatch[1]));
+        }
+      }
+
+      // Sensible defaults if neither distance nor duration was specified
+      if (!distance && !durationMins) {
+        if (isIntervals) {
+          distance = 2.0;
+        } else {
+          distance = 2.5;
+        }
+      } else if (!distance && durationMins) {
+        distance = Math.round((durationMins / 10) * 2) / 2;
+      }
+
+      const targetText =
+        distance && !durationMins
+          ? `${distance} ${distance === 1 ? 'mile' : 'miles'}`
+          : durationMins
+          ? `${durationMins} mins${distance ? ` (${distance} mi target)` : ''}`
+          : `${distance} miles`;
+
+      exercises.push({
+        id: `proto-cardio-${Date.now()}`,
+        name: day.run.trim(),
+        muscleGroup: 'Full Body',
+        type: 'cardio',
+        defaultSets: 1,
+        targetReps: targetText,
+        restPeriodSeconds: 0,
+        distance_miles: distance,
+        pace: day.pace,
+        progression_rules: isIntervals
+          ? { metric: 'seconds', trigger: 'pace_progression', increment_value: -2, action: 'drop 2-3s per interval repeat' }
+          : { metric: 'distance_miles', trigger: 'per_week', increment_value: 0.5, action: '+0.5 mi weekly aerobic expansion' },
+        notes: `${day.run} • Target Pace: ${day.pace}`
+      });
+    }
+
+    const programTitle = selectedProgram === 'apex_protocol'
+      ? `52-Week Military Combat Fitness Program (${currentPhase.title.split(':')[0]} • ${day.day}: ${day.focus})`
+      : selectedProgram === 'tactical_hypertrophy'
+      ? `12-Week Military Tactical Bodybuilding (${currentPhase.weeks} • ${day.day}: ${day.focus})`
+      : selectedProgram === 'hybrid_protocol'
+      ? `The Tactical Standard Hybrid Protocol (${currentPhase.title.split(':')[0]} • ${day.day}: ${day.focus})`
+      : `Universal Military PT Test (${currentPhase.weeks} • ${day.day}: ${day.focus})`;
+
+    // Mandatory DIME Warm-Up is recommended for all programs (8-min protocol dedicated on Tactical Bodybuilding)
+    const recommendedWarmupId =
+      selectedProgram === 'tactical_hypertrophy'
+        ? 'warmup-dime-tactical-bb'
+        : 'warmup-dime-mandatory';
+
+    return {
+      id: `session-${day.day.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`,
+      title: programTitle,
+      subtitle: `${currentPhase.title} (${currentPhase.weeks})`,
+      category: 'Hybrid',
+      frequency: 'Scheduled',
+      estimatedDurationMinutes: 60,
+      recommendedWarmupId,
+      description: `${currentPhase.title} - ${day.day}: ${day.focus}. Auto-Overload enabled session starting at the low end of prescribed set/rep ranges.`,
+      exercises: exercises.length > 0 ? exercises : [
+        {
+          id: 'ex-default',
+          name: 'Core & Mobility Circuit',
+          muscleGroup: 'Core',
+          defaultSets: 3,
+          targetReps: '15-20',
+          restPeriodSeconds: 60,
+          notes: 'Active recovery and mobility maintenance.'
+        }
+      ],
+    };
+  };
+
+  const handleLaunchDayLifts = (day: ProtocolDay) => {
+    const program = convertDayToProgram(day);
+    onStartWorkout(program);
+  };
+
+  // Quarter phase options for the 52-Week Military Combat Fitness & Readiness Program
+  const apexMesocycles = [
+    {
+      id: 'apex_phase1' as const,
+      label: 'Quarter 1: Aerobic Base, Posture & Core',
+      weeks: 'Q1: Wks 1–13',
+      badge: 'Aerobic Base & Core',
+      focus: 'Zone 2 Aerobic Base, Thoracic/Hip Mobility & Movement Mechanics (RPE 7)',
+      weekRange: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
+      defaultWeek: 1
+    },
+    {
+      id: 'apex_phase2' as const,
+      label: 'Quarter 2: Running Stamina & Grappling Strength',
+      weeks: 'Q2: Wks 14–26',
+      badge: 'Stamina & Grappling',
+      focus: 'Tempo Runs, 400m Intervals, Barbell Strength & Loaded Carries (RPE 8)',
+      weekRange: [14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26],
+      defaultWeek: 14
+    },
+    {
+      id: 'apex_phase3' as const,
+      label: 'Quarter 3: Limit Strength, Combat Speed & Threshold',
+      weeks: 'Q3: Wks 27–39',
+      badge: 'Limit Strength & Speed',
+      focus: 'Maximal Strength (80–85% 1RM), 200m–800m Track Repeats & Rotational Power (RPE 8.5)',
+      weekRange: [27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39],
+      defaultWeek: 27
+    },
+    {
+      id: 'apex_phase4' as const,
+      label: 'Quarter 4: Combat Readiness & Annual Peak',
+      weeks: 'Q4: Wks 40–52',
+      badge: 'Combat Circuit & Peak',
+      focus: 'Strength Maintenance, High-HR Decision-Making & Combat Readiness Simulation Circuits',
+      weekRange: [40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52],
+      defaultWeek: 40
+    },
+  ];
+
+  // Phase options for the 12-Week Military Tactical Bodybuilding Program (Starts Sunday)
+  const tacticalMesocycles = [
+    {
+      id: 'tb_phase1' as const,
+      label: 'Phase 1: Armor & Base',
+      weeks: 'Weeks 1–4',
+      badge: 'Base Volume & Acceleration',
+      focus: 'Main 8–10 • Acc 10–12 • Split 10/leg • Rest 120s/75s • Wk 4 Deload (-40% sets)',
+      weekRange: [1, 2, 3, 4],
+      defaultWeek: 1
+    },
+    {
+      id: 'tb_phase2' as const,
+      label: 'Phase 2: Power-Building',
+      weeks: 'Weeks 5–8',
+      badge: 'Force & Agility',
+      focus: 'Main 5–6 • Acc 8–10 • Split 8/leg • Rest 150s/90s • Pro Agility & Bike • Wk 8 Deload',
+      weekRange: [5, 6, 7, 8],
+      defaultWeek: 5
+    },
+    {
+      id: 'tb_phase3' as const,
+      label: 'Phase 3: Peak & Velocity',
+      weeks: 'Weeks 9–12',
+      badge: 'Heavy & Combat Speed',
+      focus: 'Main 3–5 • Acc 6–8 • Split 6/leg • Rest 180s • 60m Broken Sprints & T-Drill • Wk 12 Deload',
+      weekRange: [9, 10, 11, 12],
+      defaultWeek: 9
+    },
+  ];
+
+  // Mesocycle phase options for the condensed Hybrid Protocol tab
+  const protocolMesocycles = [
+    {
+      id: 'phase1' as const,
+      label: 'Phase 1: Foundation',
+      weeks: 'Weeks 1-4',
+      badge: 'Hypertrophy & Base',
+      focus: 'Aerobic Base (Zone 2) & Foundational Hypertrophy'
+    },
+    {
+      id: 'phase2' as const,
+      label: 'Phase 2: Build & Intensify',
+      weeks: 'Weeks 5-8',
+      badge: 'Strength & Threshold',
+      focus: 'Heavy Strength Loads & Threshold Expansions'
+    },
+    {
+      id: 'phase3' as const,
+      label: 'Phase 3: Peak Performance',
+      weeks: 'Weeks 9-12',
+      badge: 'Peak Power & Race Pace',
+      focus: 'Max CNS Power Output & Race Pacing'
+    },
+  ];
+
+  const daysToShow = dayViewMode === 'all' 
+    ? currentPhase.days 
+    : [currentPhase.days[dayViewMode] || currentPhase.days[0]];
+
+  const getProgramDetectedFormats = (prog: WorkoutProgram): WorkoutFormat[] => {
+    const allExercises: ExerciseTemplate[] = [
+      ...(prog.exercises || []),
+      ...((prog.schedule || []).flatMap((d) => d.exercises || [])),
+    ];
+    const set = new Set<WorkoutFormat>();
+    allExercises.forEach((ex) => {
+      set.add(getExerciseFormat(ex));
+    });
+    return Array.from(set);
+  };
+
+  const renderCoachLibrarySection = () => {
+    const visiblePrograms = coachPublishedPrograms.filter(
+      (p) => isMasterExempt || p.isPublished !== false
+    );
+    if (visiblePrograms.length === 0 && !isMasterExempt) {
+      return null;
+    }
+
+    return (
+      <div className="bg-[#0e1217] border border-amber-500/35 rounded-2xl p-4 sm:p-5 shadow-xl space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-800/80">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-400/40 flex items-center justify-center text-amber-300 shrink-0 shadow">
+              <Layers className="w-5 h-5 text-amber-400" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-amber-300 font-black px-2 py-0.5 rounded bg-amber-500/15 border border-amber-500/40">
+                  Coach Custom Drops
+                </span>
+                <span className="text-[10px] font-mono text-zinc-400">
+                  Straight • Superset • EMOM • AMRAP • Circuit
+                </span>
+              </div>
+              <h2 className="text-base sm:text-lg font-black text-white font-athletic uppercase tracking-wide mt-0.5">
+                Coach Risner&apos;s Custom Programs &amp; Single Workouts
+              </h2>
+              <p className="text-xs text-zinc-300 mt-0.5">
+                Launch custom Coach AJ workouts directly or run them through the Adaptive AI Engine to fit your injuries, gear, and ability level.
+              </p>
+            </div>
+          </div>
+
+          {isMasterExempt && onOpenCoachBuilder && (
+            <button
+              type="button"
+              onClick={() => onOpenCoachBuilder(null)}
+              className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-black uppercase text-xs font-athletic tracking-wider shadow-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 shrink-0 self-start sm:self-auto whitespace-nowrap"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Create Custom Program / Workout</span>
+            </button>
+          )}
+        </div>
+
+        {visiblePrograms.length === 0 ? (
+          <div className="p-6 rounded-xl bg-[#090b0d] border border-dashed border-zinc-700 text-center space-y-2">
+            <p className="text-xs sm:text-sm text-zinc-300 font-medium">
+              No custom Coach programs or workouts published yet.
+            </p>
+            {isMasterExempt && onOpenCoachBuilder && (
+              <button
+                type="button"
+                onClick={() => onOpenCoachBuilder(null)}
+                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs uppercase tracking-wider inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Build Your First Custom Program</span>
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {visiblePrograms.map((prog) => {
+              const schedule = prog.schedule && prog.schedule.length > 0 ? prog.schedule : [];
+              const selectedDayIdx = Math.min(
+                coachDaySelection[prog.id] ?? 0,
+                Math.max(0, schedule.length - 1)
+              );
+              const activeScheduleDay = schedule[selectedDayIdx];
+              const dayExercises = activeScheduleDay
+                ? activeScheduleDay.exercises || []
+                : prog.exercises || [];
+              const isSelectedDayRest =
+                schedule.length > 0 &&
+                (activeScheduleDay?.isRestDay || dayExercises.length === 0);
+              const detectedFormats = getProgramDetectedFormats(prog);
+              const isSingleWorkout = prog.programKind === 'single_workout' || schedule.length <= 1;
+
+              return (
+                <div
+                  key={prog.id}
+                  className={`rounded-2xl border p-4 flex flex-col justify-between gap-3.5 transition-all ${
+                    prog.isPublished === false
+                      ? 'bg-[#0e1217] border-amber-500/40'
+                      : 'bg-[#090b0d] border-zinc-800 hover:border-amber-500/50'
+                  }`}
+                >
+                  <div className="space-y-2.5">
+                    {/* Badges & Admin Controls Row */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span
+                          className={`text-[10px] font-mono font-black uppercase px-2 py-0.5 rounded border ${
+                            isSingleWorkout
+                              ? 'bg-zinc-800 text-zinc-200 border-zinc-700'
+                              : 'bg-amber-500/15 text-amber-300 border-amber-500/40'
+                          }`}
+                        >
+                          {isSingleWorkout ? 'Single Workout' : `${schedule.length}-Day Program`}
+                        </span>
+
+                        {isMasterExempt && prog.isPublished === false && (
+                          <span className="text-[10px] font-mono font-black uppercase px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
+                            <EyeOff className="w-3 h-3" />
+                            <span>Draft (Coach Only)</span>
+                          </span>
+                        )}
+
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-800 text-zinc-300">
+                          {prog.category}
+                        </span>
+                        <span className="text-[10px] font-mono text-zinc-400 flex items-center gap-1 tabular-nums">
+                          <Clock className="w-3 h-3" />
+                          {prog.estimatedDurationMinutes || 45}m
+                        </span>
+                      </div>
+
+                      {isMasterExempt && (
+                        <div className="flex items-center gap-1 shrink-0">
+                          {onOpenCoachBuilder && (
+                            <button
+                              type="button"
+                              onClick={() => onOpenCoachBuilder(prog)}
+                              className="p-1.5 rounded-lg bg-zinc-800/80 hover:bg-amber-500/20 text-zinc-300 hover:text-amber-200 border border-zinc-700 transition cursor-pointer"
+                              title="Edit custom program"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {onDeleteCoachProgram && (
+                            confirmDeleteCoachId === prog.id ? (
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  disabled={deletingCoachId === prog.id}
+                                  onClick={async () => {
+                                    setDeletingCoachId(prog.id);
+                                    try {
+                                      await onDeleteCoachProgram(prog.id);
+                                    } finally {
+                                      setDeletingCoachId(null);
+                                      setConfirmDeleteCoachId(null);
+                                    }
+                                  }}
+                                  className="px-2 py-1 rounded-lg bg-red-600 hover:bg-red-500 text-white text-[10px] font-black uppercase cursor-pointer"
+                                >
+                                  {deletingCoachId === prog.id ? '...' : 'Confirm'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmDeleteCoachId(null)}
+                                  className="px-1.5 py-1 rounded-lg bg-zinc-800 text-zinc-300 text-[10px] font-bold cursor-pointer"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeleteCoachId(prog.id)}
+                                className="p-1.5 rounded-lg bg-zinc-800/80 hover:bg-red-900/40 text-zinc-400 hover:text-red-300 border border-zinc-700 transition cursor-pointer"
+                                title="Delete custom program"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <h3 className="text-sm sm:text-base font-black text-white font-athletic uppercase tracking-wide">
+                        {prog.title}
+                      </h3>
+                      {prog.subtitle && (
+                        <p className="text-[11px] text-indigo-300 font-semibold mt-0.5">
+                          {prog.subtitle}
+                        </p>
+                      )}
+                      {prog.description && (
+                        <p className="text-xs text-zinc-400 line-clamp-2 mt-1">
+                          {prog.description}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Format Badges */}
+                    {detectedFormats.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {detectedFormats.map((fmt) => (
+                          <span
+                            key={fmt}
+                            className={`text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded border ${
+                              fmt === 'superset'
+                                ? 'bg-purple-500/15 text-purple-300 border-purple-500/40'
+                                : fmt === 'emom'
+                                ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40'
+                                : fmt === 'amrap'
+                                ? 'bg-amber-500/15 text-amber-300 border-amber-500/40'
+                                : fmt === 'circuit'
+                                ? 'bg-orange-500/15 text-orange-300 border-orange-500/40'
+                                : 'bg-amber-500/15 text-amber-300 border-amber-500/40'
+                            }`}
+                          >
+                            {getFormatLabel(fmt)}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Day selector for multi-day Coach custom programs */}
+                    {schedule.length > 1 && (
+                      <div className="pt-1">
+                        <label className="text-[10px] font-mono uppercase tracking-wider text-zinc-400 block mb-1">
+                          Select Training Day to Preview / Launch
+                        </label>
+                        <select
+                          value={selectedDayIdx}
+                          onChange={(e) =>
+                            setCoachDaySelection((prev) => ({
+                              ...prev,
+                              [prog.id]: Number(e.target.value),
+                            }))
+                          }
+                          className="w-full bg-[#0e1217] border border-zinc-700 rounded-xl px-3 py-1.5 text-xs text-white font-semibold focus:outline-none focus:border-indigo-400"
+                        >
+                          {schedule.map((d, dIdx) => (
+                            <option key={dIdx} value={dIdx}>
+                              Day {d.day || dIdx + 1}: {d.focus} {d.isRestDay || (d.exercises?.length || 0) === 0 ? '(Rest)' : `(${d.exercises?.length || 0} blocks)`}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Compact Block Preview */}
+                    <div className="bg-[#0b1322] border border-zinc-800/80 rounded-xl p-2.5 space-y-1.5">
+                      {isSelectedDayRest ? (
+                        <p className="text-[11px] text-zinc-400 italic">
+                          Active Rest / Recovery Day
+                        </p>
+                      ) : dayExercises.length === 0 ? (
+                        <p className="text-[11px] text-zinc-400 italic">
+                          No exercise blocks configured yet.
+                        </p>
+                      ) : (
+                        dayExercises.slice(0, 4).map((blk, bIdx) => {
+                          const blkFormat = getExerciseFormat(blk);
+                          return (
+                            <div key={blk.id || bIdx} className="flex items-center justify-between gap-2 text-[11px]">
+                              <span className="text-zinc-200 font-semibold truncate">
+                                <span className="text-indigo-400 font-mono mr-1">{bIdx + 1}.</span>
+                                {blk.name}
+                              </span>
+                              <span className="text-[10px] font-mono text-zinc-400 shrink-0">
+                                {blkFormat === 'superset'
+                                  ? `${blk.supersetExercises?.length || 2} mvts × ${blk.defaultSets}`
+                                  : blkFormat === 'emom'
+                                  ? `${blk.emomMinutes || blk.defaultSets}m EMOM`
+                                  : blkFormat === 'amrap'
+                                  ? `${blk.amrapDurationMinutes || 12}m AMRAP`
+                                  : blkFormat === 'circuit'
+                                  ? `${blk.defaultSets} rds`
+                                  : `${blk.defaultSets}×${blk.targetReps}`}
+                              </span>
+                            </div>
+                          );
+                        })
+                      )}
+                      {dayExercises.length > 4 && (
+                        <span className="text-[10px] font-mono text-indigo-300 block">
+                          +{dayExercises.length - 4} more blocks
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Card CTAs */}
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      disabled={isSelectedDayRest || dayExercises.length === 0}
+                      onClick={() => {
+                        const launchTitle =
+                          schedule.length > 1 && activeScheduleDay
+                            ? `${prog.title} — Day ${activeScheduleDay.day || selectedDayIdx + 1}: ${activeScheduleDay.focus}`
+                            : prog.title;
+                        onStartWorkout({
+                          ...prog,
+                          title: launchTitle,
+                          exercises: dayExercises,
+                        });
+                      }}
+                      className="flex-1 py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed text-black font-black uppercase text-xs font-athletic tracking-wider flex items-center justify-center gap-1.5 transition cursor-pointer active:scale-95 shadow"
+                    >
+                      <Play className="w-3.5 h-3.5 fill-black" />
+                      <span>{schedule.length > 1 ? `Start Day ${selectedDayIdx + 1}` : 'Start Workout'}</span>
+                    </button>
+
+                    {prog.allowAiAdaptation !== false && onAdaptCustomProgram && (
+                      <button
+                        type="button"
+                        onClick={() => onAdaptCustomProgram(prog)}
+                        className="py-2 px-3 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 font-black uppercase text-xs font-athletic tracking-wider flex items-center justify-center gap-1.5 transition cursor-pointer active:scale-95 shrink-0"
+                        title="Adapt this Coach program for injuries, equipment, and ability level"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Adapt With AI</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  if (!hasCompletedQuestionnaire && !isMasterExempt) {
+    return (
+      <div className="space-y-6">
+        {/* COACH CUSTOM PROGRAMS & WORKOUTS */}
+        {renderCoachLibrarySection()}
+
+        {/* COACH AJ'S LATEST MISSION WORKOUT SPOTLIGHT CARD - VISIBLE TO EVERY SERVICE MEMBER */}
+        {latestCoachLog && (
+          <div className="bg-[#0e1217] border border-amber-500/40 hover:border-amber-500/60 rounded-2xl p-4 shadow-xl relative overflow-hidden transition-all">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3.5 relative z-10">
+              <div className="flex items-start sm:items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0 shadow-md">
+                  <ShieldCheck className="w-5 h-5 text-amber-400" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-amber-300 font-black px-2 py-0.5 rounded bg-amber-500/20 border border-amber-500/40 flex items-center gap-1">
+                      <ShieldCheck className="w-3 h-3 text-amber-400" />
+                      Coach AJ's Latest Mission Workout
+                    </span>
+                    <span className="text-[11px] font-mono text-zinc-400 font-bold tabular-nums">
+                      {latestCoachLog.date} • {latestCoachLog.durationMinutes}m • {latestCoachLog.totalVolumeLbs.toLocaleString()} lbs
+                    </span>
+                    <span className="text-zinc-600 hidden sm:inline">•</span>
+                    <span className="text-[10px] font-mono text-amber-400/80">
+                      {COACH_AJ_EMAIL}
+                    </span>
+                  </div>
+                  <h3 className="text-sm sm:text-base font-black text-white font-athletic uppercase tracking-wide mt-0.5">
+                    {latestCoachLog.workoutTitle}
+                  </h3>
+                  <p className="text-xs text-zinc-300 line-clamp-1 mt-0.5">
+                    {latestCoachLog.exercises.map((e) => e.exerciseName).join(' • ')}
+                    {latestCoachLog.notes ? ` — "${latestCoachLog.notes}"` : ''}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0 self-start md:self-auto">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const program: WorkoutProgram = {
+                      id: `coach-latest-${latestCoachLog.id}`,
+                      title: latestCoachLog.workoutTitle.startsWith("Coach AJ's")
+                        ? latestCoachLog.workoutTitle
+                        : `Coach AJ's: ${latestCoachLog.workoutTitle}`,
+                      subtitle: 'Coach AJ Risner Verified Mission Session',
+                      category: 'Hybrid',
+                      frequency: 'Mission Session',
+                      estimatedDurationMinutes: latestCoachLog.durationMinutes || 60,
+                      description: `Direct from Coach AJ Risner's verified mission session (${latestCoachLog.date}). Total volume: ${latestCoachLog.totalVolumeLbs.toLocaleString()} lbs. Notes: ${latestCoachLog.notes || 'Mission protocol followed.'}`,
+                      exercises: latestCoachLog.exercises.map((ex, idx) => {
+                        const isBw = isBodyweightExercise(ex.exerciseName);
+                        const isTimedEx = Boolean(ex.isTimed || isExerciseTimed(ex.exerciseName));
+                        return {
+                          id: `adopted-ex-${idx}-${Date.now()}`,
+                          name: ex.exerciseName,
+                          muscleGroup: ex.muscleGroup,
+                          type: isTimedEx ? 'cardio' : undefined,
+                          defaultSets: Math.max(1, ex.sets.length),
+                          targetReps: isTimedEx
+                            ? ex.sets.map((s) => s.timeFormatted).filter(Boolean).join('/') || '45s'
+                            : ex.sets.map((s) => s.reps).filter(Boolean).join('/') || '8-10',
+                          targetRpe: ex.sets[0]?.rpe || 8.5,
+                          weight_lbs: isBw ? 0 : (ex.sets[0]?.weightLbs ?? 0),
+                          restPeriodSeconds: 90,
+                          notes: `Coach AJ Logged: ${ex.sets
+                            .map((s) =>
+                              s.timeFormatted
+                                ? s.timeFormatted
+                                : !isBw && s.weightLbs > 0
+                                ? `${s.weightLbs} lbs × ${s.reps}`
+                                : `${s.reps} reps`
+                            )
+                            .join(', ')}.`,
+                        };
+                      })
+                    };
+                    onStartWorkout(program);
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-black uppercase text-xs tracking-wider shadow-md flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 whitespace-nowrap"
+                >
+                  <Zap className="w-3.5 h-3.5 fill-black" />
+                  <span>Run Session</span>
+                </button>
+
+                {onNavigateToLogs && (
+                  <button
+                    type="button"
+                    onClick={onNavigateToLogs}
+                    className="px-3 py-2 rounded-xl border border-amber-500/40 bg-amber-950/40 hover:bg-amber-900/60 text-amber-300 font-bold text-xs transition cursor-pointer flex items-center gap-1 whitespace-nowrap"
+                  >
+                    <span>View All &rarr;</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* LOCKED ASSESSMENT GATE */}
+        <div className="rounded-3xl border border-amber-500/40 bg-[#0e1217] p-6 sm:p-12 text-center shadow-2xl relative overflow-hidden my-4">
+          <div className="max-w-2xl mx-auto space-y-6 relative z-10">
+            <div className="w-16 h-16 rounded-2xl bg-amber-500/15 border border-amber-500/40 flex items-center justify-center text-amber-400 mx-auto shadow-xl">
+              <Award className="w-8 h-8 text-amber-400" />
+            </div>
+
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/40 text-[11px] font-black uppercase font-mono tracking-wider text-amber-300">
+                <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                Physical Ability Assessment Required
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-black text-white font-athletic uppercase tracking-wide">
+                Unlock Your Prescribed Tactical Protocol
+              </h2>
+              <p className="text-sm text-zinc-300 leading-relaxed max-w-xl mx-auto">
+                All training programs are locked until you complete the 2-minute physical ability assessment. The questionnaire evaluates your push-ups, pull-ups, and running endurance, and assigns you the single protocol that directly matches your mission goal.
+              </p>
+            </div>
+
+            {/* 3 Step Diagnostic Overview */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-left">
+              <div className="p-3.5 rounded-xl bg-[#090b0d] border border-zinc-800">
+                <span className="text-amber-400 font-mono text-[10px] font-bold block mb-1">01 • CAPACITY</span>
+                <h4 className="text-xs font-bold text-white uppercase font-athletic">Push, Pull &amp; Running</h4>
+                <p className="text-[11px] text-zinc-400 mt-1">Evaluates your baseline push-ups, pull-ups, and aerobic stamina.</p>
+              </div>
+              <div className="p-3.5 rounded-xl bg-[#090b0d] border border-zinc-800">
+                <span className="text-amber-400 font-mono text-[10px] font-bold block mb-1">02 • MISSION GOAL</span>
+                <h4 className="text-xs font-bold text-white uppercase font-athletic">Targeted Track</h4>
+                <p className="text-[11px] text-zinc-400 mt-1">Select your mission: 52-Week Military, Tactical Bodybuilding, Hybrid, Military PT Test, or Adapted Track.</p>
+              </div>
+              <div className="p-3.5 rounded-xl bg-[#090b0d] border border-zinc-800">
+                <span className="text-emerald-400 font-mono text-[10px] font-bold block mb-1">03 • PRESCRIBED</span>
+                <h4 className="text-xs font-bold text-white uppercase font-athletic">Zero Guesswork</h4>
+                <p className="text-[11px] text-zinc-400 mt-1">Unlocks your exact assigned schedule with auto-overload rules.</p>
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={onOpenQuestionnaire}
+                className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-black uppercase text-sm font-athletic tracking-wider shadow-xl flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95 whitespace-nowrap"
+              >
+                <Award className="w-4 h-4" />
+                <span>Take 2-Minute Physical Assessment</span>
+                <ArrowRight className="w-4 h-4 ml-1" />
+              </button>
+
+              {onOpenAIGenerator && (
+                <button
+                  type="button"
+                  onClick={() => onOpenAIGenerator(currentAthlete?.questionnaire?.recommendedProgramKey || 'apex_protocol')}
+                  className="w-full sm:w-auto px-5 py-3 rounded-xl border border-amber-500/40 bg-amber-950/30 hover:bg-amber-900/50 text-amber-300 font-bold uppercase text-xs font-athletic tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5 text-amber-300" />
+                  <span>Adapt Program for Injuries &amp; Ability</span>
+                </button>
+              )}
+
+              {onOpenSingleDayWorkout && (
+                <button
+                  type="button"
+                  onClick={onOpenSingleDayWorkout}
+                  className="w-full sm:w-auto px-5 py-3 rounded-xl border border-zinc-700 bg-[#141a21] hover:border-amber-500/50 text-zinc-200 font-bold uppercase text-xs font-athletic tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
+                  title="Generate a custom single-day tactical workout right now"
+                >
+                  <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                  <span>Single-Day Mission Session</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* INITIAL QUESTIONNAIRE & PROGRAM RECOMMENDATION BANNER */}
+      {currentAthlete?.questionnaire && (
+        <div className="bg-gradient-to-r from-[#0c182c] via-[#0f1f38] to-[#0c182c] border border-amber-500/40 rounded-2xl p-3 sm:p-3.5 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-600/30 border border-amber-500/50 flex items-center justify-center text-amber-400 shrink-0">
+              <Award className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-amber-400 font-bold">
+                  Diagnostic Ability Match:
+                </span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-500/30 font-bold">
+                  {currentAthlete.questionnaire.fitnessTier}
+                </span>
+                <span className="text-[10px] font-mono text-zinc-400">
+                  • {currentAthlete.questionnaire.weeklyDays} Days/Wk
+                </span>
+              </div>
+              <div className="text-xs text-zinc-200 mt-0.5">
+                Recommended Track: <span className="font-bold text-white font-athletic uppercase">{currentAthlete.questionnaire.recommendedProgramTitle}</span>
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onOpenQuestionnaire}
+            className="px-3 py-1.5 rounded-xl border border-amber-500/40 bg-amber-950/80 hover:bg-amber-900 text-amber-300 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 self-start sm:self-auto shrink-0 shadow-sm"
+          >
+            <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
+            <span>Retake Assessment</span>
+          </button>
+        </div>
+      )}
+
+      {/* ON-DEMAND SINGLE DAY WORKOUT BANNER */}
+      {onOpenSingleDayWorkout && (
+        <div className="bg-[#0e1217] border border-amber-500/30 hover:border-amber-500/50 rounded-2xl p-3.5 sm:p-4 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0 shadow">
+              <Zap className="w-5 h-5 fill-amber-400 text-amber-400" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-amber-300 font-black px-2 py-0.5 rounded bg-amber-500/15 border border-amber-500/40">
+                  On-Demand AI Mission Session
+                </span>
+                <span className="text-xs text-white font-bold font-athletic tracking-wide uppercase">
+                  Need Something Different Today?
+                </span>
+              </div>
+              <p className="text-xs text-zinc-300 mt-0.5">
+                Build a custom workout in seconds based on your available time (15–90m), equipment on hand, and injury constraints.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onOpenSingleDayWorkout}
+            className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-black uppercase text-xs font-athletic tracking-wider shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 shrink-0 self-start sm:self-auto whitespace-nowrap"
+          >
+            <Zap className="w-3.5 h-3.5 text-black fill-black" />
+            <span>Generate Single Day</span>
+          </button>
+        </div>
+      )}
+
+      {/* GUIDED APP TOUR & FEATURE SHOWCASE BANNER */}
+      {onOpenGuidedTour && (
+        <div className="bg-[#0e1217] border border-emerald-500/30 hover:border-emerald-500/50 rounded-2xl p-3.5 sm:p-4 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0 shadow">
+              <Compass className="w-5 h-5 text-emerald-400" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-300 font-black px-2 py-0.5 rounded bg-emerald-500/20 border border-emerald-500/40">
+                  New Service Member Guided Walkthrough
+                </span>
+                <span className="text-xs text-white font-bold font-athletic tracking-wide uppercase">
+                  Take the Full Feature Tour
+                </span>
+              </div>
+              <p className="text-xs text-zinc-300 mt-0.5">
+                Explore daily readiness scores, auto-overload progression, Adaptive AI injury/ability program tailoring, and verified Military PT test (ACFT/PFT/CFT) simulators.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onOpenGuidedTour}
+            className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase text-xs font-athletic tracking-wider shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 shrink-0 self-start sm:self-auto whitespace-nowrap"
+          >
+            <Compass className="w-3.5 h-3.5 text-amber-300" />
+            <span>Launch Tour</span>
+          </button>
+        </div>
+      )}
+
+      {/* COACH AJ'S LATEST MISSION WORKOUT SPOTLIGHT CARD - VISIBLE TO EVERY SERVICE MEMBER */}
+      {latestCoachLog && (
+        <div className="bg-[#0e1217] border border-amber-500/40 hover:border-amber-500/60 rounded-2xl p-4 shadow-xl relative overflow-hidden transition-all">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3.5 relative z-10">
+            <div className="flex items-start sm:items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0 shadow-md">
+                <ShieldCheck className="w-5 h-5 text-amber-400" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-amber-300 font-black px-2 py-0.5 rounded bg-amber-500/20 border border-amber-500/40 flex items-center gap-1">
+                    <ShieldCheck className="w-3 h-3 text-amber-400" />
+                    Coach AJ's Latest Mission Workout
+                  </span>
+                  <span className="text-[11px] font-mono text-zinc-400 font-bold tabular-nums">
+                    {latestCoachLog.date} • {latestCoachLog.durationMinutes}m • {latestCoachLog.totalVolumeLbs.toLocaleString()} lbs
+                  </span>
+                  <span className="text-zinc-600 hidden sm:inline">•</span>
+                  <span className="text-[10px] font-mono text-amber-400/80">
+                    {COACH_AJ_EMAIL}
+                  </span>
+                </div>
+                <h3 className="text-sm sm:text-base font-black text-white font-athletic uppercase tracking-wide mt-0.5">
+                  {latestCoachLog.workoutTitle}
+                </h3>
+                <p className="text-xs text-zinc-300 line-clamp-1 mt-0.5">
+                  {latestCoachLog.exercises.map((e) => e.exerciseName).join(' • ')}
+                  {latestCoachLog.notes ? ` — "${latestCoachLog.notes}"` : ''}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0 self-start md:self-auto">
+              <button
+                type="button"
+                onClick={() => {
+                  const program: WorkoutProgram = {
+                    id: `coach-latest-${latestCoachLog.id}`,
+                    title: latestCoachLog.workoutTitle.startsWith("Coach AJ's")
+                      ? latestCoachLog.workoutTitle
+                      : `Coach AJ's: ${latestCoachLog.workoutTitle}`,
+                    subtitle: 'Coach AJ Risner Verified Mission Session',
+                    category: 'Hybrid',
+                    frequency: 'Mission Session',
+                    estimatedDurationMinutes: latestCoachLog.durationMinutes || 60,
+                    description: `Direct from Coach AJ Risner's verified mission session (${latestCoachLog.date}). Total volume: ${latestCoachLog.totalVolumeLbs.toLocaleString()} lbs. Notes: ${latestCoachLog.notes || 'Mission protocol followed.'}`,
+                    exercises: latestCoachLog.exercises.map((ex, idx) => {
+                      const isBw = isBodyweightExercise(ex.exerciseName);
+                      const isTimedEx = Boolean(ex.isTimed || isExerciseTimed(ex.exerciseName));
+                      return {
+                        id: `adopted-ex-${idx}-${Date.now()}`,
+                        name: ex.exerciseName,
+                        muscleGroup: ex.muscleGroup,
+                        type: isTimedEx ? 'cardio' : undefined,
+                        defaultSets: Math.max(1, ex.sets.length),
+                        targetReps: isTimedEx
+                          ? ex.sets.map((s) => s.timeFormatted).filter(Boolean).join('/') || '45s'
+                          : ex.sets.map((s) => s.reps).filter(Boolean).join('/') || '8-10',
+                        targetRpe: ex.sets[0]?.rpe || 8.5,
+                        weight_lbs: isBw ? 0 : (ex.sets[0]?.weightLbs ?? 0),
+                        restPeriodSeconds: 90,
+                        notes: `Coach AJ Logged: ${ex.sets
+                          .map((s) =>
+                            s.timeFormatted
+                              ? s.timeFormatted
+                              : !isBw && s.weightLbs > 0
+                              ? `${s.weightLbs} lbs × ${s.reps}`
+                              : `${s.reps} reps`
+                          )
+                          .join(', ')}.`,
+                      };
+                    })
+                  };
+                  onStartWorkout(program);
+                }}
+                className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-black uppercase text-xs tracking-wider shadow-md flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 whitespace-nowrap"
+              >
+                <Zap className="w-3.5 h-3.5 fill-black" />
+                <span>Run Session</span>
+              </button>
+
+              {onNavigateToLogs && (
+                <button
+                  type="button"
+                  onClick={onNavigateToLogs}
+                  className="px-3 py-2 rounded-xl border border-amber-500/40 bg-amber-950/40 hover:bg-amber-900/60 text-amber-300 font-bold text-xs transition cursor-pointer flex items-center gap-1 whitespace-nowrap"
+                >
+                  <span>View All &rarr;</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sleek, Compact Command Deck: Combines Identity, Status, and 4-Program Selector */}
+      <div className="bg-[#0e1217] border border-amber-500/35 hover:border-amber-400/50 rounded-2xl p-3 sm:p-4 shadow-xl">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          {/* Identity & Status */}
+          <div className="flex items-center gap-3">
+            <div className="shrink-0 hidden sm:flex">
+              <TacticalStandardCompanyEmblem size="sm" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500/15 text-amber-300 border border-amber-500/40 flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3 text-amber-400" />
+                  The Tactical Standard
+                </span>
+                <span className="text-xs text-amber-400 font-bold flex items-center gap-1">
+                  Tactical Readiness for the Modern Warfighter.
+                </span>
+                <span className="text-zinc-600 hidden md:inline">•</span>
+                <span className="text-xs text-zinc-400 hidden md:inline font-mono">
+                  Combat Readiness &amp; Tactical Chassis
+                </span>
+              </div>
+              <h1 className="text-lg sm:text-xl font-black text-white font-athletic uppercase tracking-wide mt-0.5 flex items-center gap-2 flex-wrap">
+                <span>
+                  {selectedProgram === 'custom_ai' && activeCustomProgram ? (
+                    <>
+                      <span className="text-amber-400">Custom Track:</span> {activeCustomProgram.title}
+                    </>
+                  ) : selectedProgram === 'apex_protocol' ? (
+                    <>52-Week Military <span className="text-amber-400">Combat Fitness &amp; Readiness Program</span></>
+                  ) : selectedProgram === 'tactical_hypertrophy' ? (
+                    <>12-Week Military <span className="text-amber-400">Tactical Bodybuilding Program</span></>
+                  ) : selectedProgram === 'hybrid_protocol' ? (
+                    <>The Tactical Standard <span className="text-amber-400">12-Week Hybrid Protocol</span></>
+                  ) : (
+                    <>Universal Military <span className="text-amber-400">PT Test &amp; Selection (ACFT / PFT / CFT)</span></>
+                  )}
+                </span>
+                <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-300 border border-zinc-700">
+                  {selectedProgram === 'custom_ai' && activeCustomProgram ? activeCustomProgram.frequency : currentPhase.weeks}
+                </span>
+              </h1>
+            </div>
+          </div>
+
+          {/* Quick Action Toggles: AI Generator, Readiness Score, Overload Rules, Coach Directives, and Ability Matcher */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {onOpenAIGenerator && (
+              <button
+                type="button"
+                onClick={() =>
+                  onOpenAIGenerator(
+                    selectedProgram !== 'custom_ai'
+                      ? selectedProgram
+                      : ((activeCustomProgram?.baseProgramKey as ProgramKey) || 'apex_protocol')
+                  )
+                }
+                className="px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer border bg-[#141a21] hover:bg-amber-500/15 text-amber-300 border-amber-500/50 shadow-md active:scale-95 whitespace-nowrap"
+                title="Adapt Coach Risner's master programs for your injuries, equipment, and ability level"
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5 text-amber-400" />
+                <span>Adapt Program (Injuries &amp; Ability)</span>
+              </button>
+            )}
+
+            {onOpenSingleDayWorkout && (
+              <button
+                type="button"
+                onClick={onOpenSingleDayWorkout}
+                className="px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer border bg-amber-500 hover:bg-amber-400 text-black border-amber-300 shadow-md active:scale-95 whitespace-nowrap"
+                title="Create an on-demand single day workout"
+              >
+                <Zap className="w-3.5 h-3.5 fill-black text-black" />
+                <span>Single Day Tactical Workout</span>
+              </button>
+            )}
+
+            {onOpenAthleteModal && (
+              <button
+                type="button"
+                onClick={onOpenAthleteModal}
+                className="px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer border bg-[#090b0d] hover:bg-[#141a21] text-amber-300 border-amber-500/40 shadow-sm tabular-nums whitespace-nowrap"
+                title="View Tactical Readiness Score & Daily Recovery Breakdown"
+              >
+                <BatteryCharging className="w-3.5 h-3.5 text-amber-400" />
+                <span>{readinessScore !== undefined ? `${readinessScore}% Readiness` : 'Readiness'}</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={onOpenQuestionnaire}
+              className="px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer border bg-[#090b0d] hover:bg-[#141a21] text-amber-300 border-amber-500/40 shadow-sm whitespace-nowrap"
+              title="Open Ability Assessment & Program Matcher"
+            >
+              <Award className="w-3.5 h-3.5 text-amber-400" />
+              <span>Program Matcher</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowOverloadRules(!showOverloadRules)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer border whitespace-nowrap ${
+                showOverloadRules
+                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/60 shadow-sm'
+                  : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-700'
+              }`}
+              title="Toggle Auto-Overload Guidelines"
+            >
+              <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Auto-Overload</span>
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showOverloadRules ? 'rotate-180' : ''}`} />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowCoachNotes(!showCoachNotes)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer border whitespace-nowrap ${
+                showCoachNotes
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/60 shadow-sm'
+                  : 'bg-[#090b0d] hover:bg-[#141a21] text-zinc-300 border-zinc-700'
+              }`}
+              title="Toggle Coach Directives"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+              <span>Coach Cues</span>
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showCoachNotes ? 'rotate-180' : ''}`} />
+            </button>
+          </div>
+        </div>
+
+        {/* Program Selector: 4-Program Grid for Coach AJ, or Prescribed Protocol Header for Regular Users */}
+        {isMasterExempt ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mt-3 pt-3 border-t border-zinc-800/80">
+            {/* Program 1: 52-Week Military Combat Fitness & Readiness Program */}
+            <button
+              type="button"
+              onClick={() => handleProgramSwitch('apex_protocol')}
+              className={`px-3 py-2 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between gap-2 ${
+                selectedProgram === 'apex_protocol'
+                  ? 'bg-amber-500/15 border-amber-400 shadow-md ring-1 ring-amber-400/40 text-white'
+                  : 'bg-[#090b0d] border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className={`w-2 h-2 rounded-full ${selectedProgram === 'apex_protocol' ? 'bg-amber-400' : 'bg-zinc-600'}`} />
+                  <span className="text-xs font-black uppercase tracking-wide truncate font-athletic">52-Wk Military Readiness</span>
+                </div>
+                <span className="text-[10px] text-zinc-400 block font-mono truncate">52-Wk Master • Speed, Strength &amp; Combat</span>
+              </div>
+              <span className={`text-[10px] font-black px-1.5 py-0.5 rounded font-mono shrink-0 ${
+                selectedProgram === 'apex_protocol' ? 'bg-amber-500 text-black' : 'bg-zinc-800 text-zinc-400'
+              }`}>
+                52 WKS
+              </span>
+            </button>
+
+            {/* Program 2: 12-Week Military Tactical Bodybuilding Program */}
+            <button
+              type="button"
+              onClick={() => handleProgramSwitch('tactical_hypertrophy')}
+              className={`px-3 py-2 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between gap-2 ${
+                selectedProgram === 'tactical_hypertrophy'
+                  ? 'bg-amber-500/15 border-amber-400 shadow-md ring-1 ring-amber-400/40 text-white'
+                  : 'bg-[#090b0d] border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className={`w-2 h-2 rounded-full ${selectedProgram === 'tactical_hypertrophy' ? 'bg-amber-400' : 'bg-zinc-600'}`} />
+                  <span className="text-xs font-black uppercase tracking-wide truncate font-athletic">Military Bodybuilding</span>
+                </div>
+                <span className="text-[10px] text-zinc-400 block font-mono truncate">Starts Sun • 4 Lift + 2 Speed/Cond • Daily DIME</span>
+              </div>
+              <span className={`text-[10px] font-black px-1.5 py-0.5 rounded font-mono shrink-0 ${
+                selectedProgram === 'tactical_hypertrophy' ? 'bg-amber-500 text-black' : 'bg-zinc-800 text-zinc-400'
+              }`}>
+                12 WKS
+              </span>
+            </button>
+
+            {/* Program 3: Hybrid Protocol */}
+            <button
+              type="button"
+              onClick={() => handleProgramSwitch('hybrid_protocol')}
+              className={`px-3 py-2 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between gap-2 ${
+                selectedProgram === 'hybrid_protocol'
+                  ? 'bg-amber-500/15 border-amber-400 shadow-md ring-1 ring-amber-400/40 text-white'
+                  : 'bg-[#090b0d] border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className={`w-2 h-2 rounded-full ${selectedProgram === 'hybrid_protocol' ? 'bg-amber-400' : 'bg-zinc-600'}`} />
+                  <span className="text-xs font-black uppercase tracking-wide truncate font-athletic">Hybrid Protocol</span>
+                </div>
+                <span className="text-[10px] text-zinc-400 block font-mono truncate">12-Wk Master • Strength &amp; Run (AI DB Ready)</span>
+              </div>
+              <span className={`text-[10px] font-black px-1.5 py-0.5 rounded font-mono shrink-0 ${
+                selectedProgram === 'hybrid_protocol' ? 'bg-amber-500 text-black' : 'bg-zinc-800 text-zinc-400'
+              }`}>
+                12 WKS
+              </span>
+            </button>
+
+            {/* Program 4: Universal Military PT Test */}
+            <button
+              type="button"
+              onClick={() => handleProgramSwitch('universal_pat')}
+              className={`px-3 py-2 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between gap-2 ${
+                selectedProgram === 'universal_pat'
+                  ? 'bg-amber-500/15 border-amber-400 shadow-md ring-1 ring-amber-400/40 text-white'
+                  : 'bg-[#090b0d] border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className={`w-2 h-2 rounded-full ${selectedProgram === 'universal_pat' ? 'bg-amber-400' : 'bg-zinc-600'}`} />
+                  <span className="text-xs font-black uppercase tracking-wide truncate font-athletic">Military PT Test</span>
+                </div>
+                <span className="text-[10px] text-zinc-400 block font-mono truncate">8-Wk Cycle • ACFT / PFT / CFT</span>
+              </div>
+              <span className={`text-[10px] font-black px-1.5 py-0.5 rounded font-mono shrink-0 ${
+                selectedProgram === 'universal_pat' ? 'bg-amber-500 text-black' : 'bg-zinc-800 text-zinc-400'
+              }`}>
+                8 WKS
+              </span>
+            </button>
+
+            {/* Program 6: AI-Generated Personalized Plan */}
+            {activeCustomProgram && (
+              <button
+                type="button"
+                onClick={() => handleProgramSwitch('custom_ai')}
+                className={`px-3 py-2 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between gap-2 ${
+                  selectedProgram === 'custom_ai'
+                    ? 'bg-amber-500/15 border-amber-400 shadow-md ring-1 ring-amber-400/40 text-white'
+                    : 'bg-[#090b0d] border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <Zap className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <span className="text-xs font-black uppercase tracking-wide truncate font-athletic text-white">
+                      {activeCustomProgram.title}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-amber-300 block font-mono truncate">
+                    Custom Protocol • {activeCustomProgram.frequency}
+                  </span>
+                </div>
+                <span className={`text-[10px] font-black px-1.5 py-0.5 rounded font-mono shrink-0 ${
+                  selectedProgram === 'custom_ai' ? 'bg-amber-500 text-black' : 'bg-zinc-800 text-zinc-400'
+                }`}>
+                  CUSTOM PLAN
+                </span>
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="mt-3 pt-3 border-t border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#090b0d] p-3 rounded-xl border border-amber-500/30">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-amber-500/15 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
+                <Award className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-amber-400 font-black">
+                    Prescribed Mission Protocol
+                  </span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 font-bold">
+                    {currentAthlete?.questionnaire?.fitnessTier || 'Operational Tier'}
+                  </span>
+                  <span className="text-[10px] font-mono text-zinc-400">
+                    • {currentAthlete?.questionnaire?.weeklyDays || 4} Days/Wk
+                  </span>
+                </div>
+                <div className="text-xs text-zinc-200 mt-0.5">
+                  Assigned Track: <span className="font-bold text-white font-athletic uppercase">{currentAthlete?.questionnaire?.recommendedProgramTitle || 'Assigned Protocol'}</span>
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={onOpenQuestionnaire}
+              className="px-3 py-1.5 rounded-lg border border-amber-500/40 bg-[#141a21] hover:bg-amber-500/15 text-amber-300 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 self-start sm:self-auto shrink-0 shadow-sm whitespace-nowrap"
+            >
+              <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
+              <span>Retake Assessment</span>
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* COACH CUSTOM PROGRAMS & WORKOUTS LIBRARY */}
+      {renderCoachLibrarySection()}
+
+      {/* Dynamic Program Content - Smooth CSS Fade-in Transition When Switching Programs */}
+      <div key={`${selectedProgram}-${activeApexPhaseKey}-${activeApexWeek}-${activeTacticalWeek}-${activePatWeek}`} className="animate-tab-fade space-y-6">
+        {selectedProgram === 'custom_ai' ? (
+          activeCustomProgram ? (
+            <div className="space-y-6">
+            {/* AI Program Overview Hero */}
+            <div className="p-5 sm:p-6 rounded-2xl bg-[#0e1217] border border-amber-500/40 shadow-xl relative overflow-hidden">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <span className="px-2.5 py-0.5 rounded-full bg-amber-500 text-black text-[10px] font-black uppercase font-mono tracking-wider">
+                      {activeCustomProgram.category}
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/40 text-[10px] font-black uppercase font-mono">
+                      {activeCustomProgram.frequency}
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-full bg-zinc-800 text-zinc-300 text-[10px] font-mono flex items-center gap-1 tabular-nums">
+                      <Clock className="w-3 h-3 text-zinc-400" />
+                      {activeCustomProgram.estimatedDurationMinutes} mins/session
+                    </span>
+                  </div>
+
+                  <h3 className="text-xl sm:text-2xl font-black uppercase text-white font-athletic tracking-wide">
+                    {activeCustomProgram.title}
+                  </h3>
+                  <p className="text-xs sm:text-sm text-zinc-300 mt-1 max-w-2xl leading-relaxed">
+                    {activeCustomProgram.description}
+                  </p>
+                </div>
+
+                <div className="flex sm:flex-col gap-2 shrink-0">
+                  {onOpenAIGenerator && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onOpenAIGenerator(
+                          (activeCustomProgram.baseProgramKey as ProgramKey) || 'apex_protocol'
+                        )
+                      }
+                      className="px-4 py-2.5 bg-[#141a21] hover:bg-amber-500/15 text-amber-300 border border-amber-500/40 font-black text-xs uppercase tracking-wider rounded-xl shadow-lg transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 whitespace-nowrap"
+                    >
+                      <SlidersHorizontal className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Modify Adaptations</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (activeCustomProgram.schedule?.[0]) {
+                        const day1 = activeCustomProgram.schedule[0];
+                        onStartWorkout({
+                          ...activeCustomProgram,
+                          title: `${activeCustomProgram.title} - ${day1.focus}`,
+                          exercises: day1.exercises,
+                        });
+                      } else {
+                        onStartWorkout(activeCustomProgram);
+                      }
+                    }}
+                    className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-black text-xs uppercase tracking-wider rounded-xl shadow-lg transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                  >
+                    <Play className="w-3.5 h-3.5 fill-black" />
+                    <span>Start Day 1 Session</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* AI Plan Day Schedule Navigator */}
+            {activeCustomProgram.schedule && activeCustomProgram.schedule.length > 0 && (
+              <div className="bg-[#0e1217] border-2 border-amber-500/40 rounded-2xl p-2.5 sm:p-3 shadow-md space-y-2">
+                <div className="flex items-center justify-between gap-2 px-1">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-amber-400" />
+                    <span className="text-xs font-black uppercase tracking-wider text-white font-athletic">
+                      AI Schedule Horizon ({activeCustomProgram.schedule.length} Days • {Math.ceil(activeCustomProgram.schedule.length / 7)} Weeks)
+                    </span>
+                  </div>
+                  {(dayViewMode !== 'all' || customAiWeekFilter !== 'all') && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDayViewMode('all');
+                        setCustomAiWeekFilter('all');
+                      }}
+                      className="px-2.5 py-0.5 bg-red-950/70 hover:bg-red-900 text-red-200 border border-red-700 rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-colors"
+                    >
+                      <X className="w-3 h-3" />
+                      <span>Reset Filters</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Week Filter Pills if multi-week program */}
+                {activeCustomProgram.schedule.length > 7 && (
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCustomAiWeekFilter('all');
+                        setDayViewMode('all');
+                      }}
+                      className={`px-3 py-1 rounded-lg text-xs font-mono font-bold transition shrink-0 cursor-pointer border ${
+                        customAiWeekFilter === 'all'
+                          ? 'bg-amber-500 text-black border-amber-400'
+                          : 'bg-[#090b0d] text-zinc-400 border-zinc-700 hover:text-white'
+                      }`}
+                    >
+                      All Weeks ({Math.ceil(activeCustomProgram.schedule.length / 7)})
+                    </button>
+                    {Array.from({ length: Math.ceil(activeCustomProgram.schedule.length / 7) }).map((_, wIdx) => {
+                      const wkNum = wIdx + 1;
+                      const isSelected = customAiWeekFilter === wkNum;
+                      const phaseTag = wkNum <= 4 ? 'Phase 1' : wkNum <= 8 ? 'Phase 2' : 'Phase 3';
+                      return (
+                        <button
+                          key={wkNum}
+                          type="button"
+                          onClick={() => {
+                            setCustomAiWeekFilter(wkNum);
+                            setDayViewMode('all');
+                          }}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition shrink-0 cursor-pointer border flex items-center gap-1 ${
+                            isSelected
+                              ? 'bg-amber-500 text-black border-amber-400 shadow-sm'
+                              : 'bg-[#090b0d] text-zinc-400 border-zinc-700 hover:text-white'
+                          }`}
+                        >
+                          <span>Week {wkNum}</span>
+                          <span className="text-[10px] opacity-75 font-sans">({phaseTag})</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Day Buttons Rail */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                  <button
+                    type="button"
+                    onClick={() => setDayViewMode('all')}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shrink-0 border-2 ${
+                      dayViewMode === 'all'
+                        ? 'bg-amber-500 text-black border-amber-400 shadow-md ring-2 ring-amber-400/30'
+                        : 'bg-[#090b0d] text-zinc-200 border-zinc-700 hover:border-amber-400 hover:text-white'
+                    }`}
+                  >
+                    All Days
+                  </button>
+
+                  {activeCustomProgram.schedule
+                    .map((day, idx) => ({ day, idx }))
+                    .filter(({ idx }) => {
+                      if (customAiWeekFilter === 'all') return true;
+                      const weekOfIndex = Math.floor(idx / 7) + 1;
+                      return weekOfIndex === customAiWeekFilter;
+                    })
+                    .map(({ day, idx }) => {
+                      const isSelected = dayViewMode === idx;
+                      const isRest = !day.exercises || day.exercises.length === 0;
+
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setDayViewMode(idx)}
+                          className={`relative px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer shrink-0 flex items-center gap-1.5 border-2 ${
+                            isSelected
+                              ? 'bg-amber-500 text-black border-amber-400 shadow-md ring-2 ring-amber-400/30'
+                              : isRest
+                              ? 'bg-[#090b0d]/80 text-zinc-400 border-zinc-800 hover:border-zinc-600'
+                              : 'bg-[#090b0d] text-zinc-200 border-zinc-700 hover:border-amber-400 hover:text-white'
+                          }`}
+                        >
+                          <span>Day {day.day || idx + 1}</span>
+                          {isRest && <span className="text-[9px] uppercase font-mono opacity-80">(Rest)</span>}
+                        </button>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+
+            {/* AI Plan Day Cards */}
+            <div className="space-y-5">
+              {(activeCustomProgram.schedule || [])
+                .map((day, idx) => ({ day, idx }))
+                .filter(({ idx }) => {
+                  if (dayViewMode !== 'all') return dayViewMode === idx;
+                  if (customAiWeekFilter !== 'all') {
+                    const weekOfIndex = Math.floor(idx / 7) + 1;
+                    return weekOfIndex === customAiWeekFilter;
+                  }
+                  return true;
+                })
+                .map(({ day, idx }) => {
+                const dayNum = day.day || (dayViewMode === 'all' ? idx + 1 : (typeof dayViewMode === 'number' ? dayViewMode + 1 : idx + 1));
+                const isRest = !day.exercises || day.exercises.length === 0;
+
+                return (
+                  <div
+                    key={idx}
+                    className={`rounded-2xl border transition-all overflow-hidden ${
+                      isRest
+                        ? 'bg-zinc-950/60 border-zinc-800/80'
+                        : 'bg-zinc-900 border-zinc-800 shadow-lg'
+                    }`}
+                  >
+                    <div className="bg-zinc-800/70 px-5 py-4 flex justify-between items-center border-b border-zinc-800 flex-wrap gap-2">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-700 flex items-center justify-center font-black text-sm text-white font-mono">
+                          D{dayNum}
+                        </div>
+                        <div>
+                          <h3 className="font-black text-white text-base sm:text-lg tracking-wide font-athletic">
+                            Day {dayNum}
+                          </h3>
+                          <span className="text-xs text-amber-400 font-bold tracking-wide">
+                            {day.focus}
+                          </span>
+                        </div>
+                      </div>
+
+                      {!isRest && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onStartWorkout({
+                              ...activeCustomProgram,
+                              title: `${activeCustomProgram.title} - ${day.focus}`,
+                              exercises: day.exercises,
+                            });
+                          }}
+                          className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-black font-black rounded-xl text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-md cursor-pointer active:scale-95 whitespace-nowrap"
+                        >
+                          <Play className="w-3.5 h-3.5 fill-black" />
+                          <span>Start Day {dayNum} Session</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="p-4 sm:p-6 space-y-4">
+                      {isRest ? (
+                        <div className="p-6 text-center bg-[#090b0d] rounded-xl border border-zinc-800">
+                          <Flame className="w-8 h-8 text-amber-400 mx-auto mb-2" />
+                          <h5 className="font-bold text-white text-sm uppercase">Tactical Active Regeneration</h5>
+                          <p className="text-xs text-zinc-400 mt-1 max-w-md mx-auto">
+                            Light mobility, active tissue flush, or casual walking. Consolidate nervous system recovery for upcoming working sessions.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {day.exercises.map((ex, exIdx) => {
+                            if (isCircuitExercise(ex)) {
+                              return (
+                                <div key={ex.id || exIdx} className="space-y-1.5">
+                                  {(ex.originalExerciseName || ex.adaptationReason || ex.scalingNote) && (
+                                    <div className="flex flex-wrap items-center gap-1.5 px-2">
+                                      {ex.originalExerciseName && (
+                                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
+                                          <RefreshCw className="w-2.5 h-2.5 text-amber-400" />
+                                          Swapped from: {ex.originalExerciseName}
+                                        </span>
+                                      )}
+                                      {ex.adaptationReason && (
+                                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-500/30">
+                                          {ex.adaptationReason}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                  <TacticalCircuitCard
+                                    exercise={ex}
+                                    index={exIdx}
+                                    activeTimer={activeExerciseTimer}
+                                    onToggleTimer={handleToggleExerciseTimer}
+                                    onAdjustTimer={handleAdjustActiveTimerRemaining}
+                                    onStopTimer={stopExerciseTimer}
+                                  />
+                                </div>
+                              );
+                            }
+
+                            const cleanExerciseName = ex.name.replace(/\[.*?\]/g, '').trim();
+                            const currentRest = exerciseRestTimes[cleanExerciseName] || ex.restPeriodSeconds || 90;
+                            const exFormat = getExerciseFormat(ex);
+                            const ssDetails = exFormat === 'superset' ? parseSupersetDetails(ex) : null;
+                            const emomDetails = exFormat === 'emom' ? parseEmomDetails(ex) : null;
+                            const amrapDetails = exFormat === 'amrap' ? parseAmrapDetails(ex) : null;
+                            return (
+                              <div
+                                key={ex.id || exIdx}
+                                className={`p-3.5 rounded-xl bg-[#090b0d] border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                                  ex.originalExerciseName
+                                    ? 'border-amber-500/50 hover:border-amber-400'
+                                    : exFormat === 'superset'
+                                    ? 'border-amber-500/40 hover:border-amber-400'
+                                    : exFormat === 'emom'
+                                    ? 'border-emerald-500/40 hover:border-emerald-400'
+                                    : exFormat === 'amrap'
+                                    ? 'border-amber-500/40 hover:border-amber-400'
+                                    : 'border-zinc-800 hover:border-amber-500/40'
+                                }`}
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="w-5 h-5 rounded-md bg-amber-500/20 text-amber-300 font-mono text-xs font-black flex items-center justify-center shrink-0">
+                                      {exIdx + 1}
+                                    </span>
+                                    <h4 className="font-bold text-white text-xs sm:text-sm font-athletic">
+                                      {ex.name}
+                                    </h4>
+                                    {exFormat !== 'straight' && (
+                                      <span
+                                        className={`text-[10px] font-mono font-black uppercase px-2 py-0.5 rounded border ${
+                                          exFormat === 'superset'
+                                            ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
+                                            : exFormat === 'emom'
+                                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                                            : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                                        }`}
+                                      >
+                                        {getFormatLabel(exFormat)}
+                                      </span>
+                                    )}
+                                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950 text-amber-400 border border-amber-500/30">
+                                      {ex.muscleGroup}
+                                    </span>
+                                    {ex.originalExerciseName && (
+                                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
+                                        <RefreshCw className="w-2.5 h-2.5 text-amber-400" />
+                                        Replaced: {ex.originalExerciseName}
+                                      </span>
+                                    )}
+                                    {ex.scalingNote && (
+                                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-sky-950 text-sky-300 border border-sky-500/30">
+                                        {ex.scalingNote}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {ssDetails && ssDetails.movements.length > 0 && (
+                                    <div className="mt-2 ml-7 space-y-1">
+                                      {ssDetails.movements.map((m, mIdx) => (
+                                        <div key={mIdx} className="flex items-center gap-2 text-[11px]">
+                                          <span className="font-mono font-black text-purple-300 bg-purple-950/70 border border-purple-500/30 px-1.5 py-0.5 rounded">
+                                            A{mIdx + 1}
+                                          </span>
+                                          <span className="text-zinc-200 font-semibold">{m.name}</span>
+                                          <span className="text-zinc-400 font-mono">({m.targetReps})</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+
+                                  {emomDetails && emomDetails.movements.length > 0 && (
+                                    <div className="mt-2 ml-7 space-y-1">
+                                      {emomDetails.movements.map((m, mIdx) => (
+                                        <div key={mIdx} className="flex items-center gap-2 text-[11px]">
+                                          <span className="font-mono font-bold text-emerald-300">•</span>
+                                          <span className="text-zinc-200 font-semibold">{m.name}</span>
+                                          <span className="text-zinc-400 font-mono">({m.targetReps})</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+
+                                  {amrapDetails && amrapDetails.isMultiMovementBlock && amrapDetails.movements.length > 0 && (
+                                    <div className="mt-2 ml-7 space-y-1">
+                                      {amrapDetails.movements.map((m, mIdx) => (
+                                        <div key={mIdx} className="flex items-center gap-2 text-[11px]">
+                                          <span className="font-mono font-bold text-amber-300">•</span>
+                                          <span className="text-zinc-200 font-semibold">{m.name}</span>
+                                          <span className="text-zinc-400 font-mono">({m.targetReps})</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+
+                                  {ex.notes && (
+                                    <p className="text-[11px] text-zinc-400 mt-1 ml-7 italic">
+                                      {ex.notes}
+                                    </p>
+                                  )}
+                                </div>
+
+                                <div className="flex items-center gap-3 shrink-0 ml-7 sm:ml-0">
+                                  <div className="text-right">
+                                    <span className="text-xs font-black font-mono text-white block">
+                                      {ex.defaultSets} sets × {ex.targetReps}
+                                    </span>
+                                    <span className="text-[10px] font-mono text-amber-400">
+                                      Target RPE {ex.targetRpe || 8}
+                                    </span>
+                                  </div>
+
+                                  {/* Dedicated Rest Timer for this AI Exercise */}
+                                  <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0">
+                                    {activeExerciseTimer && activeExerciseTimer.exerciseName === cleanExerciseName ? (
+                                      <div className="flex items-center gap-1 bg-[#0e1217] border border-amber-500/60 shadow-lg shadow-amber-500/20 rounded-xl p-1 animate-in fade-in duration-200">
+                                        {/* -15s */}
+                                        <button
+                                          type="button"
+                                          onClick={() => handleAdjustActiveTimerRemaining(-15)}
+                                          className="px-1.5 py-1 text-[11px] font-mono text-zinc-400 hover:text-white hover:bg-zinc-800 rounded transition-colors cursor-pointer"
+                                          title="Minus 15s"
+                                        >
+                                          -15
+                                        </button>
+
+                                        {/* Main Toggle / Countdown Display */}
+                                        <button
+                                          type="button"
+                                          onClick={() => handleToggleExerciseTimer(cleanExerciseName, currentRest)}
+                                          className={`flex items-center gap-1.5 px-3 py-1 font-mono text-xs font-black rounded-lg transition-all cursor-pointer ${
+                                            activeExerciseTimer.secondsRemaining === 0
+                                              ? 'bg-emerald-500 text-black'
+                                              : activeExerciseTimer.isRunning
+                                                ? 'bg-amber-500 text-black shadow-md tabular-nums'
+                                                : 'bg-zinc-800 text-amber-300 border border-amber-500/30 tabular-nums'
+                                          }`}
+                                          title={
+                                            activeExerciseTimer.secondsRemaining === 0
+                                              ? 'Rest complete! Click to restart.'
+                                              : activeExerciseTimer.isRunning
+                                                ? 'Pause countdown'
+                                                : 'Resume countdown'
+                                          }
+                                        >
+                                          {activeExerciseTimer.secondsRemaining === 0 ? (
+                                            <span className="flex items-center gap-1">
+                                              <CheckCircle2 className="w-3.5 h-3.5" />
+                                              <span>DONE!</span>
+                                            </span>
+                                          ) : (
+                                            <>
+                                              {activeExerciseTimer.isRunning ? (
+                                                <Pause className="w-3 h-3 fill-current" />
+                                              ) : (
+                                                <Play className="w-3 h-3 fill-current ml-0.5" />
+                                              )}
+                                              <span className="tabular-nums">{activeExerciseTimer.secondsRemaining}s</span>
+                                            </>
+                                          )}
+                                        </button>
+
+                                        {/* +15s */}
+                                        <button
+                                          type="button"
+                                          onClick={() => handleAdjustActiveTimerRemaining(15)}
+                                          className="px-1.5 py-1 text-[11px] font-mono text-zinc-400 hover:text-white hover:bg-zinc-800 rounded transition-colors cursor-pointer"
+                                          title="Plus 15s"
+                                        >
+                                          +15
+                                        </button>
+
+                                        {/* Cancel Timer */}
+                                        <button
+                                          type="button"
+                                          onClick={handleCancelExerciseTimer}
+                                          className="p-1 text-zinc-400 hover:text-amber-400 hover:bg-zinc-800 rounded transition-colors cursor-pointer ml-0.5"
+                                          title="Dismiss timer"
+                                        >
+                                          <X className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center gap-1.5">
+                                        <div className="flex items-center bg-[#090b0d] border border-zinc-800 rounded-lg p-0.5">
+                                          <button
+                                            type="button"
+                                            onClick={() => handleUpdateExerciseRest(cleanExerciseName, currentRest - 15)}
+                                            className="px-1.5 py-1 text-[11px] font-mono text-zinc-400 hover:text-white hover:bg-zinc-800 rounded transition-colors cursor-pointer"
+                                            title="Minus 15s"
+                                          >
+                                            -15
+                                          </button>
+
+                                          <button
+                                            type="button"
+                                            onClick={() => handleToggleExerciseTimer(cleanExerciseName, currentRest)}
+                                            className="flex items-center gap-1 px-2.5 py-1 bg-zinc-800/80 hover:bg-amber-500 hover:text-black text-amber-400 font-mono text-xs font-bold rounded transition-all cursor-pointer tabular-nums"
+                                            title={`Click to start ${currentRest}s rest countdown`}
+                                          >
+                                            <Clock className="w-3 h-3" />
+                                            <span>{currentRest}s</span>
+                                          </button>
+
+                                          <button
+                                            type="button"
+                                            onClick={() => handleUpdateExerciseRest(cleanExerciseName, currentRest + 15)}
+                                            className="px-1.5 py-1 text-[11px] font-mono text-zinc-400 hover:text-white hover:bg-zinc-800 rounded transition-colors cursor-pointer"
+                                            title="Plus 15s"
+                                          >
+                                            +15
+                                          </button>
+                                        </div>
+
+                                        {/* 1-Tap Trigger Button */}
+                                        <button
+                                          type="button"
+                                          onClick={() => handleToggleExerciseTimer(cleanExerciseName, currentRest)}
+                                          className="p-1.5 bg-[#090b0d] hover:bg-amber-500/15 text-zinc-400 hover:text-amber-400 border border-zinc-800 hover:border-amber-500/40 rounded-lg transition-colors cursor-pointer"
+                                          title="Start rest timer now"
+                                        >
+                                          <Timer className="w-4 h-4" />
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <div className="p-6 sm:p-10 rounded-2xl bg-[#0e1217] border border-amber-500/40 shadow-xl text-center space-y-4 my-2">
+            <div className="w-14 h-14 rounded-2xl bg-amber-500/15 border border-amber-400/40 flex items-center justify-center text-amber-300 mx-auto shadow-md">
+              <Zap className="w-7 h-7 text-amber-400" />
+            </div>
+            <div className="max-w-xl mx-auto space-y-2">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-amber-300 font-bold px-2.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/40 inline-block">
+                Individualized Programming Prescribed
+              </span>
+              <h3 className="text-xl sm:text-2xl font-black text-white font-athletic uppercase tracking-wide">
+                Adapted Master Protocol
+              </h3>
+              <p className="text-xs sm:text-sm text-zinc-300 leading-relaxed">
+                Your diagnostic assessment prescribed individualized adaptations. Launch the Adaptive AI Program Engine to tailor any of Coach Risner&apos;s core protocols around your injuries, equipment, and ability level.
+              </p>
+            </div>
+            {onOpenAIGenerator && (
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => onOpenAIGenerator('apex_protocol')}
+                  className="px-6 py-3.5 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs uppercase tracking-wider rounded-xl shadow-xl inline-flex items-center gap-2 cursor-pointer active:scale-95 font-athletic whitespace-nowrap"
+                >
+                  <SlidersHorizontal className="w-4 h-4 text-black" />
+                  <span>Adapt a Master Program</span>
+                  <ArrowRight className="w-4 h-4 ml-1" />
+                </button>
+              </div>
+            )}
+          </div>
+        )) : (
+          <>
+        {/* COMPACT UNIVERSAL MILITARY PT WEEK SELECTOR RAIL */}
+        {selectedProgram === 'universal_pat' && (
+          <div className="bg-[#0e1217] border border-amber-500/40 rounded-2xl p-2.5 sm:p-3 shadow-md space-y-2">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+                <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 shrink-0 flex items-center gap-1 mr-1">
+                  <Calendar className="w-3 h-3 text-amber-400" />
+                  Military PT Week:
+                </span>
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((w) => {
+                  const isSelectedWeek = activePatWeek === w;
+                  const isDeload = w === 4;
+                  const isPeak = w === 8;
+                  return (
+                    <button
+                      key={w}
+                      type="button"
+                      onClick={() => {
+                        setActivePatWeek(w);
+                        setDayViewMode('all');
+                      }}
+                      className={`px-3 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer border flex items-center gap-1 tabular-nums ${
+                        isSelectedWeek
+                          ? 'bg-amber-500 text-black border-amber-400 shadow-sm font-black'
+                          : 'bg-[#090b0d] text-zinc-400 border-zinc-800 hover:text-white hover:border-zinc-700'
+                      }`}
+                    >
+                      <span>Week {w}</span>
+                      {isDeload && <span className="text-[9px] font-black uppercase bg-red-950/80 text-red-300 border border-red-500/40 px-1 rounded">Deload</span>}
+                      {isPeak && <span className="text-[9px] font-black uppercase bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 px-1 rounded">Peak Test</span>}
+                    </button>
+                  );
+                })}
+              </div>
+              <span className="text-[11px] font-mono text-amber-400 font-bold shrink-0">
+                Week {activePatWeek} Active • ACFT / PFT Benchmarks Synced
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* COMPACT 12-WEEK TACTICAL BODYBUILDING PHASE & WEEK SELECTOR RAIL */}
+        {selectedProgram === 'tactical_hypertrophy' && (
+          <div className="bg-[#0e1217] border border-amber-500/30 rounded-2xl p-2.5 sm:p-3 shadow-md space-y-2">
+            {/* Phase Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+              <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 shrink-0 flex items-center gap-1 mr-1">
+                <Activity className="w-3 h-3" />
+                Phase:
+              </span>
+              {tacticalMesocycles.map((m) => {
+                const isSelected = activeTacticalPhaseKey === m.id;
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => {
+                      setActiveTacticalPhaseKey(m.id);
+                      setActiveTacticalWeek(m.defaultWeek);
+                      setDayViewMode('all');
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer shrink-0 border flex items-center gap-1.5 ${
+                      isSelected
+                        ? 'bg-amber-500 text-black border-amber-400 shadow-sm font-black'
+                        : 'bg-[#090b0d] text-zinc-300 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800'
+                    }`}
+                  >
+                    <span>{m.label} ({m.weeks})</span>
+                    {isSelected && <CheckCircle2 className="w-3 h-3 text-black" />}
+                  </button>
+                );
+              })}
+              <span className="text-[10px] font-mono text-amber-300 bg-amber-950/50 border border-amber-500/30 px-2 py-0.5 rounded ml-auto shrink-0 hidden lg:inline">
+                Starts Sunday · Mandatory 8m DIME Daily
+              </span>
+            </div>
+
+            {/* 12 Week Selector inlined cleanly */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pt-1.5 border-t border-zinc-800/80 scrollbar-none">
+              <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400 shrink-0 flex items-center gap-1 mr-1">
+                <Calendar className="w-3 h-3" />
+                Week:
+              </span>
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((w) => {
+                const isSelectedWeek = activeTacticalWeek === w;
+                const isDeload = w === 4 || w === 8 || w === 12;
+                const phaseIdForWeek = w <= 4 ? 'tb_phase1' : w <= 8 ? 'tb_phase2' : 'tb_phase3';
+                return (
+                  <button
+                    key={w}
+                    type="button"
+                    onClick={() => {
+                      setActiveTacticalWeek(w);
+                      setActiveTacticalPhaseKey(phaseIdForWeek);
+                      setDayViewMode('all');
+                    }}
+                    className={`px-2.5 py-0.5 rounded-md text-xs font-mono font-bold transition-all cursor-pointer border flex items-center gap-1 shrink-0 tabular-nums ${
+                      isSelectedWeek
+                        ? 'bg-amber-500 text-black border-amber-400 shadow-sm font-black'
+                        : 'bg-[#090b0d] text-zinc-400 border-zinc-800 hover:text-white hover:border-zinc-700'
+                    }`}
+                  >
+                    <span>W{w}</span>
+                    {isDeload && (
+                      <span className="text-[8px] font-black uppercase bg-red-950/80 text-red-300 border border-red-500/40 px-1 rounded">
+                        Deload
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+              <span className="text-[10px] font-mono text-amber-400 ml-auto hidden sm:inline shrink-0 tabular-nums">
+                Week {activeTacticalWeek} of 12 Active
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* COMPACT MESOCYCLE & WEEK SELECTOR RAIL */}
+        {selectedProgram === 'apex_protocol' && (
+        <div className="bg-[#0e1217] border border-amber-500/30 rounded-2xl p-2.5 sm:p-3 shadow-md space-y-2">
+          {/* Quarter Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+            <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 shrink-0 flex items-center gap-1 mr-1">
+              <Activity className="w-3 h-3" />
+              Quarter:
+            </span>
+            {apexMesocycles.map((m) => {
+              const isSelected = activeApexPhaseKey === m.id;
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => {
+                    setActiveApexPhaseKey(m.id);
+                    setActiveApexWeek(m.defaultWeek);
+                    setDayViewMode('all');
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer shrink-0 border flex items-center gap-1.5 ${
+                    isSelected
+                      ? 'bg-amber-500 text-black border-amber-400 shadow-sm font-black'
+                      : 'bg-[#090b0d] text-zinc-300 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800'
+                  }`}
+                >
+                  <span>{m.weeks}</span>
+                  <span className="text-[10px] opacity-80 hidden md:inline">({m.badge})</span>
+                  {isSelected && <CheckCircle2 className="w-3 h-3 text-black" />}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Week Selector inlined cleanly */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pt-1.5 border-t border-zinc-800/80 scrollbar-none">
+            <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400 shrink-0 mr-1">
+              Week:
+            </span>
+            {(apexMesocycles.find((m) => m.id === activeApexPhaseKey)?.weekRange || [1, 2, 3, 4]).map((w) => {
+              const isSelectedWeek = activeApexWeek === w;
+              const isDeloadWk = w % 4 === 0 && w !== 52;
+              const isTaperWk = w === 51;
+              const isBenchmarkWk = w === 13 || w === 26 || w === 39 || w === 52;
+              return (
+                <button
+                  key={w}
+                  type="button"
+                  onClick={() => {
+                    setActiveApexWeek(w);
+                    setDayViewMode('all');
+                  }}
+                  className={`px-2.5 py-0.5 rounded-md text-xs font-mono font-bold transition-all cursor-pointer border flex items-center gap-1 shrink-0 tabular-nums ${
+                    isSelectedWeek
+                      ? 'bg-amber-500 text-black border-amber-400 shadow-sm font-black'
+                      : 'bg-[#090b0d] text-zinc-400 border-zinc-800 hover:text-white hover:border-zinc-700'
+                  }`}
+                >
+                  <span>W{w}</span>
+                  {isDeloadWk && <span className="text-[8px] font-black uppercase px-1 rounded bg-red-950/90 text-red-300 border border-red-500/40">Deload</span>}
+                  {isTaperWk && <span className="text-[8px] font-black uppercase px-1 rounded bg-amber-950/90 text-amber-300 border border-amber-500/40">Taper</span>}
+                  {isBenchmarkWk && <span className="text-[8px] font-black uppercase px-1 rounded bg-emerald-950/90 text-emerald-300 border border-emerald-500/40">Test</span>}
+                </button>
+              );
+            })}
+            <span className="text-[10px] font-mono text-amber-400 ml-auto hidden sm:inline shrink-0 tabular-nums">
+              Week {activeApexWeek} of 52 Active
+            </span>
+          </div>
+        </div>
+      )}
+
+      {selectedProgram === 'hybrid_protocol' && (
+        <div className="bg-[#0e1217] border border-amber-500/30 rounded-2xl p-2.5 sm:p-3 shadow-md flex items-center gap-2 overflow-x-auto scrollbar-none">
+          <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 shrink-0 flex items-center gap-1 mr-1">
+            <Activity className="w-3 h-3" />
+            Phase:
+          </span>
+          {protocolMesocycles.map((m) => {
+            const isSelected = activeProtocolPhaseKey === m.id;
+            return (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => {
+                  setActiveProtocolPhaseKey(m.id);
+                  setDayViewMode('all');
+                }}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer shrink-0 border flex items-center gap-1.5 ${
+                  isSelected
+                    ? 'bg-amber-500 text-black border-amber-400 font-black shadow-sm'
+                    : 'bg-[#090b0d] text-zinc-300 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800'
+                }`}
+              >
+                <span>{m.label} ({m.weeks})</span>
+                {isSelected && <CheckCircle2 className="w-3 h-3 text-black" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* COLLAPSIBLE AUTO-OVERLOAD BENCHMARKS (Expands cleanly on user request) */}
+      {showOverloadRules && (
+        <RequireTier 
+          requiredTier="pro" 
+          featureName="Auto-Overload Engine"
+        >
+          <div className="bg-zinc-900/95 border border-emerald-500/30 rounded-2xl p-3.5 sm:p-4 shadow-lg animate-in fade-in duration-200">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-2.5 border-b border-zinc-800">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-emerald-400" />
+                <h3 className="text-xs sm:text-sm font-black uppercase text-emerald-400 tracking-wider font-athletic">
+                  {selectedProgram === 'apex_protocol' 
+                    ? `52-Week Military Progression Rules & Benchmarks (${currentPhase.weeks})`
+                    : selectedProgram === 'tactical_hypertrophy'
+                    ? `12-Week Military Tactical Bodybuilding Double Progression & Field Rules (${currentPhase.weeks})`
+                    : selectedProgram === 'hybrid_protocol'
+                    ? '12-Week Hybrid Protocol Auto-Overload Benchmarks'
+                    : `Military PT Test Auto-Overload Benchmarks (${currentPhase.weeks})`}
+                </h3>
+              </div>
+              <span className="text-[11px] text-zinc-400 font-mono">
+                Starts at low end of set/rep ranges • Intra-session Set 1 auto-pacing active
+              </span>
+            </div>
+
+          {selectedProgram === 'apex_protocol' ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mt-2.5">
+              <div className="p-2.5 bg-zinc-950/80 rounded-xl border border-zinc-800/80">
+                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">1. Reps First &rarr; 2. Weight Second</span>
+                <span className="text-sm font-black text-emerald-400 font-mono tabular-nums">+2.5–5 lbs / +5–10 lbs</span>
+                <span className="text-[10px] text-zinc-400 block mt-0.5">Start at low end of rep range; hit top of range on all sets before adding load</span>
+              </div>
+              <div className="p-2.5 bg-zinc-950/80 rounded-xl border border-zinc-800/80">
+                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">3. Sets Third &amp; Set 1 Auto-Pacing</span>
+                <span className="text-sm font-black text-emerald-400 font-mono">Low-End Start &rarr; +1 Set</span>
+                <span className="text-[10px] text-zinc-400 block mt-0.5">Starts at low end of set range; Set 1 log auto-calculates Sets 2+ weight</span>
+              </div>
+              <div className="p-2.5 bg-zinc-950/80 rounded-xl border border-zinc-800/80">
+                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Every 4th Week Deload</span>
+                <span className="text-sm font-black text-emerald-400 font-mono tabular-nums">-40% Volume</span>
+                <span className="text-[10px] text-zinc-400 block mt-0.5">Wks 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48 cut sets/miles 40%</span>
+              </div>
+              <div className="p-2.5 bg-zinc-950/80 rounded-xl border border-zinc-800/80">
+                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Annual Combat Benchmarks</span>
+                <span className="text-sm font-black text-emerald-400 font-mono tabular-nums">1.5-Mi &lt; 10:30 • 300m &lt; 46s</span>
+                <span className="text-[10px] text-zinc-400 block mt-0.5">TBDL 2.0x BW • Bench 1.25x BW • 12+ Pull-Ups • 50+ Push-Ups</span>
+              </div>
+            </div>
+          ) : selectedProgram === 'tactical_hypertrophy' ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mt-2.5">
+              <div className="p-2.5 bg-[#090b0d] rounded-xl border border-zinc-800/80">
+                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Double Progression</span>
+                <span className="text-sm font-black text-amber-400 font-mono tabular-nums">+5 lbs Upper • +10 lbs Lower</span>
+                <span className="text-[10px] text-zinc-400 block mt-0.5">Hit top reps on all sets with 1–2 RIR before adding weight</span>
+              </div>
+              <div className="p-2.5 bg-[#090b0d] rounded-xl border border-zinc-800/80">
+                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">3-Phase Linear Wave</span>
+                <span className="text-sm font-black text-amber-400 font-mono tabular-nums">8–10 &rarr; 5–6 &rarr; 3–5 Reps</span>
+                <span className="text-[10px] text-zinc-400 block mt-0.5">Ph 1 Armor (W1–4) • Ph 2 Power (W5–8) • Ph 3 Peak (W9–12)</span>
+              </div>
+              <div className="p-2.5 bg-[#090b0d] rounded-xl border border-zinc-800/80">
+                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Deloads (Weeks 4, 8, 12)</span>
+                <span className="text-sm font-black text-amber-400 font-mono tabular-nums">-40% Sets • ~80% Load</span>
+                <span className="text-[10px] text-zinc-400 block mt-0.5">Cut working sets 40% &amp; move lighter loads with crisp speed</span>
+              </div>
+              <div className="p-2.5 bg-[#090b0d] rounded-xl border border-zinc-800/80">
+                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Field Ops &amp; DIME Rules</span>
+                <span className="text-sm font-black text-amber-400 font-mono tabular-nums">Daily 8m DIME • 3 RIR Cap</span>
+                <span className="text-[10px] text-zinc-400 block mt-0.5">Field ops/4h sleep: halve accessories, swap sprints for 20m Zone 2</span>
+              </div>
+            </div>
+          ) : selectedProgram === 'universal_pat' ? (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mt-2.5">
+              <div className="p-2.5 bg-[#090b0d] rounded-xl border border-amber-500/30">
+                <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider block">Cadence Push-Ups</span>
+                <span className="text-sm font-black text-amber-400 font-mono tabular-nums">+1-2 reps / wk</span>
+                <span className="text-[10px] text-zinc-400 block mt-0.5">Metronome cadence consistency</span>
+              </div>
+              <div className="p-2.5 bg-[#090b0d] rounded-xl border border-amber-500/30">
+                <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider block">300m Sprint Intervals</span>
+                <span className="text-sm font-black text-amber-400 font-mono tabular-nums">-1 to 2 sec</span>
+                <span className="text-[10px] text-zinc-400 block mt-0.5">Target: sub-50s repeats</span>
+              </div>
+              <div className="p-2.5 bg-[#090b0d] rounded-xl border border-amber-500/30">
+                <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider block">Combat Casualty Drag / Sled</span>
+                <span className="text-sm font-black text-amber-400 font-mono tabular-nums">5x50y Sub-25s</span>
+                <span className="text-[10px] text-zinc-400 block mt-0.5">Relentless posterior drive</span>
+              </div>
+              <div className="p-2.5 bg-[#090b0d] rounded-xl border border-amber-500/30">
+                <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider block">Military 1.5–2 Mi Run Standard</span>
+                <span className="text-sm font-black text-amber-400 font-mono tabular-nums">Sub-11:00 / 13:30</span>
+                <span className="text-[10px] text-zinc-400 block mt-0.5">Selection &amp; PT test benchmark</span>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mt-2.5">
+              <div className="p-2.5 bg-[#090b0d] rounded-xl border border-zinc-800/80">
+                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Squat &amp; Deadlift</span>
+                <span className="text-sm font-black text-amber-400 font-mono tabular-nums">+10 lbs</span>
+                <span className="text-[10px] text-zinc-400 block mt-0.5">Upon hitting top rep ceiling</span>
+              </div>
+              <div className="p-2.5 bg-[#090b0d] rounded-xl border border-zinc-800/80">
+                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Bench, OHP &amp; Rows</span>
+                <span className="text-sm font-black text-amber-400 font-mono tabular-nums">+5 lbs</span>
+                <span className="text-[10px] text-zinc-400 block mt-0.5">Upon hitting target reps</span>
+              </div>
+              <div className="p-2.5 bg-[#090b0d] rounded-xl border border-zinc-800/80">
+                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Weighted Pull-Ups</span>
+                <span className="text-sm font-black text-amber-400 font-mono tabular-nums">+2.5 - 5 lbs</span>
+                <span className="text-[10px] text-zinc-400 block mt-0.5">Upon completing 6-8 reps</span>
+              </div>
+              <div className="p-2.5 bg-[#090b0d] rounded-xl border border-zinc-800/80">
+                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Zone 2 Aerobic Base</span>
+                <span className="text-sm font-black text-amber-400 font-mono tabular-nums">+0.5 - 1.0 mi/wk</span>
+                <span className="text-[10px] text-zinc-400 block mt-0.5">Continuous base expansion</span>
+              </div>
+            </div>
+          )}
+          </div>
+        </RequireTier>
+      )}
+
+      {/* COLLAPSIBLE COACH'S DIRECTIVES */}
+      {showCoachNotes && (
+        <div className="bg-[#0e1217] border border-amber-500/30 rounded-xl p-3.5 shadow-sm animate-in fade-in duration-200">
+          <div className="flex items-center gap-2 mb-2">
+            <ShieldCheck className="w-4 h-4 text-amber-400" />
+            <span className="text-xs font-bold text-zinc-200 uppercase tracking-wider">
+              {currentPhase.coachRule ? "Coach Aryan's Tactical Directives & Overload Laws" : "Order of Operations & Recovery Guidelines"}
+            </span>
+          </div>
+          <p className="leading-relaxed text-xs text-zinc-300">
+            {currentPhase.coachRule ? currentPhase.coachRule : COACH_RULES.orderOfOperations.splitSessions}
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 pt-2 border-t border-zinc-800">
+            <div className="p-2 bg-[#090b0d] rounded-lg border border-zinc-800">
+              <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider block mb-0.5">
+                {COACH_RULES.zone2Guidance.title}
+              </span>
+              <span className="text-[11px] text-zinc-400">{COACH_RULES.zone2Guidance.rule}</span>
+            </div>
+            <div className="p-2 bg-[#090b0d] rounded-lg border border-zinc-800">
+              <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider block mb-0.5">
+                {COACH_RULES.progressiveOverload.title}
+              </span>
+              <span className="text-[11px] text-zinc-400">{COACH_RULES.progressiveOverload.rule}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DIRECT PROGRAM ADAPTATION BAR ON EVERY MASTER PROGRAM */}
+      {onOpenAIGenerator && selectedProgram !== 'custom_ai' && (
+        <div className="bg-gradient-to-r from-amber-950/60 via-[#141a21] to-amber-950/30 border border-amber-500/40 rounded-2xl p-3 sm:p-3.5 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
+              <SlidersHorizontal className="w-4 h-4 text-amber-400" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-amber-300 font-black px-2 py-0.5 rounded bg-amber-500/20 border border-amber-500/40">
+                  Clinical &amp; Ability Program Adapter
+                </span>
+                <span className="text-xs font-bold text-white font-athletic uppercase">
+                  Need to Modify This Program for Injuries or Ability Level?
+                </span>
+              </div>
+              <p className="text-[11px] text-zinc-300 mt-0.5">
+                Automatically swap movements that aggravate your joints, adjust sets/reps/RPE to your experience level, or scale running distances while keeping Coach Risner&apos;s exact weekly structure.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => onOpenAIGenerator(selectedProgram)}
+            className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-black uppercase text-xs font-athletic tracking-wider shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 shrink-0 self-start sm:self-auto whitespace-nowrap"
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5 text-black" />
+            <span>Adapt This Program &rarr;</span>
+          </button>
+        </div>
+      )}
+
+      {/* Day Navigator Filter Bar */}
+      <div className="bg-[#0e1217] border-2 border-amber-500/40 rounded-2xl p-2.5 sm:p-3 shadow-md">
+        <div className="flex items-center justify-between gap-2 mb-2 px-1">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-amber-400" />
+            <span className="text-xs font-black uppercase tracking-wider text-white font-athletic">
+              Daily Schedule Navigator
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            {dayViewMode !== 'all' && (
+              <button
+                type="button"
+                onClick={() => setDayViewMode('all')}
+                className="px-2.5 py-0.5 bg-red-950/70 hover:bg-red-900 text-red-200 border border-red-700 rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-colors"
+                title="Exit single day view"
+              >
+                <X className="w-3 h-3" />
+                <span>Exit Day View</span>
+              </button>
+            )}
+            <span className="text-[11px] text-zinc-300 font-mono font-bold tabular-nums">
+              {dayViewMode === 'all' ? 'Showing all 7 days' : `Day ${dayViewMode + 1} of 7`}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+          {/* "All Days" Pill */}
+          <button
+            type="button"
+            onClick={() => setDayViewMode('all')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shrink-0 border-2 ${
+              dayViewMode === 'all'
+                ? 'bg-amber-500 text-black border-amber-400 shadow-md shadow-amber-950/60 ring-2 ring-amber-400/30'
+                : 'bg-[#090b0d] text-zinc-200 border-zinc-700 hover:border-amber-400 hover:text-white hover:bg-zinc-800'
+            }`}
+          >
+            All Days ({currentPhase.days.length})
+          </button>
+
+          {/* Individual Day Pills */}
+          {currentPhase.days.map((day, idx) => {
+            const isSelected = dayViewMode === idx;
+            const isRest = isProtocolRestDay(day);
+
+            return (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => setDayViewMode(idx)}
+                className={`relative px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer shrink-0 flex items-center gap-1.5 border-2 ${
+                  isSelected
+                    ? 'bg-amber-500 text-black border-amber-400 shadow-md shadow-amber-950/60 ring-2 ring-amber-400/30'
+                    : isRest
+                    ? 'bg-[#090b0d]/80 text-zinc-400 border-zinc-800 hover:border-zinc-600'
+                    : 'bg-[#090b0d] text-zinc-200 border-zinc-700 hover:border-amber-400 hover:text-white'
+                }`}
+              >
+                <span>{`Day ${idx + 1}`}</span>
+                {isRest && (
+                  <span className="text-[9px] uppercase font-mono opacity-80">(Rest)</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Focused Day Navigator Header (When a single day is selected) */}
+      {dayViewMode !== 'all' && (
+        <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-[#0e1217] border-2 border-amber-500/50 rounded-2xl shadow-md">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                const prevIdx = (dayViewMode - 1 + currentPhase.days.length) % currentPhase.days.length;
+                setDayViewMode(prevIdx);
+              }}
+              className="flex items-center gap-1 px-3 py-1.5 bg-[#090b0d] hover:bg-zinc-800 text-zinc-200 hover:text-white rounded-xl text-xs font-black transition-all border-2 border-zinc-700 hover:border-amber-400 cursor-pointer"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              <span>Prev Day</span>
+            </button>
+
+            <span className="text-xs sm:text-sm font-black text-white px-2">
+              Day {dayViewMode + 1} · {currentPhase.days[dayViewMode]?.focus}
+            </span>
+
+            <button
+              type="button"
+              onClick={() => {
+                const nextIdx = (dayViewMode + 1) % currentPhase.days.length;
+                setDayViewMode(nextIdx);
+              }}
+              className="flex items-center gap-1 px-3 py-1.5 bg-[#090b0d] hover:bg-zinc-800 text-zinc-200 hover:text-white rounded-xl text-xs font-black transition-all border-2 border-zinc-700 hover:border-amber-400 cursor-pointer"
+            >
+              <span>Next Day</span>
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setDayViewMode('all')}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-black rounded-xl text-xs font-black uppercase tracking-wider transition-all border border-amber-400 shadow-md cursor-pointer active:scale-95 whitespace-nowrap"
+          >
+            <X className="w-3.5 h-3.5 stroke-[3]" />
+            <span>Exit Day View (Show All Days)</span>
+          </button>
+        </div>
+      )}
+
+      {/* Daily Cards */}
+      <div className="space-y-5">
+        {daysToShow.map((day, idx) => {
+          const isRestDay = isProtocolRestDay(day);
+          const dayNum = dayViewMode === 'all' ? idx + 1 : (typeof dayViewMode === 'number' ? dayViewMode + 1 : idx + 1);
+
+          return (
+            <div
+              key={idx}
+              className={`rounded-2xl border transition-all overflow-hidden ${
+                isRestDay
+                  ? 'bg-zinc-950/60 border-zinc-800/80'
+                  : 'bg-zinc-900 border-zinc-800 shadow-lg'
+              }`}
+            >
+              {/* Day Header */}
+              <div className="bg-zinc-800/70 px-5 py-4 flex justify-between items-center border-b border-zinc-800 flex-wrap gap-2">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-700 flex items-center justify-center font-black text-sm text-white font-mono">
+                    {`D${dayNum}`}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-black text-white text-base sm:text-lg tracking-wide font-athletic">
+                        {`Day ${dayNum}`}
+                      </h3>
+                    </div>
+                    <span className="text-xs text-amber-400 font-bold tracking-wide">
+                      {day.focus}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  {day.progressionRule && (
+                    <span className="text-[10px] font-bold px-2.5 py-1 bg-amber-500/10 text-amber-300 border border-amber-500/30 rounded-lg flex items-center gap-1">
+                      <TrendingUp className="w-3 h-3 text-amber-400 shrink-0" />
+                      <span>{day.progressionRule}</span>
+                    </span>
+                  )}
+
+                  {!isRestDay && (
+                    <button
+                      type="button"
+                      onClick={() => handleLaunchDayLifts(day)}
+                      className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-black font-black rounded-xl text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-md cursor-pointer active:scale-95 whitespace-nowrap"
+                    >
+                      <Play className="w-3.5 h-3.5 fill-black text-black stroke-[2]" />
+                      <span>Start Live Session</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Day Body Content */}
+              <div className="p-4 sm:p-6 space-y-4">
+                {/* WARM UP PRIMER */}
+                <div className="bg-[#090b0d] rounded-xl p-3.5 border border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center text-amber-400 text-xs font-bold uppercase tracking-wider mb-1">
+                      <Flame className="w-3.5 h-3.5 mr-1.5" />
+                      <span>Movement Primer & Dynamic Warm-Up</span>
+                    </div>
+                    <p className="text-xs sm:text-sm text-zinc-300 leading-relaxed">{day.warmup}</p>
+                  </div>
+
+                  {(!isRestDay || day.warmup.toLowerCase().includes('dime')) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onSelectWarmup(
+                          selectedProgram === 'tactical_hypertrophy'
+                            ? 'warmup-dime-tactical-bb'
+                            : 'warmup-dime-mandatory'
+                        );
+                      }}
+                      className="shrink-0 px-3 py-1.5 bg-[#0e1217] hover:bg-zinc-800 text-amber-300 hover:text-white text-xs font-bold rounded-lg border border-amber-500/30 transition-colors flex items-center gap-1.5 self-start sm:self-center cursor-pointer"
+                    >
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>{selectedProgram === 'tactical_hypertrophy' ? 'DIME 8-Min Primer' : 'DIME Guided Primer'}</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* STRENGTH SECTION */}
+                <div>
+                  <div className="flex items-center justify-between mb-2.5">
+                    <div className="flex items-center text-zinc-400 text-xs font-bold uppercase tracking-wider">
+                      <Dumbbell className="w-4 h-4 mr-2 text-zinc-500" />
+                      <span>Strength Exercises & Auto-Overload Rules</span>
+                    </div>
+
+                    <span className="text-[11px] text-zinc-500 font-mono">
+                      {isRestDay ? '0 movements' : `${day.strength.filter(isRealStrengthExercise).length} movements`}
+                    </span>
+                  </div>
+
+                  {isRestDay ? (
+                    <div className="p-4 bg-zinc-950/60 rounded-xl border border-zinc-800/60 text-center">
+                      <p className="text-sm text-zinc-400 italic">
+                        {day.strength.join(', ')}
+                      </p>
+                      <span className="text-xs text-zinc-500 block mt-1">
+                        Active recovery, nutrition replenishment, and muscle restoration.
+                      </span>
+                    </div>
+                  ) : day.strength.filter(isRealStrengthExercise).length === 0 ? (
+                    <div className="p-3.5 bg-zinc-950/40 rounded-xl border border-zinc-800/60 text-center">
+                      <p className="text-xs text-zinc-400">
+                        Conditioning & Aerobic Base priority session. Scheduled cardio details below.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {day.strength.filter(isRealStrengthExercise).map((exerciseStr, i) => {
+                        const currentRest = getExerciseRest(exerciseStr);
+                        const overloadMatch = exerciseStr.match(/\[(Overload:.*?)\]/);
+                        const cleanExerciseName = exerciseStr.replace(/\[.*?\]/g, '').trim();
+                        const protoSuperset = isSupersetExercise({ name: cleanExerciseName, notes: exerciseStr })
+                          ? parseSupersetDetails({ name: cleanExerciseName, notes: exerciseStr })
+                          : null;
+
+                        return (
+                          <div
+                            key={i}
+                            className={`bg-zinc-950/80 border rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all ${
+                              protoSuperset
+                                ? 'border-purple-500/40 hover:border-purple-400/70'
+                                : 'border-zinc-800/80 hover:border-zinc-700/80'
+                            }`}
+                          >
+                            {/* Exercise Details */}
+                            <div className="flex items-start gap-2.5 min-w-0">
+                              <span className="w-5 h-5 rounded-md bg-zinc-900 border border-zinc-800 flex items-center justify-center text-[10px] font-mono text-zinc-400 font-bold shrink-0 mt-0.5">
+                                {i + 1}
+                              </span>
+
+                              <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-bold text-white text-sm tracking-wide">
+                                    {cleanExerciseName}
+                                  </span>
+                                  {protoSuperset && (
+                                    <span className="text-[10px] font-mono font-black uppercase px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40">
+                                      Superset
+                                    </span>
+                                  )}
+                                </div>
+
+                                {protoSuperset && protoSuperset.movements.length >= 2 && (
+                                  <div className="flex flex-wrap items-center gap-2 mt-1">
+                                    {protoSuperset.movements.map((m, mIdx) => (
+                                      <span key={mIdx} className="text-[11px] text-zinc-300 inline-flex items-center gap-1">
+                                        <span className="font-mono font-bold text-purple-300">A{mIdx + 1}:</span>
+                                        <span>{m.name}</span>
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+
+                                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                  {overloadMatch && (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded">
+                                      <TrendingUp className="w-3 h-3 text-amber-400 shrink-0" />
+                                      <span>{overloadMatch[1]}</span>
+                                    </span>
+                                  )}
+
+                                  <span className="text-[10px] text-zinc-400">
+                                    {currentRest >= 180 ? 'Heavy CNS Rest' : currentRest >= 120 ? 'Strength Rest' : 'Standard Rest'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Clean, Streamlined Dedicated Rest Timer for this Exercise */}
+                            <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0">
+                              {activeExerciseTimer && activeExerciseTimer.exerciseName === cleanExerciseName ? (
+                                <div className="flex items-center gap-1 bg-[#0e1217] border border-amber-500/60 shadow-lg shadow-amber-500/20 rounded-xl p-1 animate-in fade-in duration-200">
+                                  {/* -15s */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAdjustActiveTimerRemaining(-15)}
+                                    className="px-1.5 py-1 text-[11px] font-mono text-zinc-400 hover:text-white hover:bg-zinc-800 rounded transition-colors cursor-pointer"
+                                    title="Minus 15s"
+                                  >
+                                    -15
+                                  </button>
+
+                                  {/* Main Toggle / Countdown Display */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleExerciseTimer(cleanExerciseName, currentRest)}
+                                    className={`flex items-center gap-1.5 px-3 py-1 font-mono text-xs font-black rounded-lg transition-all cursor-pointer ${
+                                      activeExerciseTimer.secondsRemaining === 0
+                                        ? 'bg-emerald-500 text-black'
+                                        : activeExerciseTimer.isRunning
+                                          ? 'bg-amber-500 text-black shadow-md tabular-nums'
+                                          : 'bg-zinc-800 text-amber-300 border border-amber-500/30 tabular-nums'
+                                    }`}
+                                    title={
+                                      activeExerciseTimer.secondsRemaining === 0
+                                        ? 'Rest complete! Click to restart.'
+                                        : activeExerciseTimer.isRunning
+                                          ? 'Pause countdown'
+                                          : 'Resume countdown'
+                                    }
+                                  >
+                                    {activeExerciseTimer.secondsRemaining === 0 ? (
+                                      <span className="flex items-center gap-1">
+                                        <CheckCircle2 className="w-3.5 h-3.5" />
+                                        <span>DONE!</span>
+                                      </span>
+                                    ) : (
+                                      <>
+                                        {activeExerciseTimer.isRunning ? (
+                                          <Pause className="w-3 h-3 fill-current" />
+                                        ) : (
+                                          <Play className="w-3 h-3 fill-current ml-0.5" />
+                                        )}
+                                        <span className="tabular-nums">{activeExerciseTimer.secondsRemaining}s</span>
+                                      </>
+                                    )}
+                                  </button>
+
+                                  {/* +15s */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAdjustActiveTimerRemaining(15)}
+                                    className="px-1.5 py-1 text-[11px] font-mono text-zinc-400 hover:text-white hover:bg-zinc-800 rounded transition-colors cursor-pointer"
+                                    title="Plus 15s"
+                                  >
+                                    +15
+                                  </button>
+
+                                  {/* Cancel Timer */}
+                                  <button
+                                    type="button"
+                                    onClick={handleCancelExerciseTimer}
+                                    className="p-1 text-zinc-400 hover:text-amber-400 hover:bg-zinc-800 rounded transition-colors cursor-pointer ml-0.5"
+                                    title="Dismiss timer"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1.5">
+                                  <div className="flex items-center bg-[#090b0d] border border-zinc-800 rounded-lg p-0.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUpdateExerciseRest(cleanExerciseName, currentRest - 15)}
+                                      className="px-1.5 py-1 text-[11px] font-mono text-zinc-400 hover:text-white hover:bg-zinc-800 rounded transition-colors cursor-pointer"
+                                      title="Minus 15s"
+                                    >
+                                      -15
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => handleToggleExerciseTimer(cleanExerciseName, currentRest)}
+                                      className="flex items-center gap-1 px-2.5 py-1 bg-zinc-800/80 hover:bg-amber-500 hover:text-black text-amber-400 font-mono text-xs font-bold rounded transition-all cursor-pointer tabular-nums"
+                                      title={`Click to start ${currentRest}s rest countdown`}
+                                    >
+                                      <Clock className="w-3 h-3" />
+                                      <span>{currentRest}s</span>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUpdateExerciseRest(cleanExerciseName, currentRest + 15)}
+                                      className="px-1.5 py-1 text-[11px] font-mono text-zinc-400 hover:text-white hover:bg-zinc-800 rounded transition-colors cursor-pointer"
+                                      title="Plus 15s"
+                                    >
+                                      +15
+                                    </button>
+                                  </div>
+
+                                  {/* 1-Tap Trigger Button */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleExerciseTimer(cleanExerciseName, currentRest)}
+                                    className="p-1.5 bg-[#090b0d] hover:bg-amber-500/15 text-zinc-400 hover:text-amber-400 border border-zinc-800 hover:border-amber-500/40 rounded-lg transition-colors cursor-pointer"
+                                    title="Start rest timer now"
+                                  >
+                                    <Timer className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* CONDITIONING / CARDIO SECTION */}
+                <div className="bg-[#090b0d] rounded-xl p-3.5 border border-zinc-800/80">
+                  <div className="flex items-center text-zinc-400 text-xs font-bold uppercase tracking-wider mb-1.5">
+                    <div className="mr-2 text-amber-400">
+                      <ShoeIcon />
+                    </div>
+                    <span>Conditioning & Aerobic Base</span>
+                  </div>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <p className="font-bold text-white text-xs sm:text-sm">{day.run}</p>
+                    <p className="text-xs text-zinc-400 font-mono">{day.pace}</p>
+                  </div>
+                </div>
+
+                {/* Day Card Footer CTA */}
+                {!isRestDay && (
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={() => handleLaunchDayLifts(day)}
+                      className="w-full py-3 bg-amber-500 hover:bg-amber-400 text-black font-black rounded-xl text-xs sm:text-sm uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer active:scale-98"
+                    >
+                      <Play className="w-4 h-4 fill-black" />
+                      <span>Start & Track Day {dayNum} Session</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+        </>
+      )}
+      </div>
+    </div>
+  );
+};

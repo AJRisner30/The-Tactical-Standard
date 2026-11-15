@@ -1,0 +1,2490 @@
+import express from 'express';
+import http from 'http';
+import { createServer as createViteServer } from 'vite';
+import { GoogleGenAI, Type, Modality, LiveServerMessage } from '@google/genai';
+import { WebSocketServer, WebSocket } from 'ws';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import fs from 'fs';
+import { 
+  buildDynamicCalibratedPlan, 
+  extractBannedMovements, 
+  sanitizePlanAgainstLimitations,
+  getDistinctCircuitForDay,
+  sanitizeExerciseList,
+  validateAndFixSplitLogic,
+  periodizeSchedule
+} from './tacticalEngineServer.ts';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+interface WorkoutGenerationRequest {
+  goals: string[];
+  fitnessLevel: string;
+  frequency: string;
+  scheduleDuration: 'weekly' | 'monthly' | '8weeks' | '12weeks' | string;
+  scheduleWeeks?: number;
+  equipment: string[];
+  sessionDurationMinutes?: number;
+  injuries?: string[];
+  injuryNotes?: string;
+  notes?: string;
+  cardioPreference?: 'none' | 'running' | 'cardio_circuits' | 'hybrid';
+  runningDistancePreference?: string;
+  cardioCircuitType?: string;
+  userEmail?: string;
+}
+
+// Dynamic tactical plan generator in case API key is missing or quota exceeded
+function generateFallbackWorkoutPlan(params: WorkoutGenerationRequest) {
+  return buildDynamicCalibratedPlan(params);
+}
+
+function _legacyUnusedFallback(params: WorkoutGenerationRequest) {
+  const goalStr = params.goals?.join(', ') || 'General Conditioning';
+  const isHypertrophy = params.goals?.some(g => g.toLowerCase().includes('hypertrophy') || g.toLowerCase().includes('muscle'));
+  const isStrength = params.goals?.some(g => g.toLowerCase().includes('strength') || g.toLowerCase().includes('power'));
+  const isEndurance = params.goals?.some(g => g.toLowerCase().includes('endurance') || g.toLowerCase().includes('loss'));
+
+  const injuryRaw = [
+    ...(params.injuries || []),
+    params.injuryNotes || '',
+    params.notes || '',
+  ].join(' ');
+  const injuryLower = injuryRaw.toLowerCase();
+  const hasHipInjury = /hip|labrum|fai|impingement|groin|acetabul/i.test(injuryLower);
+  const hasBackInjury = /back|lumbar|disc|herniat|sciatica|spine/i.test(injuryLower);
+  const hasShoulderInjury = /shoulder|rotator|cuff|ac joint/i.test(injuryLower);
+
+  const category = isStrength ? 'Strength' : isHypertrophy ? 'Hypertrophy' : isEndurance ? 'Athletic Conditioning' : 'Hybrid';
+  const durationDays = params.scheduleDuration === 'monthly' ? 28 : 7;
+  const daysPerWeek = parseInt(params.frequency, 10) || 4;
+
+  const sampleDays = [
+    {
+      day: 1,
+      focus: 'Day 1: Heavy Armor Upper Body & Horizontal Press/Pull',
+      isRestDay: false,
+      exercises: [
+        {
+          id: 'ex-ai-1',
+          name: 'Barbell Bench Press (or Heavy DB Floor Press)',
+          muscleGroup: 'Chest' as const,
+          defaultSets: 4,
+          targetReps: isStrength ? '5 reps' : '8-10 reps',
+          restPeriodSeconds: 120,
+          targetRpe: 8,
+          notes: 'Lower with controlled 3-second eccentric. Explode through lockout.',
+        },
+        {
+          id: 'ex-ai-2',
+          name: 'Chest-Supported Row or Barbell Pendlay Row',
+          muscleGroup: 'Back' as const,
+          defaultSets: 4,
+          targetReps: '8-10 reps',
+          restPeriodSeconds: 90,
+          targetRpe: 8,
+          notes: 'Full scapular retraction at top. Squeeze lats for 1 second.',
+        },
+        {
+          id: 'ex-ai-3',
+          name: 'Standing Overhead Barbell/Dumbbell Military Press',
+          muscleGroup: 'Shoulders' as const,
+          defaultSets: 3,
+          targetReps: '8-12 reps',
+          restPeriodSeconds: 90,
+          targetRpe: 8,
+          notes: 'Glutes and core locked down. Press in a straight vertical bar path.',
+        },
+        {
+          id: 'ex-ai-4',
+          name: 'Weighted or Assisted Pull-Ups',
+          muscleGroup: 'Back' as const,
+          defaultSets: 3,
+          targetReps: '6-8 reps',
+          restPeriodSeconds: 90,
+          targetRpe: 8,
+          notes: 'Full dead-hang at bottom, chest up to touch the bar.',
+        },
+        {
+          id: 'ex-ai-5',
+          name: 'Hanging Knee Raises / Hollow Body Rocks',
+          muscleGroup: 'Core' as const,
+          defaultSets: 3,
+          targetReps: '15-20 reps',
+          restPeriodSeconds: 60,
+          targetRpe: 7,
+          notes: 'Strict core tension. Avoid swinging or momentum.',
+        },
+      ],
+    },
+    {
+      day: 2,
+      focus: hasHipInjury
+        ? 'Day 2: Lower Body Power & Hip-Sparing Kinetic Chain (Labrum Protected)'
+        : 'Day 2: Lower Body Kinetic Power & Posterior Chain',
+      isRestDay: false,
+      exercises: hasHipInjury ? [
+        {
+          id: 'ex-ai-6',
+          name: 'Box Squat to Parallel (Hip Labrum & Joint Protection)',
+          muscleGroup: 'Quads' as const,
+          defaultSets: 4,
+          targetReps: '8-10 reps',
+          restPeriodSeconds: 90,
+          targetRpe: 7,
+          notes: 'CLINICAL LABRUM PROTOCOL: Box height set to 90° or slightly above. Keep shins vertical and sit back into hips. Eliminates femoral head impingement against acetabular labrum. Never dive below parallel.',
+        },
+        {
+          id: 'ex-ai-7',
+          name: 'High-Handle Trap Bar RDL (Restricted Hip Hinge Depth)',
+          muscleGroup: 'Hamstrings & Glutes' as const,
+          defaultSets: 4,
+          targetReps: '8-10 reps',
+          restPeriodSeconds: 90,
+          targetRpe: 7,
+          notes: 'Hinge back with soft knees only to mid-shin level. Stop before any pinch or tension at anterior hip socket.',
+        },
+        {
+          id: 'ex-ai-8',
+          name: 'Banded Spanish Squats or Terminal Knee Extensions (TKE)',
+          muscleGroup: 'Quads' as const,
+          defaultSets: 3,
+          targetReps: '12-15 reps',
+          restPeriodSeconds: 60,
+          targetRpe: 7,
+          notes: 'Heavy band behind knees forces vertical tibia. Delivers intense quad hypertrophy with zero hip joint irritation.',
+        },
+        {
+          id: 'ex-ai-8b',
+          name: 'Barbell or Dumbbell Hip Thrusts (Neutral Pelvis)',
+          muscleGroup: 'Hamstrings & Glutes' as const,
+          defaultSets: 3,
+          targetReps: '10-12 reps',
+          restPeriodSeconds: 75,
+          targetRpe: 8,
+          notes: 'Drive through heels. Squeeze glutes at top lockout with neutral pelvis. Does not enter deep hip flexion, keeping labrum safe.',
+        },
+      ] : [
+        {
+          id: 'ex-ai-6',
+          name: 'Barbell Back Squat or Trap Bar Deadlift',
+          muscleGroup: 'Quads' as const,
+          defaultSets: 4,
+          targetReps: isStrength ? '5 reps' : '6-8 reps',
+          restPeriodSeconds: 150,
+          targetRpe: 8,
+          notes: 'Brace abdominal wall tightly against lifting belt. Drive knees out.',
+        },
+        {
+          id: 'ex-ai-7',
+          name: 'Romanian Deadlift (RDL)',
+          muscleGroup: 'Hamstrings & Glutes' as const,
+          defaultSets: 3,
+          targetReps: '8-10 reps',
+          restPeriodSeconds: 90,
+          targetRpe: 8,
+          notes: 'Hips back until hamstring stretch is felt. Maintain neutral lumbar spine.',
+        },
+        {
+          id: 'ex-ai-8',
+          name: 'Bulgarian Split Squats (or Walking DB Lunges)',
+          muscleGroup: 'Quads' as const,
+          defaultSets: 3,
+          targetReps: '10-12 reps/leg',
+          restPeriodSeconds: 75,
+          targetRpe: 8,
+          notes: 'Unilateral stability for combat sprint velocity and knee health.',
+        },
+        {
+          id: 'ex-ai-9',
+          name: 'Standing Heavy Calf Raises',
+          muscleGroup: 'Hamstrings & Glutes' as const,
+          defaultSets: 3,
+          targetReps: '15 reps',
+          restPeriodSeconds: 60,
+          targetRpe: 7,
+          notes: '2-second stretch at bottom, explosive drive onto big toes.',
+        },
+        {
+          id: 'ex-ai-10',
+          name: 'Standing Suitcase Carries',
+          muscleGroup: 'Core' as const,
+          defaultSets: 3,
+          targetReps: '50 yds/side',
+          restPeriodSeconds: 60,
+          targetRpe: 7,
+          notes: 'Antilateral flexion. Walk upright with zero torso tilting.',
+        },
+      ],
+    },
+    {
+      day: 3,
+      focus: 'Day 3: Active Tactical Recovery & Mobility Flush',
+      isRestDay: true,
+      exercises: [],
+    },
+    {
+      day: 4,
+      focus: 'Day 4: Tactical Upper Hypertrophy & Arm Armor',
+      isRestDay: false,
+      exercises: [
+        {
+          id: 'ex-ai-11',
+          name: 'Incline Dumbbell Bench Press',
+          muscleGroup: 'Chest' as const,
+          defaultSets: 4,
+          targetReps: '10-12 reps',
+          restPeriodSeconds: 90,
+          targetRpe: 8,
+          notes: 'Upper clavicular head focus. Controlled eccentric.',
+        },
+        {
+          id: 'ex-ai-12',
+          name: 'Neutral Grip Lat Pulldown or Single-Arm Cable Row',
+          muscleGroup: 'Back' as const,
+          defaultSets: 4,
+          targetReps: '10-12 reps',
+          restPeriodSeconds: 75,
+          targetRpe: 8,
+          notes: 'Pull elbows toward back pockets to hit lower lats.',
+        },
+        {
+          id: 'ex-ai-13',
+          name: 'Dumbbell Lateral Raises (Heavy Leaning or Cable)',
+          muscleGroup: 'Shoulders' as const,
+          defaultSets: 4,
+          targetReps: '12-15 reps',
+          restPeriodSeconds: 60,
+          targetRpe: 8,
+          notes: 'Slight forward lean, lead with elbows for medial delt cap.',
+        },
+        {
+          id: 'ex-ai-14',
+          name: 'Overhead Cable Triceps Extensions & Barbell Biceps Curls',
+          muscleGroup: 'Arms' as const,
+          defaultSets: 3,
+          targetReps: '12-15 reps',
+          restPeriodSeconds: 60,
+          targetRpe: 8,
+          notes: 'Superset arms for combat grip strength and elbow tendon resilience.',
+        },
+      ],
+    },
+    {
+      day: 5,
+      focus: 'Day 5: Posterior Chain Overload & Tactical Conditioning',
+      isRestDay: false,
+      exercises: [
+        {
+          id: 'ex-ai-15',
+          name: 'Conventional Deadlift or Heavy Kettlebell Swings',
+          muscleGroup: 'Hamstrings & Glutes' as const,
+          defaultSets: 4,
+          targetReps: isStrength ? '4-6 reps' : '8-10 reps',
+          restPeriodSeconds: 150,
+          targetRpe: 8,
+          notes: 'Maximum whole-body recruitment. Solid hip hinge lockout.',
+        },
+        {
+          id: 'ex-ai-16',
+          name: 'Front Squats or Goblet Squats',
+          muscleGroup: 'Quads' as const,
+          defaultSets: 3,
+          targetReps: '8-10 reps',
+          restPeriodSeconds: 90,
+          targetRpe: 8,
+          notes: 'High torso angle builds anterior core and quadriceps depth.',
+        },
+        {
+          id: 'ex-ai-17',
+          name: 'Farmers Walk with Heavy Dumbbells or Trap Bar',
+          muscleGroup: 'Full Body' as const,
+          defaultSets: 4,
+          targetReps: '60 yds',
+          restPeriodSeconds: 90,
+          targetRpe: 9,
+          notes: 'Crush grip, chest proud, short rapid steps.',
+        },
+      ],
+    },
+    {
+      day: 6,
+      focus: 'Day 6: Aerobic Base Flush or Tactical Ruck Interval',
+      isRestDay: daysPerWeek < 5,
+      exercises: daysPerWeek < 5 ? [] : [
+        {
+          id: 'ex-ai-18',
+          name: 'Zone 2 Ruck or Trail Run (35-45 lbs)',
+          muscleGroup: 'Full Body' as const,
+          defaultSets: 1,
+          targetReps: '3.0 - 4.0 miles',
+          restPeriodSeconds: 0,
+          targetRpe: 6,
+          notes: 'Conversational pace (120-140 BPM). Aerobic cardiac stroke volume development.',
+        },
+      ],
+    },
+    {
+      day: 7,
+      focus: 'Day 7: Full Regeneration & Ready State Mobility',
+      isRestDay: true,
+      exercises: [],
+    },
+  ];
+
+  // If user requested running, cardio circuits, or hybrid, integrate into sampleDays
+  if (params.cardioPreference === 'running') {
+    const distText = params.runningDistancePreference || '1.5-2.0 Miles';
+    sampleDays.forEach((d) => {
+      if (!d.isRestDay) {
+        d.exercises.push({
+          id: `ex-run-${d.day}`,
+          name: `Tactical Combat Aerobic Run (${distText})`,
+          muscleGroup: 'Full Body' as const,
+          defaultSets: 1,
+          targetReps: distText,
+          restPeriodSeconds: 0,
+          targetRpe: 7,
+          notes: 'Zone 2 steady-state run for cardiac output and operational stamina.',
+        });
+      }
+    });
+  } else if (params.cardioPreference === 'cardio_circuits') {
+    const circuitStyle = params.cardioCircuitType || 'Combat Metabolic Circuit';
+    sampleDays.forEach((d) => {
+      if (!d.isRestDay) {
+        d.exercises.push({
+          id: `ex-circuit-${d.day}`,
+          name: `${circuitStyle} Finisher`,
+          muscleGroup: 'Full Body' as const,
+          type: 'circuit',
+          defaultSets: 3,
+          targetReps: '3 rounds (40s work / 20s rest)',
+          restPeriodSeconds: 60,
+          targetRpe: 8,
+          notes: 'Circuit Stations: 1. Kettlebell Swings (40s), 2. Combat Sprawls / Burpees (40s), 3. Mountain Climbers (40s), 4. Loaded Farmer Marches (40s). Continuous rotation, 60s recovery between rounds.',
+        });
+      }
+    });
+  } else if (params.cardioPreference === 'hybrid') {
+    sampleDays.forEach((d, idx) => {
+      if (!d.isRestDay) {
+        if (idx % 2 === 0) {
+          d.exercises.push({
+            id: `ex-run-${d.day}`,
+            name: `Operational Aerobic Base Run (1.5 - 2.5 Miles)`,
+            muscleGroup: 'Full Body' as const,
+            defaultSets: 1,
+            targetReps: '1.5 - 2.5 Miles',
+            restPeriodSeconds: 0,
+            targetRpe: 7,
+            notes: 'Steady aerobic endurance run.',
+          });
+        } else {
+          d.exercises.push({
+            id: `ex-circuit-${d.day}`,
+            name: `Combat Metabolic Conditioning Circuit`,
+            muscleGroup: 'Full Body' as const,
+            type: 'circuit',
+            defaultSets: 3,
+            targetReps: '3 rounds (40s work / 20s rest)',
+            restPeriodSeconds: 60,
+            targetRpe: 8,
+            notes: 'Circuit Stations: 1. Combat Burpees (40s), 2. Kettlebell Swings (40s), 3. Speed Mountain Climbers (40s), 4. Plank Knee Drives (40s). 60s round rest.',
+          });
+        }
+      }
+    });
+  }
+
+  // If monthly duration requested, repeat the weekly block structure across 4 weeks with progression notes
+  const fullSchedule = [];
+  if (params.scheduleDuration === 'monthly') {
+    for (let w = 0; w < 4; w++) {
+      for (const d of sampleDays) {
+        const dayNumber = w * 7 + d.day;
+        const weekLabel = `Week ${w + 1}`;
+        fullSchedule.push({
+          day: dayNumber,
+          focus: `${weekLabel} - ${d.focus}`,
+          isRestDay: d.isRestDay,
+          exercises: d.exercises.map(ex => ({
+            ...ex,
+            id: `${ex.id}-w${w + 1}`,
+            notes: w === 3 ? `${ex.notes} [Deload/Peak week: reduce volume by 25% to consolidate gains]` : ex.notes,
+          })),
+        });
+      }
+    }
+  } else {
+    fullSchedule.push(...sampleDays);
+  }
+
+  return {
+    title: `AI Personalized ${category} Protocol`,
+    subtitle: `Custom tailored for ${params.fitnessLevel} • ${params.frequency} • ${goalStr}`,
+    category,
+    frequency: params.frequency,
+    scheduleDuration: params.scheduleDuration === 'monthly' ? '4-Week Monthly Protocol' : '7-Day Rotation',
+    estimatedDurationMinutes: params.sessionDurationMinutes || 55,
+    description: `Scientifically calibrated ${category.toLowerCase()} protocol designed specifically around ${goalStr.toLowerCase()}. Built with progressive overload mechanisms, optimal recovery pacing for ${params.fitnessLevel.toLowerCase()} athletes, and formatted to run with equipment: ${params.equipment?.join(', ') || 'Standard gym equipment'}.`,
+    coachingPhilosophy: `The Tactical Standard periodization: Compound multi-joint lifts come first when neural drive is highest, followed by targeted structural hypertrophy and stabilization. Rest intervals are strictly timed to balance ATP-CP restoration with metabolic stress.`,
+    weeklyProgressionTips: [
+      'Apply double progression: when you achieve the upper target rep count across all working sets, increase load by 2.5-5 lbs on upper body and 5-10 lbs on lower body.',
+      'Maintain RPE discipline: leave 1-2 reps in reserve on compound lifts to prevent systemic central nervous system burnout.',
+      'Sleep minimum 7.5 hours per night for hormone optimization and muscle tissue repair.',
+    ],
+    nutritionAdvice: isHypertrophy
+      ? 'Consume 0.8-1.0g protein per lb of bodyweight daily with a slight 250-350 kcal surplus.'
+      : 'Maintain high protein intake (1.0g/lb) with whole-food nutrient density and adequate hydration with electrolytes.',
+    schedule: fullSchedule,
+  };
+}
+
+interface SingleWorkoutRequest {
+  workoutType: string;
+  durationMinutes: number;
+  equipment: string[];
+  intensity?: 'High' | 'Moderate' | 'Low / Recovery';
+  fitnessLevel?: string;
+  injuries?: string[];
+  injuryNotes?: string;
+  customPrompt?: string;
+  cardioPreference?: 'none' | 'running' | 'cardio_circuits' | 'hybrid';
+  runningDistancePreference?: string;
+  cardioCircuitType?: string;
+  userEmail?: string;
+}
+
+type SingleWorkoutEquipmentMode = 'bw_only' | 'db_only' | 'kb_only' | 'flexible';
+
+function resolveSingleWorkoutEquipmentMode(params: {
+  workoutType?: string;
+  customPrompt?: string;
+  equipment?: string[];
+}): SingleWorkoutEquipmentMode {
+  const typeLower = (params.workoutType || '').toLowerCase();
+  const promptLower = (params.customPrompt || '').toLowerCase();
+  const combinedPrompt = `${typeLower} ${promptLower}`;
+  const equipStr = (params.equipment || []).join(' ').toLowerCase();
+
+  if (
+    /\b(?:bw|bodyweight|calisthenics?)\s*only\b|\b(?:only|just|strictly|purely|all)\s+(?:bw|bodyweight|calisthenics?)\b|\bzero[- ]equipment\b|\bno\s+(?:weights?|equipment|gear|gym)\b/i.test(combinedPrompt) ||
+    typeLower.includes('bodyweight tactical calisthenics') ||
+    typeLower.includes('bodyweight duty calisthenics')
+  ) {
+    return 'bw_only';
+  }
+
+  if (
+    /\b(?:db|dumbbells?)\s*only\b|\b(?:only|just|strictly|purely|all)\s+(?:db|dumbbells?)\b/i.test(combinedPrompt) ||
+    typeLower.includes('dumbbell only')
+  ) {
+    return 'db_only';
+  }
+
+  if (
+    /\b(?:kb|kettlebells?)\s*only\b|\b(?:only|just|strictly|purely|all)\s+(?:kb|kettlebells?)\b/i.test(combinedPrompt) ||
+    typeLower.includes('kettlebell only')
+  ) {
+    return 'kb_only';
+  }
+
+  const hasCommercialOrBarbell = equipStr.includes('barbell') || equipStr.includes('commercial');
+  const hasDumbbell = equipStr.includes('dumbbell');
+  const hasKettlebell = equipStr.includes('kettlebell');
+  const hasBodyweight = equipStr.includes('bodyweight');
+  const hasCables = equipStr.includes('cable');
+  const hasVest = equipStr.includes('vest') || equipStr.includes('ruck');
+
+  if (hasBodyweight && !hasCommercialOrBarbell && !hasDumbbell && !hasKettlebell && !hasCables && !hasVest) {
+    return 'bw_only';
+  }
+  if (hasDumbbell && !hasCommercialOrBarbell && !hasKettlebell && !hasCables) {
+    return 'db_only';
+  }
+  if (hasKettlebell && !hasCommercialOrBarbell && !hasDumbbell && !hasCables) {
+    return 'kb_only';
+  }
+
+  return 'flexible';
+}
+
+const SERVER_BW_FALLBACK_BY_GROUP: Record<string, { name: string; targetReps: string; notes: string }> = {
+  Chest: {
+    name: 'Strict Hand-Release Push-Ups (or Deficit Push-Ups)',
+    targetReps: '12-18 reps',
+    notes: '100% bodyweight chest pressing. Chest touches deck smoothly each rep.',
+  },
+  Back: {
+    name: 'Strict Pull-Ups or Inverted Bodyweight Rows',
+    targetReps: '8-12 reps',
+    notes: '100% bodyweight pulling. Full scapular retraction at the top.',
+  },
+  Quads: {
+    name: 'Bodyweight Bulgarian Split Squats or Tempo Air Squats',
+    targetReps: '12-15 reps per leg',
+    notes: '100% bodyweight lower-body drive with 3-second controlled descent.',
+  },
+  'Hamstrings & Glutes': {
+    name: 'Single-Leg Glute Bridges or Bodyweight Single-Leg RDL',
+    targetReps: '12-15 reps per side',
+    notes: '100% bodyweight posterior chain activation with strong glute squeeze.',
+  },
+  Shoulders: {
+    name: 'Pike Push-Ups & Prone Y-T-W Scapular Raises',
+    targetReps: '10-12 reps',
+    notes: '100% bodyweight shoulder and scapular stability work.',
+  },
+  Arms: {
+    name: 'Diamond Push-Ups & Bench / Floor Triceps Dips',
+    targetReps: '12-15 reps',
+    notes: '100% bodyweight triceps and upper-arm density.',
+  },
+  Core: {
+    name: 'Hollow Body Rocks & Plank Shoulder Taps',
+    targetReps: '15-20 reps',
+    notes: '100% bodyweight anti-rotation core control.',
+  },
+  'Full Body': {
+    name: 'Burpee Broad Jumps or Squat Thrusts',
+    targetReps: '10-12 reps',
+    notes: '100% bodyweight full-body power and conditioning.',
+  },
+};
+
+const SERVER_DB_FALLBACK_BY_GROUP: Record<string, { name: string; targetReps: string; notes: string }> = {
+  Chest: {
+    name: 'Dumbbell Flat Bench Press (or DB Floor Press)',
+    targetReps: '8-12 reps',
+    notes: 'Dumbbell-only pressing. Keep elbows at a 45-degree angle.',
+  },
+  Back: {
+    name: 'Chest-Supported Dumbbell Row (or Single-Arm DB Row)',
+    targetReps: '8-12 reps',
+    notes: 'Dumbbell-only pulling. Pull elbow smoothly toward hip pocket.',
+  },
+  Quads: {
+    name: 'Dumbbell Goblet Squats or DB Bulgarian Split Squats',
+    targetReps: '10-12 reps',
+    notes: 'Dumbbell-only knee-dominant strength with upright torso.',
+  },
+  'Hamstrings & Glutes': {
+    name: 'Dumbbell Romanian Deadlift (RDL)',
+    targetReps: '8-12 reps',
+    notes: 'Dumbbell-only posterior hinge. Keep bells tight to thighs.',
+  },
+  Shoulders: {
+    name: 'Standing Dumbbell Overhead Press & Lateral Raises',
+    targetReps: '10-12 reps',
+    notes: 'Dumbbell-only deltoid pressing and shoulder stability.',
+  },
+  Arms: {
+    name: 'Dumbbell Hammer Curls & Overhead DB Triceps Extensions',
+    targetReps: '12-15 reps',
+    notes: 'Dumbbell-only arm hypertrophy and grip durability.',
+  },
+  Core: {
+    name: 'Dumbbell Suitcase Carry or Weighted DB Russian Twists',
+    targetReps: '12 reps per side',
+    notes: 'Dumbbell-only anti-lateral flexion trunk stability.',
+  },
+  'Full Body': {
+    name: 'Dual Dumbbell Thrusters (Squat to Press)',
+    targetReps: '10-12 reps',
+    notes: 'Dumbbell-only full-body power transfer.',
+  },
+};
+
+const SERVER_KB_FALLBACK_BY_GROUP: Record<string, { name: string; targetReps: string; notes: string }> = {
+  Chest: {
+    name: 'Single-Arm Kettlebell Floor Press',
+    targetReps: '8-12 reps per arm',
+    notes: 'Kettlebell-only pressing with anti-rotation core lock.',
+  },
+  Back: {
+    name: 'Single-Arm Kettlebell Gorilla Row',
+    targetReps: '8-12 reps per arm',
+    notes: 'Kettlebell-only upper-back and lat density.',
+  },
+  Quads: {
+    name: 'Kettlebell Goblet Squats (3-Second Pause)',
+    targetReps: '10-12 reps',
+    notes: 'Kettlebell-only squat depth and quad force.',
+  },
+  'Hamstrings & Glutes': {
+    name: 'Kettlebell Hardstyle Swings',
+    targetReps: '15 reps',
+    notes: 'Kettlebell-only explosive hip hinge snap.',
+  },
+  Shoulders: {
+    name: 'Kettlebell Clean & Strict Overhead Press',
+    targetReps: '8-10 reps per arm',
+    notes: 'Kettlebell-only rack-to-lockout overhead stability.',
+  },
+  Arms: {
+    name: 'Kettlebell Crush-Grip Curls & Overhead Extensions',
+    targetReps: '10-12 reps',
+    notes: 'Kettlebell-only forearm, bicep, and tricep work.',
+  },
+  Core: {
+    name: 'Kettlebell Suitcase Carry or Half-Kneeling Halo',
+    targetReps: '10 reps per side',
+    notes: 'Kettlebell-only 360-degree trunk and shoulder armor.',
+  },
+  'Full Body': {
+    name: 'Kettlebell Clean & Press or Snatches',
+    targetReps: '8-10 reps per arm',
+    notes: 'Kettlebell-only tactical power conditioning.',
+  },
+};
+
+function enforceEquipmentModeOnExercises<T extends {
+  name?: string;
+  muscleGroup?: string;
+  type?: string;
+  format?: string;
+  defaultSets?: number;
+  targetReps?: string;
+  restPeriodSeconds?: number;
+  notes?: string;
+  supersetExercises?: Array<{ name: string; targetReps: string; muscleGroup?: string }>;
+}>(exercises: T[], mode: SingleWorkoutEquipmentMode): T[] {
+  if (mode === 'flexible') return exercises;
+
+  const weightedInBwRegex = /\b(barbell|dumbbell|dumbbells|db|kettlebell|kettlebells|kb|cable|machine|smith|trap\s*bar|hex\s*bar|sandbag|sled|landmine|ez[-\s]?bar|plate|vest|ruck|band|banded|medicine\s*ball|med\s*ball|farmer|suitcase|assault\s*bike|rower|skierg|ergometer)\b/i;
+  const nonDbRegex = /\b(barbell|kettlebell|kettlebells|kb|cable|machine|smith|trap\s*bar|hex\s*bar|sandbag|sled|landmine|ez[-\s]?bar|assault\s*bike|rower|skierg)\b/i;
+  const nonKbRegex = /\b(barbell|dumbbell|dumbbells|db|cable|machine|smith|trap\s*bar|hex\s*bar|sandbag|sled|landmine|ez[-\s]?bar|assault\s*bike|rower|skierg)\b/i;
+
+  const checkRegex =
+    mode === 'bw_only' ? weightedInBwRegex : mode === 'db_only' ? nonDbRegex : nonKbRegex;
+  const map =
+    mode === 'bw_only'
+      ? SERVER_BW_FALLBACK_BY_GROUP
+      : mode === 'db_only'
+      ? SERVER_DB_FALLBACK_BY_GROUP
+      : SERVER_KB_FALLBACK_BY_GROUP;
+
+  return exercises.map((ex, idx) => {
+    const text = `${ex.name || ''} ${ex.notes || ''}`;
+    const isPureRunning =
+      ex.type === 'cardio' &&
+      /\b(run|sprint|jog|shuttle|interval)\b/i.test(ex.name || '') &&
+      !checkRegex.test(ex.name || '');
+
+    if (isPureRunning) return ex;
+
+    if (ex.type === 'circuit' || ex.format === 'circuit') {
+      if (mode === 'bw_only' && checkRegex.test(text)) {
+        return {
+          ...ex,
+          name: 'SpecOps Bodyweight Armor & Calisthenics Circuit (4 Rounds)',
+          type: 'circuit',
+          format: 'circuit',
+          defaultSets: 4,
+          targetReps: '4 rounds (40s Work / 20s Rest)',
+          restPeriodSeconds: 60,
+          notes:
+            'Circuit Stations: 1. Strict Hand-Release Push-Ups (40s), 2. Explosive Jump Squats or Air Squats (40s), 3. Inverted Bodyweight Rows or Pull-Ups (40s), 4. Hollow Body Rocks & Plank Shoulder Taps (40s). Rotate station to station with zero weighted equipment.',
+        };
+      }
+      if (mode === 'db_only' && checkRegex.test(text)) {
+        return {
+          ...ex,
+          name: 'Dumbbell Metabolic Velocity Circuit (4 Rounds)',
+          type: 'circuit',
+          format: 'circuit',
+          defaultSets: 4,
+          targetReps: '4 rounds (40s Work / 20s Rest)',
+          restPeriodSeconds: 60,
+          notes:
+            'Circuit Stations: 1. Dual Dumbbell Thrusters (40s), 2. Dumbbell Suitcase Marches (40s), 3. Dumbbell RDL to Shrug (40s), 4. Dumbbell Push-Up to Hex Row (40s). Dumbbells only.',
+        };
+      }
+      if (mode === 'kb_only' && checkRegex.test(text)) {
+        return {
+          ...ex,
+          name: 'Tactical Kettlebell Combat Circuit (4 Rounds)',
+          type: 'circuit',
+          format: 'circuit',
+          defaultSets: 4,
+          targetReps: '4 rounds (40s Work / 20s Rest)',
+          restPeriodSeconds: 60,
+          notes:
+            'Circuit Stations: 1. Kettlebell Hardstyle Swings (40s), 2. Kettlebell Goblet Squats (40s), 3. Single-Arm Kettlebell Renegade Rows (40s), 4. Kettlebell High Pulls / Snatches (40s). Kettlebells only.',
+        };
+      }
+      return ex;
+    }
+
+    if (ex.type === 'superset' || ex.format === 'superset') {
+      if (checkRegex.test(text) || (ex.supersetExercises || []).some((m) => checkRegex.test(m.name))) {
+        if (mode === 'bw_only') {
+          return {
+            ...ex,
+            name: 'Pike Push-Ups + Inverted Bodyweight Rows Superset',
+            type: 'superset',
+            format: 'superset',
+            supersetExercises: [
+              { name: 'Pike Push-Ups', targetReps: '10-12 reps', muscleGroup: 'Shoulders' },
+              { name: 'Inverted Bodyweight Rows or Prone Y-T-Ws', targetReps: '12-15 reps', muscleGroup: 'Back' },
+            ],
+            targetReps: '10-12 / 12-15',
+            notes: '100% bodyweight shoulder and upper-back superset.',
+          };
+        }
+        if (mode === 'db_only') {
+          return {
+            ...ex,
+            name: 'Dumbbell Lateral Raises + Chest-Supported DB Rear Delt Flyes Superset',
+            type: 'superset',
+            format: 'superset',
+            supersetExercises: [
+              { name: 'Standing Dumbbell Lateral Raises', targetReps: '12-15 reps', muscleGroup: 'Shoulders' },
+              { name: 'Chest-Supported DB Rear Delt Flyes', targetReps: '15 reps', muscleGroup: 'Back' },
+            ],
+            targetReps: '12-15 / 15',
+            notes: 'Dumbbell-only upper armor superset.',
+          };
+        }
+        return {
+          ...ex,
+          name: 'Kettlebell Halos + Kettlebell Gorilla Row Superset',
+          type: 'superset',
+          format: 'superset',
+          supersetExercises: [
+            { name: 'Kettlebell Halos', targetReps: '10 reps/dir', muscleGroup: 'Shoulders' },
+            { name: 'Kettlebell Gorilla Row', targetReps: '10-12 reps', muscleGroup: 'Back' },
+          ],
+          targetReps: '10 / 10-12',
+          notes: 'Kettlebell-only shoulder & upper-back superset.',
+        };
+      }
+      return ex;
+    }
+
+    if (checkRegex.test(ex.name || '') || (mode === 'bw_only' && checkRegex.test(ex.notes || ''))) {
+      const groupKey = ex.muscleGroup || 'Full Body';
+      const fb = map[groupKey] || map['Full Body'];
+      const alts = [fb, map.Chest, map.Back, map.Quads, map['Hamstrings & Glutes'], map.Core];
+      const chosen = fb || alts[idx % alts.length];
+      return {
+        ...ex,
+        name: chosen.name,
+        type: 'strength',
+        format: 'straight',
+        targetReps: chosen.targetReps,
+        notes: chosen.notes,
+      };
+    }
+
+    return ex;
+  });
+}
+
+function generateFallbackSingleWorkout(params: SingleWorkoutRequest) {
+  const duration = params.durationMinutes || 45;
+  const typeLower = (params.workoutType || 'Full-Body Density').toLowerCase();
+  const equipmentMode = resolveSingleWorkoutEquipmentMode(params);
+  const isDbOnly = equipmentMode === 'db_only';
+  const isBwOnly = equipmentMode === 'bw_only';
+  const isKbOnly = equipmentMode === 'kb_only';
+
+  const injuryRaw = [
+    ...(params.injuries || []),
+    params.injuryNotes || '',
+    params.customPrompt || '',
+  ].join(' ').toLowerCase();
+
+  const hasHipInjury = /hip|labrum|fai|impingement/i.test(injuryRaw);
+  const hasBackInjury = /back|lumbar|disc|sciatica|spine/i.test(injuryRaw);
+  const hasShoulderInjury = /shoulder|rotator|cuff/i.test(injuryRaw);
+  const hasKneeInjury = /knee|patell|meniscus/i.test(injuryRaw);
+
+  let title = 'AI Tactical Single-Day Session';
+  let subtitle = `${duration}-Min Custom Session • ${params.intensity || 'High'} Intensity`;
+  let category: 'Strength' | 'Hypertrophy' | 'Athletic Conditioning' | 'Power' | 'Hybrid' = 'Hybrid';
+  let recommendedWarmupId = 'warmup-universal-tactical';
+
+  const exercises: Array<{
+    id: string;
+    name: string;
+    muscleGroup: 'Chest' | 'Back' | 'Quads' | 'Hamstrings & Glutes' | 'Shoulders' | 'Arms' | 'Core' | 'Full Body';
+    type?: string;
+    format?: string;
+    supersetExercises?: Array<{ name: string; targetReps: string; muscleGroup?: string }>;
+    defaultSets: number;
+    targetReps: string;
+    restPeriodSeconds: number;
+    targetRpe: number;
+    notes: string;
+  }> = [];
+
+  if (typeLower.includes('regeneration') || typeLower.includes('mobility') || typeLower.includes('recovery')) {
+    category = 'Athletic Conditioning';
+    title = isBwOnly ? 'Bodyweight Active Regeneration & Mobility Flush' : 'Active Regeneration, Decompression & Mobility Flush';
+    subtitle = `${duration}-Min Low-Impact Joint Decompression & Core Flow`;
+    recommendedWarmupId = 'warmup-dime-mandatory';
+
+    exercises.push({
+      id: 'sw-ex-1',
+      name: 'World Greatest Stretch & Thoracic Spine Rotations',
+      muscleGroup: 'Full Body',
+      type: 'strength',
+      format: 'straight',
+      defaultSets: 3,
+      targetReps: '8 reps per side',
+      restPeriodSeconds: 30,
+      targetRpe: 6,
+      notes: 'Controlled nasal breathing. Open hip flexors, hamstrings, and thoracic spine.',
+    });
+    exercises.push({
+      id: 'sw-ex-2',
+      name: '90/90 Hip Capsule Switches & Glute Bridge Hold',
+      muscleGroup: 'Hamstrings & Glutes',
+      type: 'strength',
+      format: 'straight',
+      defaultSets: 3,
+      targetReps: '10 reps per side',
+      restPeriodSeconds: 30,
+      targetRpe: 6,
+      notes: 'Smooth internal and external hip rotation without pinching.',
+    });
+    exercises.push({
+      id: 'sw-ex-3',
+      name: 'Scapular Push-Ups & Prone Y-T-W Decompression',
+      muscleGroup: 'Shoulders',
+      type: 'strength',
+      format: 'straight',
+      defaultSets: 3,
+      targetReps: '12 reps',
+      restPeriodSeconds: 30,
+      targetRpe: 6,
+      notes: 'Counteract plate carrier and rucksack forward shoulder posture.',
+    });
+    exercises.push({
+      id: 'sw-ex-4',
+      name: 'McGill Big 3: Bird-Dogs & Dead Bugs',
+      muscleGroup: 'Core',
+      type: 'strength',
+      format: 'straight',
+      defaultSets: 3,
+      targetReps: '10 reps per side',
+      restPeriodSeconds: 30,
+      targetRpe: 6,
+      notes: 'Low-tension spinal stabilization and lumbar decompression.',
+    });
+  } else if (typeLower.includes('upper') || typeLower.includes('pump') || typeLower.includes('chest') || typeLower.includes('arm')) {
+    category = 'Hypertrophy';
+    title = isBwOnly
+      ? 'Bodyweight-Only Upper Armor & Calisthenics Burner'
+      : isDbOnly
+      ? 'Dumbbell-Only Upper Armor & Hypertrophy Burner'
+      : isKbOnly
+      ? 'Kettlebell-Only Upper Body Strength & Density'
+      : 'Tactical Upper Body Power & Arm Density';
+    subtitle = `${duration}-Min Upper Push/Pull Density • Chest, Back & Arms`;
+    recommendedWarmupId = 'warmup-upper-primer';
+
+    exercises.push({
+      id: 'sw-ex-1',
+      name: isBwOnly
+        ? 'Strict Hand-Release Push-Ups (or Deficit Push-Ups)'
+        : isKbOnly
+        ? 'Single-Arm Kettlebell Floor Press'
+        : isDbOnly
+        ? 'Heavy Dumbbell Neutral-Grip Flat Bench'
+        : hasShoulderInjury
+        ? 'Neutral-Grip Dumbbell Floor Press'
+        : 'Barbell Bench Press (or Heavy DB Press)',
+      muscleGroup: 'Chest',
+      type: 'strength',
+      format: 'straight',
+      defaultSets: 4,
+      targetReps: isBwOnly ? '15-20 reps' : '8-10 reps',
+      restPeriodSeconds: 90,
+      targetRpe: 8,
+      notes: 'Controlled 3-second descent. Keep scapulae pinned back to protect rotator cuff.',
+    });
+
+    exercises.push({
+      id: 'sw-ex-2',
+      name: isBwOnly
+        ? 'Chest-to-Bar Pull-Ups or Inverted Bodyweight Rows'
+        : isKbOnly
+        ? 'Single-Arm Kettlebell Gorilla Row'
+        : isDbOnly
+        ? 'Chest-Supported Dumbbell Row'
+        : 'Chest-Supported Dumbbell / Barbell Row',
+      muscleGroup: 'Back',
+      type: 'strength',
+      format: 'straight',
+      defaultSets: 4,
+      targetReps: '8-10 reps',
+      restPeriodSeconds: 75,
+      targetRpe: 8,
+      notes: 'Full lat stretch at bottom, explosive squeeze at top with neutral spine.',
+    });
+
+    exercises.push({
+      id: 'sw-ex-3',
+      name: isBwOnly
+        ? 'Pike Push-Ups (Feet Elevated or Floor)'
+        : isKbOnly
+        ? 'Kettlebell Clean & Strict Overhead Press'
+        : isDbOnly
+        ? 'Seated Dumbbell Overhead Strict Press'
+        : hasShoulderInjury
+        ? 'Landmine Shoulder Press or Half-Kneeling DB Press'
+        : 'Standing Dumbbell Overhead Strict Press',
+      muscleGroup: 'Shoulders',
+      type: 'strength',
+      format: 'straight',
+      defaultSets: 3,
+      targetReps: '10-12 reps',
+      restPeriodSeconds: 60,
+      targetRpe: 8,
+      notes: 'Lock down ribcage and glutes. Avoid spinal arching.',
+    });
+
+    if (duration >= 30) {
+      exercises.push({
+        id: 'sw-ex-4',
+        name: isBwOnly
+          ? 'Diamond Push-Ups (Triceps & Inner Chest)'
+          : isKbOnly
+          ? 'Kettlebell Crush-Grip Curls'
+          : 'Incline Dumbbell Hammer Curls',
+        muscleGroup: 'Arms',
+        type: 'strength',
+        format: 'straight',
+        defaultSets: 3,
+        targetReps: '12-15 reps',
+        restPeriodSeconds: 60,
+        targetRpe: 8,
+        notes: 'Strict elbow flexion. Control negative tempo.',
+      });
+      exercises.push({
+        id: 'sw-ex-5',
+        name: isBwOnly
+          ? 'Bench / Box Dips (Strict Scapular Retraction)'
+          : isKbOnly
+          ? 'Kettlebell Overhead Triceps Extensions'
+          : isDbOnly
+          ? 'Dumbbell Overhead Triceps Extensions (or Skull Crushers)'
+          : 'Overhead Rope Triceps Extensions or Skull Crushers',
+        muscleGroup: 'Arms',
+        type: 'strength',
+        format: 'straight',
+        defaultSets: 3,
+        targetReps: '12-15 reps',
+        restPeriodSeconds: 60,
+        targetRpe: 8,
+        notes: 'Target long head of triceps for structural elbow joint stabilization.',
+      });
+    }
+
+    if (duration >= 45) {
+      exercises.push({
+        id: 'sw-ex-6',
+        name: isBwOnly
+          ? 'Prone Y-T-W Scapular Raises (Bodyweight)'
+          : isKbOnly
+          ? 'Kettlebell Halos (Scapular & Shoulder Armor)'
+          : isDbOnly
+          ? 'Chest-Supported Dumbbell Rear Delt Flyes'
+          : 'Face Pulls with Band or Cable (Scapular Retraction)',
+        muscleGroup: 'Shoulders',
+        type: 'strength',
+        format: 'straight',
+        defaultSets: 3,
+        targetReps: '15-20 reps',
+        restPeriodSeconds: 45,
+        targetRpe: 7,
+        notes: 'External rotation focus to balance chest pressing volume.',
+      });
+    }
+  } else if (typeLower.includes('leg') || typeLower.includes('lower') || typeLower.includes('squat')) {
+    category = 'Strength';
+    title = isBwOnly
+      ? 'Bodyweight-Only Lower Body Power & Unilateral Control'
+      : isDbOnly
+      ? 'Dumbbell-Only Lower Body Power & Posterior Chain'
+      : isKbOnly
+      ? 'Kettlebell-Only Lower Body Chassis & Hinge'
+      : 'Lower Body Chassis Overload & Power';
+    subtitle = `${duration}-Min Leg Drive & Posterior Chain Resilience`;
+    recommendedWarmupId = 'warmup-lower-prep';
+
+    exercises.push({
+      id: 'sw-ex-1',
+      name: isBwOnly
+        ? hasHipInjury
+          ? 'Bodyweight Box Squats to Parallel (Vertical Shins)'
+          : 'Tempo Bodyweight Squats (3s Down) or Explosive Jump Squats'
+        : isKbOnly
+        ? 'Kettlebell Goblet Squats (Vertical Torso)'
+        : hasHipInjury
+        ? isDbOnly
+          ? 'Dumbbell Box Squats to Parallel'
+          : 'Box Squat to Parallel (Hip Labrum Safe • Vertical Shins)'
+        : isDbOnly
+        ? 'Heavy Dumbbell Goblet Squats (Elevated Heels)'
+        : 'Barbell Back Squats (or Safety Bar Squat)',
+      muscleGroup: 'Quads',
+      type: 'strength',
+      format: 'straight',
+      defaultSets: 4,
+      targetReps: isBwOnly ? '15-20 reps' : '8-10 reps',
+      restPeriodSeconds: isBwOnly ? 60 : 100,
+      targetRpe: 8,
+      notes: hasHipInjury ? 'Sit back onto box to eliminate acute hip pinch. Vertical tibia angles.' : 'Drive through full foot balance. Control descent.',
+    });
+
+    exercises.push({
+      id: 'sw-ex-2',
+      name: isBwOnly
+        ? 'Single-Leg Bodyweight Romanian Deadlifts & Glute-Ham Bridges'
+        : isKbOnly
+        ? 'Kettlebell Single-Leg Romanian Deadlift'
+        : isDbOnly || hasBackInjury
+        ? 'Dumbbell Romanian Deadlift (RDL)'
+        : 'High-Handle Trap Bar Deadlift / Dumbbell RDL',
+      muscleGroup: 'Hamstrings & Glutes',
+      type: 'strength',
+      format: 'straight',
+      defaultSets: 4,
+      targetReps: isBwOnly ? '12 reps per leg' : '8-10 reps',
+      restPeriodSeconds: 90,
+      targetRpe: 8,
+      notes: 'Hip hinge emphasis. Soft knees, push hips back to the wall until hamstring tension peaks.',
+    });
+
+    exercises.push({
+      id: 'sw-ex-3',
+      name: isBwOnly
+        ? hasKneeInjury
+          ? 'Low-Box Bodyweight Step-Ups & Reverse Lunges'
+          : 'Bodyweight Bulgarian Split Squats or Walking Lunges'
+        : isKbOnly
+        ? 'Kettlebell Goblet Reverse Lunges'
+        : hasKneeInjury && !isDbOnly
+        ? 'Backward Sled Drags or Step-Downs'
+        : isDbOnly
+        ? 'Dumbbell Bulgarian Split Squats'
+        : 'Bulgarian Split Squats or Walking Lunges',
+      muscleGroup: 'Quads',
+      type: 'strength',
+      format: 'straight',
+      defaultSets: 3,
+      targetReps: '10-12 reps per leg',
+      restPeriodSeconds: 75,
+      targetRpe: 8,
+      notes: 'Unilateral quad balance and knee tendon stabilization.',
+    });
+
+    if (duration >= 30) {
+      exercises.push({
+        id: 'sw-ex-4',
+        name: isBwOnly
+          ? 'Single-Leg Glute Bridges (3-Second Peak Squeeze)'
+          : isKbOnly
+          ? 'Kettlebell Hardstyle Swings'
+          : isDbOnly
+          ? 'Dumbbell Hip Thrusts (Shoulders Elevated)'
+          : 'Dumbbell / Barbell Hip Thrusts or Glute Bridges',
+        muscleGroup: 'Hamstrings & Glutes',
+        type: 'strength',
+        format: 'straight',
+        defaultSets: 3,
+        targetReps: '12-15 reps',
+        restPeriodSeconds: 60,
+        targetRpe: 8,
+        notes: 'Full glute extension at lockout with a neutral pelvis.',
+      });
+      exercises.push({
+        id: 'sw-ex-5',
+        name: isBwOnly
+          ? 'Single-Leg Bodyweight Calf Raises & Wall Tibialis Raises'
+          : isKbOnly
+          ? 'Kettlebell-Loaded Single-Leg Calf Raises'
+          : 'Standing Dumbbell Calf Raises & Tibialis Raises',
+        muscleGroup: 'Quads',
+        type: 'strength',
+        format: 'straight',
+        defaultSets: 3,
+        targetReps: '15-20 reps',
+        restPeriodSeconds: 45,
+        targetRpe: 8,
+        notes: 'Ankle joint durability and combat sprint propulsion.',
+      });
+    }
+  } else if (typeLower.includes('sprint') || typeLower.includes('pursuit') || typeLower.includes('conditioning') || typeLower.includes('metabolic')) {
+    category = 'Athletic Conditioning';
+    title = isBwOnly
+      ? 'Bodyweight-Only Combat Sprint & Conditioning Intervals'
+      : 'Tactical Sprint & VO2 Conditioning Engine';
+    subtitle = `${duration}-Min High-Output Aerobic / Anaerobic Shifter`;
+    recommendedWarmupId = 'warmup-apex-sop';
+
+    exercises.push({
+      id: 'sw-ex-1',
+      name: 'Combat Sprint Repeats (100m to 200m or Shuttle Sprints)',
+      muscleGroup: 'Full Body',
+      type: 'cardio',
+      format: 'straight',
+      defaultSets: duration <= 25 ? 5 : 8,
+      targetReps: '100m sprint / 45s recovery',
+      restPeriodSeconds: 60,
+      targetRpe: 9,
+      notes: 'Simulate combat bounding acceleration: explode from zero to max velocity in first 3 strides.',
+    });
+
+    exercises.push({
+      id: 'sw-ex-2',
+      name: isBwOnly
+        ? 'Explosive Jump Squats (Soft Landing)'
+        : isKbOnly
+        ? 'Kettlebell Hardstyle Swings'
+        : 'Dumbbell Thrusters (Squat to Overhead Press)',
+      muscleGroup: 'Full Body',
+      type: 'strength',
+      format: 'straight',
+      defaultSets: 4,
+      targetReps: '15 reps',
+      restPeriodSeconds: 60,
+      targetRpe: 8,
+      notes: 'Continuous metabolic rhythm. Drive hard through hips.',
+    });
+
+    exercises.push({
+      id: 'sw-ex-3',
+      name: isBwOnly
+        ? 'Lateral Skater Bounds & Broad Jumps'
+        : isKbOnly
+        ? 'Heavy Kettlebell Farmers Carry'
+        : isDbOnly
+        ? 'Heavy Dumbbell Farmers Carry'
+        : 'Farmers Walk with Heavy Load (or Heavy Kettlebell Carry)',
+      muscleGroup: 'Full Body',
+      type: isBwOnly ? 'strength' : 'cardio',
+      format: 'straight',
+      defaultSets: 4,
+      targetReps: isBwOnly ? '12 reps per side' : '60 yards',
+      restPeriodSeconds: 60,
+      targetRpe: 9,
+      notes: isBwOnly ? 'Explosive lateral change-of-direction tactical agility.' : 'Maintain tactical upright posture under intense grip exhaustion.',
+    });
+
+    if (duration >= 30) {
+      exercises.push({
+        id: 'sw-ex-4',
+        name: 'Burpee Broad Jumps or Sprawl to Sprint',
+        muscleGroup: 'Full Body',
+        type: 'strength',
+        format: 'straight',
+        defaultSets: 3,
+        targetReps: '10 reps',
+        restPeriodSeconds: 60,
+        targetRpe: 9,
+        notes: 'Prone-to-sprint ground-recovery speed and anaerobic power transfer.',
+      });
+      exercises.push({
+        id: 'sw-ex-5',
+        name: 'Hanging Knee Raises (or Lying Leg Raises)',
+        muscleGroup: 'Core',
+        type: 'strength',
+        format: 'straight',
+        defaultSets: 3,
+        targetReps: '12-15 reps',
+        restPeriodSeconds: 45,
+        targetRpe: 8,
+        notes: 'Anterior core brace against rotational torsional stress.',
+      });
+    }
+  } else if (isKbOnly || typeLower.includes('kettlebell')) {
+    category = 'Athletic Conditioning';
+    title = 'Kettlebell-Only Tactical Functional Flow';
+    subtitle = `${duration}-Min Pure Kettlebell Work Capacity (Kettlebells Only)`;
+    recommendedWarmupId = 'warmup-universal-tactical';
+
+    exercises.push({
+      id: 'sw-ex-1',
+      name: 'Single or Double Kettlebell Clean & Press',
+      muscleGroup: 'Full Body',
+      type: 'strength',
+      format: 'straight',
+      defaultSets: 4,
+      targetReps: '8 reps',
+      restPeriodSeconds: 60,
+      targetRpe: 8,
+      notes: 'Hips generate clean momentum. Strict lockout overhead. Kettlebells only.',
+    });
+
+    exercises.push({
+      id: 'sw-ex-2',
+      name: 'Kettlebell Goblet Squats with 3-Second Isometric Pause',
+      muscleGroup: 'Quads',
+      type: 'strength',
+      format: 'straight',
+      defaultSets: 4,
+      targetReps: '10 reps',
+      restPeriodSeconds: 60,
+      targetRpe: 8,
+      notes: 'Sit into deep squat, pause 3s at bottom, explode up.',
+    });
+
+    exercises.push({
+      id: 'sw-ex-3',
+      name: 'Single-Arm Kettlebell Gorilla Row or Renegade Row',
+      muscleGroup: 'Back',
+      type: 'strength',
+      format: 'straight',
+      defaultSets: 3,
+      targetReps: '8 reps per side',
+      restPeriodSeconds: 60,
+      targetRpe: 8,
+      notes: 'Anti-rotational core stabilization. Squeeze upper back.',
+    });
+
+    if (duration >= 30) {
+      exercises.push({
+        id: 'sw-ex-4',
+        name: 'Kettlebell Hardstyle Swings or Snatches',
+        muscleGroup: 'Hamstrings & Glutes',
+        type: 'strength',
+        format: 'straight',
+        defaultSets: 3,
+        targetReps: '15 reps',
+        restPeriodSeconds: 60,
+        targetRpe: 8,
+        notes: 'Explosive hip hinge snap driving kettlebell horizontally.',
+      });
+      exercises.push({
+        id: 'sw-ex-5',
+        name: 'Kettlebell Suitcase Carry (Unilateral Offset Weight)',
+        muscleGroup: 'Core',
+        type: 'cardio',
+        format: 'straight',
+        defaultSets: 3,
+        targetReps: '50 yds per side',
+        restPeriodSeconds: 45,
+        targetRpe: 8,
+        notes: 'Resist lateral spinal bending. Keep shoulders completely level.',
+      });
+    }
+  } else if (isDbOnly || typeLower.includes('dumbbell only')) {
+    category = 'Hypertrophy';
+    title = 'Dumbbell-Only Tactical Armor & Hypertrophy';
+    subtitle = `${duration}-Min Pure Dumbbell Session (Dumbbells Only)`;
+    recommendedWarmupId = 'warmup-upper-primer';
+
+    exercises.push({
+      id: 'sw-ex-1',
+      name: hasShoulderInjury ? 'Neutral-Grip Dumbbell Floor Press' : 'Dumbbell Flat Bench Press',
+      muscleGroup: 'Chest',
+      type: 'strength',
+      format: 'straight',
+      defaultSets: 4,
+      targetReps: '8-10 reps',
+      restPeriodSeconds: 90,
+      targetRpe: 8,
+      notes: 'Controlled 3-second eccentric. Dumbbells only.',
+    });
+
+    exercises.push({
+      id: 'sw-ex-2',
+      name: 'Chest-Supported Dumbbell Row (or Single-Arm DB Row)',
+      muscleGroup: 'Back',
+      type: 'strength',
+      format: 'straight',
+      defaultSets: 4,
+      targetReps: '8-10 reps',
+      restPeriodSeconds: 75,
+      targetRpe: 8,
+      notes: 'Pull elbows smoothly toward hips with full scapular contraction.',
+    });
+
+    exercises.push({
+      id: 'sw-ex-3',
+      name: hasHipInjury ? 'Dumbbell Box Squats to Parallel' : 'Dumbbell Goblet Squats',
+      muscleGroup: 'Quads',
+      type: 'strength',
+      format: 'straight',
+      defaultSets: 3,
+      targetReps: '10-12 reps',
+      restPeriodSeconds: 90,
+      targetRpe: 8,
+      notes: 'Keep torso tall and drive evenly through midfoot.',
+    });
+
+    if (duration >= 30) {
+      exercises.push({
+        id: 'sw-ex-4',
+        name: 'Dumbbell Romanian Deadlift (RDL)',
+        muscleGroup: 'Hamstrings & Glutes',
+        type: 'strength',
+        format: 'straight',
+        defaultSets: 3,
+        targetReps: '10 reps',
+        restPeriodSeconds: 75,
+        targetRpe: 8,
+        notes: 'Push hips back toward the wall while keeping dumbbells close to thighs.',
+      });
+      exercises.push({
+        id: 'sw-ex-5',
+        name: hasShoulderInjury ? 'Half-Kneeling Dumbbell Neutral Press' : 'Seated Dumbbell Overhead Press',
+        muscleGroup: 'Shoulders',
+        type: 'strength',
+        format: 'straight',
+        defaultSets: 3,
+        targetReps: '10-12 reps',
+        restPeriodSeconds: 60,
+        targetRpe: 8,
+        notes: 'Ribs locked down, press straight overhead.',
+      });
+    }
+
+    if (duration >= 45) {
+      exercises.push({
+        id: 'sw-ex-6',
+        name: 'Dumbbell Hammer Curls + Overhead DB Triceps Extension Superset',
+        muscleGroup: 'Arms',
+        type: 'superset',
+        format: 'superset',
+        supersetExercises: [
+          { name: 'Dumbbell Hammer Curls', targetReps: '12 reps', muscleGroup: 'Arms' },
+          { name: 'Overhead Dumbbell Triceps Extension', targetReps: '12-15 reps', muscleGroup: 'Arms' },
+        ],
+        defaultSets: 3,
+        targetReps: '12 / 12-15',
+        restPeriodSeconds: 45,
+        targetRpe: 8,
+        notes: 'Dumbbell-only arm armor finisher.',
+      });
+    }
+  } else if (typeLower.includes('ruck') || typeLower.includes('carry')) {
+    category = 'Hybrid';
+    title = isBwOnly ? 'Bodyweight Tactical Chassis & Core Endurance' : 'Combat Chassis: Ruck, Heavy Carry & Core Overload';
+    subtitle = `${duration}-Min Tactical Frame & Structural Load Endurance`;
+    recommendedWarmupId = 'warmup-apex-sop';
+
+    exercises.push({
+      id: 'sw-ex-1',
+      name: isBwOnly ? 'Strict Hand-Release Push-Ups' : 'Heavy Weighted Trap Bar / Dumbbell Farmers Carry',
+      muscleGroup: isBwOnly ? 'Chest' : 'Full Body',
+      type: isBwOnly ? 'strength' : 'cardio',
+      format: 'straight',
+      defaultSets: 5,
+      targetReps: isBwOnly ? '15 reps' : '60 yds (Max Load)',
+      restPeriodSeconds: 75,
+      targetRpe: 9,
+      notes: isBwOnly ? 'Zero equipment pressing stamina.' : 'Crush grip, chest proud, glutes tight, controlled strides.',
+    });
+
+    exercises.push({
+      id: 'sw-ex-2',
+      name: isBwOnly ? 'Inverted Bodyweight Rows or Pull-Ups' : 'Heavy Sandbag or Dumbbell Bear-Hug Carry',
+      muscleGroup: isBwOnly ? 'Back' : 'Full Body',
+      type: isBwOnly ? 'strength' : 'cardio',
+      format: 'straight',
+      defaultSets: 4,
+      targetReps: isBwOnly ? '10-12 reps' : '50 yds',
+      restPeriodSeconds: 60,
+      targetRpe: 8,
+      notes: isBwOnly ? 'Bodyweight pulling posture endurance.' : 'Anterior core isometric tension mimicking body drags and subject control.',
+    });
+
+    exercises.push({
+      id: 'sw-ex-3',
+      name: isBwOnly ? 'Single-Leg Bodyweight Romanian Deadlifts' : 'High-Handle Trap Bar Deadlift or Romanian Deadlift',
+      muscleGroup: 'Hamstrings & Glutes',
+      type: 'strength',
+      format: 'straight',
+      defaultSets: 4,
+      targetReps: isBwOnly ? '10 reps per leg' : '8 reps',
+      restPeriodSeconds: 90,
+      targetRpe: 8,
+      notes: 'Build posterior spinal stability.',
+    });
+
+    if (duration >= 30) {
+      exercises.push({
+        id: 'sw-ex-4',
+        name: isBwOnly ? 'Bodyweight Walking Lunges or Step-Ups' : 'Weighted Vest / Pack Walking Lunges or Step-Ups',
+        muscleGroup: 'Quads',
+        type: 'strength',
+        format: 'straight',
+        defaultSets: 3,
+        targetReps: '10 reps per leg',
+        restPeriodSeconds: 60,
+        targetRpe: 8,
+        notes: 'Structural leg endurance.',
+      });
+      exercises.push({
+        id: 'sw-ex-5',
+        name: isBwOnly ? 'Side Plank & Hollow Body Hold' : 'Suitcase Hold & March (Anti-Lateral Flexion)',
+        muscleGroup: 'Core',
+        type: isBwOnly ? 'core' : 'cardio',
+        format: 'straight',
+        defaultSets: 3,
+        targetReps: isBwOnly ? '45s per side' : '40s per side',
+        restPeriodSeconds: 45,
+        targetRpe: 8,
+        notes: 'Reinforces the lumbar spine.',
+      });
+    }
+  } else {
+    category = 'Hybrid';
+    title = isBwOnly ? 'Bodyweight-Only Tactical Calisthenics & Core' : 'Tactical Full-Body Density & Armor Protocol';
+    subtitle = isBwOnly
+      ? `${duration}-Min Zero-Equipment Calisthenics • Push, Pull, Squat, Core`
+      : `${duration}-Min Complete Tactical Session • Push, Pull, Hinge, Carry`;
+    recommendedWarmupId = 'warmup-universal-tactical';
+
+    exercises.push({
+      id: 'sw-ex-1',
+      name: isBwOnly
+        ? 'Strict Hand-Release Push-Ups (or Deficit Push-Ups)'
+        : isDbOnly
+        ? 'Heavy Dumbbell Flat Bench Press'
+        : 'Barbell Bench Press or Floor Press',
+      muscleGroup: 'Chest',
+      type: 'strength',
+      format: 'straight',
+      defaultSets: 4,
+      targetReps: isBwOnly ? '15-20 reps' : '8-10 reps',
+      restPeriodSeconds: 90,
+      targetRpe: 8,
+      notes: 'Drive through floor, maintain solid shoulder retraction.',
+    });
+
+    exercises.push({
+      id: 'sw-ex-2',
+      name: isBwOnly
+        ? 'Strict Dead-Hang Pull-Ups or Inverted Bodyweight Rows'
+        : 'Chest-Supported Row or Barbell Row',
+      muscleGroup: 'Back',
+      type: 'strength',
+      format: 'straight',
+      defaultSets: 4,
+      targetReps: isBwOnly ? '6-10 reps' : '8-10 reps',
+      restPeriodSeconds: 75,
+      targetRpe: 8,
+      notes: 'Full pull with elbows leading back toward hips.',
+    });
+
+    exercises.push({
+      id: 'sw-ex-3',
+      name: isBwOnly
+        ? hasHipInjury
+          ? 'Bodyweight Box Squats to Parallel (Vertical Shins)'
+          : 'Bodyweight Bulgarian Split Squats or Tempo Air Squats'
+        : hasHipInjury
+        ? 'Parallel Box Squats (Vertical Shins)'
+        : isDbOnly
+        ? 'Dumbbell Front Squats / Goblet Squats'
+        : 'Barbell Back Squats',
+      muscleGroup: 'Quads',
+      type: 'strength',
+      format: 'straight',
+      defaultSets: 3,
+      targetReps: isBwOnly ? '12-15 reps' : '10 reps',
+      restPeriodSeconds: isBwOnly ? 60 : 90,
+      targetRpe: 8,
+      notes: 'Smooth descent with zero joint bounce.',
+    });
+
+    if (duration >= 30) {
+      exercises.push({
+        id: 'sw-ex-4',
+        name: isBwOnly
+          ? 'Single-Leg Bodyweight Romanian Deadlifts or Glute Bridges'
+          : hasBackInjury
+          ? 'Hamstring Glute Bridges'
+          : 'High-Handle Trap Bar RDL or Dumbbell RDL',
+        muscleGroup: 'Hamstrings & Glutes',
+        type: 'strength',
+        format: 'straight',
+        defaultSets: 3,
+        targetReps: isBwOnly ? '12 reps per side' : '10 reps',
+        restPeriodSeconds: 60,
+        targetRpe: 8,
+        notes: 'Peak hamstring & glute engagement.',
+      });
+      exercises.push({
+        id: 'sw-ex-5',
+        name: isBwOnly ? 'Hanging Knee Raises & Hollow Body Rocks' : 'Heavy Farmers Carry or Kettlebell March',
+        muscleGroup: 'Core',
+        type: isBwOnly ? 'strength' : 'cardio',
+        format: 'straight',
+        defaultSets: 3,
+        targetReps: isBwOnly ? '15 reps' : '50 yds',
+        restPeriodSeconds: 45,
+        targetRpe: 8,
+        notes: 'High-tension combat core brace.',
+      });
+    }
+
+    if (duration >= 45) {
+      exercises.push(
+        isBwOnly
+          ? {
+              id: 'sw-ex-6',
+              name: 'Pike Push-Ups + Prone Y-T-W Scapular Raises Superset',
+              muscleGroup: 'Shoulders',
+              type: 'superset',
+              format: 'superset',
+              supersetExercises: [
+                { name: 'Pike Push-Ups', targetReps: '10-12 reps', muscleGroup: 'Shoulders' },
+                { name: 'Prone Y-T-W Scapular Raises', targetReps: '12-15 reps', muscleGroup: 'Back' },
+              ],
+              defaultSets: 3,
+              targetReps: '10-12 / 12-15',
+              restPeriodSeconds: 45,
+              targetRpe: 8,
+              notes: '100% bodyweight shoulder stability and upper-back posture.',
+            }
+          : {
+              id: 'sw-ex-6',
+              name: 'Standing DB Lateral Raises + Face Pulls Superset',
+              muscleGroup: 'Shoulders',
+              type: 'superset',
+              format: 'superset',
+              supersetExercises: [
+                { name: 'Standing DB Lateral Raises', targetReps: '12-15 reps', muscleGroup: 'Shoulders' },
+                { name: 'Face Pulls (Band or Cable)', targetReps: '15-20 reps', muscleGroup: 'Back' },
+              ],
+              defaultSets: 3,
+              targetReps: '12-15 / 15-20',
+              restPeriodSeconds: 45,
+              targetRpe: 8,
+              notes: 'Shoulder stability and upper armor definition.',
+            }
+      );
+    }
+  }
+
+  const bannedRules = extractBannedMovements(
+    [params.customPrompt || '', params.injuryNotes || '', ...(params.injuries || [])].join(' '),
+    params.injuries || []
+  );
+
+  if (params.cardioPreference === 'running') {
+    const distText = params.runningDistancePreference || '1.5 Miles';
+    exercises.push({
+      id: `sw-cardio-${Date.now()}`,
+      name: `Tactical Aerobic Run (${distText})`,
+      muscleGroup: 'Full Body',
+      type: 'cardio',
+      defaultSets: 1,
+      targetReps: distText,
+      restPeriodSeconds: 0,
+      targetRpe: 7,
+      notes: 'Paced Zone 2/3 steady aerobic run. Builds service member endurance, cardiac stroke volume, and rapid recovery capacity.',
+    });
+    title += ' + Combat Run';
+    category = 'Hybrid';
+  } else if (params.cardioPreference === 'cardio_circuits') {
+    const effectiveCircuitPref = isBwOnly
+      ? 'Calisthenics'
+      : isDbOnly
+      ? 'Full Body Density'
+      : isKbOnly
+      ? 'Full Body'
+      : params.cardioCircuitType;
+    const circuitEx = getDistinctCircuitForDay(0, effectiveCircuitPref, bannedRules);
+    exercises.push(circuitEx as any);
+    title += ' + Cardio Circuit';
+    category = 'Hybrid';
+  } else if (params.cardioPreference === 'hybrid') {
+    exercises.push({
+      id: `sw-cardio-1-${Date.now()}`,
+      name: `Combat Sprint Repeats (400m x 4)`,
+      muscleGroup: 'Full Body',
+      type: 'cardio',
+      defaultSets: 4,
+      targetReps: '400m @ 85% sprint',
+      restPeriodSeconds: 90,
+      targetRpe: 9,
+      notes: 'Explosive acceleration and anaerobic lactate tolerance.',
+    });
+    const effectiveCircuitPref = isBwOnly
+      ? 'Calisthenics'
+      : isDbOnly
+      ? 'Full Body Density'
+      : isKbOnly
+      ? 'Full Body'
+      : params.cardioCircuitType;
+    const circuitEx = getDistinctCircuitForDay(1, effectiveCircuitPref, bannedRules);
+    exercises.push(circuitEx as any);
+    title += ' + Hybrid Cardio & Run';
+    category = 'Hybrid';
+  }
+
+  const programId = `ai-single-${Date.now().toString(36)}`;
+  const equipmentCleaned = enforceEquipmentModeOnExercises(exercises, equipmentMode);
+  const sanitizedExercises = sanitizeExerciseList(equipmentCleaned, bannedRules);
+
+  const equipmentSummaryLabel = isBwOnly
+    ? 'Bodyweight Only (Zero Weighted Equipment)'
+    : isDbOnly
+    ? 'Dumbbells Only'
+    : isKbOnly
+    ? 'Kettlebells Only'
+    : (params.equipment || []).join(', ') || 'Standard gear';
+
+  return {
+    id: programId,
+    title,
+    subtitle,
+    category,
+    frequency: 'Single Day Session',
+    estimatedDurationMinutes: duration,
+    description: `A custom-engineered on-demand single-day session designed around: ${params.workoutType}. Calibrated for ${duration} minutes with equipment: ${equipmentSummaryLabel}. Intensity targeted at ${params.intensity || 'High'}.`,
+    recommendedWarmupId,
+    exercises: sanitizedExercises,
+  };
+}
+
+async function startServer() {
+  const app = express();
+  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+
+  app.use(express.json({ limit: '10mb' }));
+
+  // Shared Gemini client management with reactive API key lookup
+  let cachedAi: GoogleGenAI | null = null;
+  let lastApiKey = '';
+
+  function getGeminiClient(): GoogleGenAI | null {
+    const key = process.env.GEMINI_API_KEY;
+    if (!key || key.trim().length === 0) {
+      cachedAi = null;
+      lastApiKey = '';
+      return null;
+    }
+    if (cachedAi && lastApiKey === key) {
+      return cachedAi;
+    }
+    try {
+      cachedAi = new GoogleGenAI({
+        apiKey: key,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          },
+        },
+      });
+      lastApiKey = key;
+      return cachedAi;
+    } catch (err) {
+      console.warn('[Server] Error initializing GoogleGenAI:', err);
+      return null;
+    }
+  }
+
+  // Health check endpoint
+  app.get('/api/health', (req, res) => {
+    res.json({
+      status: 'ok',
+      hasGeminiApiKey: Boolean(process.env.GEMINI_API_KEY),
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  function callWithTimeout<T>(promise: Promise<T>, ms = 8000): Promise<T> {
+    return Promise.race([
+      promise,
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(`Model request timed out after ${ms}ms`)), ms)
+      ),
+    ]);
+  }
+
+  // POST /api/gemini/generate-workout-plan
+  app.post('/api/gemini/generate-workout-plan', async (req, res) => {
+    const params: WorkoutGenerationRequest = req.body;
+
+    if (!params || !params.goals || !params.fitnessLevel) {
+      return res.status(400).json({
+        error: 'Missing required training parameters (goals, fitnessLevel, frequency, equipment).',
+      });
+    }
+
+    const ai = getGeminiClient();
+
+    // If Gemini client is not initialized or API key is absent, return the calibrated fallback plan
+    if (!ai) {
+      console.log('[Server] No GEMINI_API_KEY configured. Serving high-fidelity personalized fallback plan.');
+      const fallback = generateFallbackWorkoutPlan(params);
+      return res.json({
+        success: true,
+        data: fallback,
+        source: 'local_engine',
+      });
+    }
+
+    try {
+      let weeksCount = 4;
+      if (typeof params.scheduleWeeks === 'number' && params.scheduleWeeks >= 1 && params.scheduleWeeks <= 12) {
+        weeksCount = Math.round(params.scheduleWeeks);
+      } else if (params.scheduleDuration === '12weeks' || params.scheduleDuration === '12-week' || params.scheduleDuration === 'macrocycle') {
+        weeksCount = 12;
+      } else if (params.scheduleDuration === '8weeks' || params.scheduleDuration === '8-week') {
+        weeksCount = 8;
+      } else if (params.scheduleDuration === 'monthly' || params.scheduleDuration === '4weeks' || params.scheduleDuration === '4-week') {
+        weeksCount = 4;
+      } else if (params.scheduleDuration === 'weekly' || params.scheduleDuration === '1week' || params.scheduleDuration === '1-week') {
+        weeksCount = 1;
+      } else if (typeof params.scheduleDuration === 'string') {
+        const match = params.scheduleDuration.match(/(\d+)\s*week/i);
+        if (match) {
+          weeksCount = Math.max(1, Math.min(12, parseInt(match[1], 10)));
+        }
+      }
+      const scheduleDaysTarget = weeksCount * 7;
+      const daysPerWeek = parseInt(params.frequency, 10) || 4;
+
+      const injuriesList = [
+        ...(params.injuries || []),
+        params.injuryNotes || '',
+        params.notes || '',
+      ].filter((s) => s && s.trim().length > 0);
+      const injuryReported = injuriesList.join('; ');
+
+      const injuryDirectives = injuryReported ? `
+================================================================================
+CRITICAL MEDICAL SAFETY & INJURY ADAPTATION DIRECTIVE (ZERO-TOLERANCE MANDATE):
+The athlete has reported the following injury/condition: "${injuryReported}".
+YOU ARE STRICTLY FORBIDDEN FROM PRESCRIBING ANY EXERCISES THAT AGGRAVATE THIS CONDITION.
+1. HIP LABRUM TEAR / FAI / HIP IMPINGEMENT:
+   - STRICTLY FORBIDDEN: Barbell Back Squats (heavy, deep, or standard), Front Squats past 90°, 45-degree leg press, deep walking lunges, Bulgarian split squats with deep hip flexion.
+   - MANDATORY SUBSTITUTES: Box Squats to parallel or above 90° (vertical shins), Belt Squats, Spanish Squats, High-Handle Trap Bar RDLs (restricted hinge depth), Glute Bridges/Hip Thrusts with neutral pelvis, Backward Sled Drags/Pushes.
+2. LOWER BACK / LUMBAR DISC / SCIATICA:
+   - FORBIDDEN: Heavy axial barbell squats, conventional deadlifts from floor, standing good mornings.
+   - SUBSTITUTES: Belt squats, Chest-supported rows, High-handle trap bar deadlifts, McGill Big 3.
+3. SHOULDER / ROTATOR CUFF:
+   - FORBIDDEN: Behind-the-neck presses, military presses with flared elbows, deep dips, wide bench.
+   - SUBSTITUTES: Neutral-grip DB floor presses, landmine presses, face pulls.
+4. KNEE / PATELLAR / MENISCUS:
+   - FORBIDDEN: Explosive jump squats, lunges with forward knee tracking over toes under load.
+   - SUBSTITUTES: Backward sled drags, box squats with vertical shins, hamstring curls.
+Include clinical modification cues in each exercise's 'notes' field.
+================================================================================
+` : '';
+
+      const cardioDirective = params.cardioPreference === 'running' ? `
+================================================================================
+MANDATORY CARDIO INTEGRATION (RUNNING):
+The athlete explicitly requested RUNNING to be integrated into their training plan.
+Running Preference / Target: ${params.runningDistancePreference || 'Tactical Aerobic Run (1.5 - 3.0 Miles)'}
+You MUST integrate running into the schedule:
+- Include dedicated running conditioning sessions or append post-lifting running (e.g. "Tactical Aerobic Base Run - ${params.runningDistancePreference || '1.5-2.0 Miles'}", "Combat 400m-800m Interval Repeats", or "Zone 2 Combat Stamina Run").
+- Exercise type should be designated as cardio with target distance/time specified.
+================================================================================` : params.cardioPreference === 'cardio_circuits' ? `
+================================================================================
+MANDATORY CARDIO INTEGRATION (CARDIO CIRCUITS):
+The athlete explicitly requested CARDIO CIRCUITS to be integrated into their training plan.
+Circuit Style: ${params.cardioCircuitType || 'Combat HIIT & Metabolic Conditioning Circuits'}
+You MUST integrate high-impact metabolic cardio circuits into the schedule:
+- Program metabolic conditioning finishers or dedicated circuit days (e.g., "Combat Conditioning Circuit: Kettlebell Swings, Burpees, Mountain Climbers, Battle Ropes (4 rounds)", "Assault Bike / Rower Anaerobic Intervals", or "Tactical Ruck & Carry Flush").
+================================================================================` : params.cardioPreference === 'hybrid' ? `
+================================================================================
+MANDATORY CARDIO INTEGRATION (HYBRID RUNNING + CIRCUITS):
+The athlete requested BOTH running endurance AND cardio circuits.
+Include structured interval/tempo running alongside tactical functional conditioning circuits throughout the training week.
+================================================================================` : '';
+
+      const bannedRules = extractBannedMovements(
+        [params.notes || '', params.injuryNotes || '', ...(params.injuries || [])].join(' '),
+        params.injuries || []
+      );
+
+      const bannedSection = bannedRules.length > 0 ? `
+================================================================================
+CRITICAL ZERO-TOLERANCE BANNED EXERCISES BLACKLIST:
+The athlete has explicitly declared they CANNOT do the following exercises or have limitations:
+${bannedRules.map(b => `- FORBIDDEN MOVEMENT: "${b.label}" (Banned keyword: ${b.keyword})`).join('\n')}
+YOU ARE STRICTLY FORBIDDEN from including any of these movements or their direct variations.
+If any of these movements appear, the program is considered completely broken and unsafe.
+Instead, use safe, clinical-grade alternatives (e.g. floor press, belt/box squats, landmine press, chest-supported rows).
+================================================================================` : '';
+
+      const circuitVarietyDirective = `
+================================================================================
+CIRCUIT VARIETY REQUIREMENT:
+When programming cardio circuits or metabolic finishers, DO NOT REPEAT THE SAME MOVEMENTS ACROSS SESSIONS!
+Select from diverse tactical circuit archetypes such as:
+1. Tactical Kettlebell Combat Flow: Single-Arm KB Swings, Goblet Squats, Push-up to Renegade Row, KB High Pulls.
+2. Combat Sprint & Anaerobic Intervals: Shuttle Sprints, Combat Sprawls, Skater Hops, Speed Mountain Climbers.
+3. SpecOps Bodyweight Armor Metcon: Hand-Release Push-Ups, Jump Squats, Inverted Rows, Hollow Body Rocks.
+4. Tactical Sandbag Grinder: Ground-to-Shoulder, Bear Hug March, Sandbag Clean, Burpee Over Sandbag.
+5. Dumbbell Metabolic Velocity: Dual DB Thrusters, Suitcase Marches, DB RDL to Shrug, Hex Rows.
+6. Ergometer & Combat Power: Assault Bike / Rower sprints, Slam Balls, Farmer Carries, Knee Tucks.
+7. Combat Core & Anti-Rotation: Pallof Press, Copenhagen Side Plank, Russian Twists, Hanging Tucks.
+8. Military PT & Combat Obstacle Simulator: Hand-Release Push-Ups, Casualty Drag Sled/Heel Walk, Box Step-ups, High-Knee Sprints.
+Each day's circuit MUST be unique with distinct movements, stations, and work/rest intervals.
+================================================================================`;
+
+      const splitArchitectureDirective = `
+================================================================================
+PHYSIOLOGICAL RECOVERY & WORKOUT SPLIT ARCHITECTURE (MANDATORY):
+You MUST build a logical training split adhering strictly to exercise science and physiological recovery:
+1. Minimum 48-72 hours between training the same major muscle group, especially LEGS / LOWER BODY / POSTERIOR CHAIN.
+2. NEVER PROGRAM BACK-TO-BACK OR NEAR-CONSECUTIVE LEG DAYS:
+   - For example, Day 2 Legs, Day 3 Rest, Day 4 Legs is STRICTLY FORBIDDEN and medically illogical.
+   - Lower body sessions must NEVER be scheduled on consecutive training days, even if separated by a rest day. Always program an Upper Body session or 2+ rest days between lower body sessions!
+3. Follow these exact architectural templates for the athlete's frequency (${daysPerWeek} training days per week):
+   * 3-DAY SPLIT:
+     - Day 1: Full Body A (Horizontal Push Bench/Press, Squat, Core)
+     - Day 2: Rest & Recovery
+     - Day 3: Full Body B (Vertical Press, Hinge/Deadlift, Pulling)
+     - Day 4: Rest & Recovery
+     - Day 5: Full Body C (Unilateral Legs, Incline Press, Carries)
+     - Days 6-7: Rest
+   * 4-DAY SPLIT:
+     - Day 1: Upper Body A (Chest, Horizontal Rows, Delts)
+     - Day 2: Lower Body A (Squat/Quad Dominant, Calves, Core)
+     - Day 3: REST & ACTIVE RECOVERY (Mandatory Rest)
+     - Day 4: Upper Body B (Vertical Pulling, Incline Press, Delts, Arms) - MUST BE UPPER BODY
+     - Day 5: Lower Body B (Deadlift/Posterior Chain Hinge, Hamstrings, Glutes, Loaded Carries)
+     - Days 6-7: Rest & Mobility Flush
+   * 5-DAY SPLIT:
+     - Day 1: Upper Push (Chest, Anterior/Lateral Delts, Triceps)
+     - Day 2: Upper Pull (Lats, Upper Back, Biceps)
+     - Day 3: Lower Body Chassis A (Squats, Quads, Calves, Core)
+     - Day 4: REST & ACTIVE RECOVERY
+     - Day 5: Upper Body Armor & Density (Push/Pull, Delts, Arms)
+     - Day 6: Lower Body Chassis B (Deadlifts, Posterior Chain, Carries)
+     - Day 7: REST & REGENERATION
+   * 6-DAY SPLIT:
+     - Day 1: Push A | Day 2: Pull A | Day 3: Legs A (Squat focus) | Day 4: Push B | Day 5: Pull B | Day 6: Legs B (Deadlift/Hinge focus) | Day 7: Rest
+================================================================================`;
+
+      const systemPrompt = `You are the Head Tactical Strength & Conditioning Coach at The Tactical Standard, specializing in military physical preparation, armed forces combat readiness, hybrid athlete periodization, and science-backed progressive overload.
+Create a comprehensive, custom-tailored workout schedule matching the athlete's exact specifications:
+- Fitness Goals: ${params.goals.join(', ')}
+- Current Fitness Level: ${params.fitnessLevel}
+- Workout Frequency: ${params.frequency} (${daysPerWeek} training days per 7 days)
+- Schedule Type: ${weeksCount > 1 ? `${weeksCount}-Week Periodized Program (${scheduleDaysTarget} Total Days)` : '7-Day Rotation Schedule (Day 1 through Day 7)'}
+- Available Equipment: ${params.equipment.join(', ')}
+- Target Session Duration: ${params.sessionDurationMinutes || 55} minutes
+- Cardio / Running Preference: ${params.cardioPreference ? `${params.cardioPreference.toUpperCase()} (${params.runningDistancePreference || params.cardioCircuitType || 'Integrated'})` : 'Default'}
+- Reported Injuries / Medical Limitations: ${injuryReported || 'None reported'}
+- Special Notes / Constraints: ${params.notes || 'None'}
+${bannedSection}
+${splitArchitectureDirective}
+${cardioDirective}
+${circuitVarietyDirective}
+${injuryDirectives}
+
+RULES:
+1. Every day MUST have a day number (Day 1, Day 2, etc.), a focus description, isRestDay boolean, and an array of exercises (empty if isRestDay).
+2. For training days, program 4 to 6 specific exercises strictly matching the available equipment. If running or cardio circuits are requested, ensure every session or scheduled conditioning day includes the specified running or cardio circuits.
+3. Every exercise must specify:
+   - id: unique string (e.g. "ex-1")
+   - name: clear exercise name
+   - muscleGroup: one of ['Chest', 'Back', 'Quads', 'Hamstrings & Glutes', 'Shoulders', 'Arms', 'Core', 'Full Body']
+   - type: optional string, set to "circuit" for metabolic circuits/finishers, "cardio" for runs, or "strength" / "core"
+   - For circuit exercises: set type to "circuit", defaultSets to round count (e.g. 3 or 4), targetReps to interval scheme (e.g. "3 rounds (40s work / 20s rest)"), restPeriodSeconds to rest between rounds (e.g. 60), and in notes list the numbered stations: "Circuit Stations: 1. [Movement 1], 2. [Movement 2], 3. [Movement 3], 4. [Movement 4]. [Execution cue]"
+   - targetRpe: integer between 6 and 9
+   - notes: tactical execution cue, pace guidance, and progressive overload trigger
+4. Category MUST be one of: 'Strength', 'Hypertrophy', 'Athletic Conditioning', 'Power', 'Hybrid'. If running or cardio circuits are added, category should prefer 'Hybrid' or 'Athletic Conditioning'.
+5. Include actionable weeklyProgressionTips and nutrition advice tailored to their goal.
+6. VARIETY & SETS/REPS CALIBRATION:
+   - Provide genuine exercise variety across different days. Do NOT repeat identical templates or exercises.
+   - Sets, reps, and rest MUST strictly match the athlete's primary goal:
+     * Max Strength / Heavy Power: 4-5 sets x 3-5 reps (120-180s rest, RPE 8-9)
+     * Muscle Gain / Armor Hypertrophy: 3-4 sets x 8-12 reps (75-90s rest, RPE 8)
+     * Weight Loss / Metabolic Shred: 3-4 sets x 12-15+ reps (45-60s rest, RPE 7-8)
+     * Tactical Hybrid / Durability: 3-4 sets x 6-8 reps + metabolic conditioning finisher
+     * Physical Ability Test (PAT): 3-4 sets x 15-25 reps or timed sets (60s rest)
+     * Beginner: 3 sets x 10-12 reps with fundamental biomechanics
+     * Elite: Undulating periodization, cluster sets, and heavy tactical load carriage`;
+
+      let response: any = null;
+      const candidateModels = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-3.8-flash'];
+      let lastModelError: any = null;
+
+      for (const modelName of candidateModels) {
+        try {
+          response = await callWithTimeout(
+            ai.models.generateContent({
+              model: modelName,
+              contents: systemPrompt,
+            config: {
+              responseMimeType: 'application/json',
+              responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              title: { type: Type.STRING },
+              subtitle: { type: Type.STRING },
+              category: {
+                type: Type.STRING,
+                enum: ['Strength', 'Hypertrophy', 'Athletic Conditioning', 'Power', 'Hybrid'],
+              },
+              frequency: { type: Type.STRING },
+              scheduleDuration: { type: Type.STRING },
+              estimatedDurationMinutes: { type: Type.INTEGER },
+              description: { type: Type.STRING },
+              coachingPhilosophy: { type: Type.STRING },
+              weeklyProgressionTips: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+              },
+              nutritionAdvice: { type: Type.STRING },
+              schedule: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    day: { type: Type.INTEGER },
+                    focus: { type: Type.STRING },
+                    isRestDay: { type: Type.BOOLEAN },
+                    exercises: {
+                      type: Type.ARRAY,
+                      items: {
+                        type: Type.OBJECT,
+                        properties: {
+                          id: { type: Type.STRING },
+                          name: { type: Type.STRING },
+                          muscleGroup: {
+                            type: Type.STRING,
+                            enum: ['Chest', 'Back', 'Quads', 'Hamstrings & Glutes', 'Shoulders', 'Arms', 'Core', 'Full Body'],
+                          },
+                          type: { type: Type.STRING },
+                          defaultSets: { type: Type.INTEGER },
+                          targetReps: { type: Type.STRING },
+                          restPeriodSeconds: { type: Type.INTEGER },
+                          targetRpe: { type: Type.INTEGER },
+                          notes: { type: Type.STRING },
+                        },
+                        required: ['id', 'name', 'muscleGroup', 'defaultSets', 'targetReps', 'restPeriodSeconds'],
+                      },
+                    },
+                  },
+                  required: ['day', 'focus', 'isRestDay', 'exercises'],
+                },
+              },
+            },
+            required: [
+              'title',
+              'subtitle',
+              'category',
+              'frequency',
+              'scheduleDuration',
+              'estimatedDurationMinutes',
+              'description',
+              'schedule',
+            ],
+          },
+        },
+      }), 8000);
+
+          const responseText = response.text;
+          if (responseText) {
+            const parsedPlan = JSON.parse(responseText);
+
+            if (Array.isArray(parsedPlan.schedule) && parsedPlan.schedule.length > 0) {
+              parsedPlan.schedule = periodizeSchedule(
+                parsedPlan.schedule,
+                scheduleDaysTarget,
+                weeksCount,
+                params.goals.join(' '),
+                params.fitnessLevel,
+                bannedRules,
+                params.cardioPreference,
+                params.runningDistancePreference,
+                params.cardioCircuitType,
+                daysPerWeek
+              );
+            }
+
+            parsedPlan.scheduleDuration = weeksCount === 1
+              ? '7-Day Rotation'
+              : weeksCount === 4
+              ? '4-Week Monthly Periodization'
+              : `${weeksCount}-Week Periodized Macro-Cycle (${weeksCount <= 4 ? 'Phase 1' : weeksCount <= 8 ? 'Phases 1-2' : 'Full 3-Phase Periodization'})`;
+
+            if (weeksCount >= 8 && (!parsedPlan.weeklyProgressionTips || parsedPlan.weeklyProgressionTips.length < 3)) {
+              parsedPlan.weeklyProgressionTips = [
+                'Phase 1 (Weeks 1-4 Accumulation): Build kinetic volume and technical precision. Week 4 features a 25% volume deload.',
+                'Phase 2 (Weeks 5-8 Intensification): Heavier compound multi-joint sets with double progression (+2.5-5 lbs upper, +5-10 lbs lower).',
+                'Phase 3 (Weeks 9-12 Peak Combat Power): Rate of force development, max strength realization, and Week 12 benchmark testing & tactical taper.',
+              ];
+            }
+
+            const fixedPlan = validateAndFixSplitLogic(parsedPlan, bannedRules);
+            const sanitizedPlan = sanitizePlanAgainstLimitations(fixedPlan, bannedRules);
+            return res.json({
+              success: true,
+              data: sanitizedPlan,
+              source: modelName,
+            });
+          }
+        } catch (mErr: any) {
+          lastModelError = mErr;
+          console.warn(`[Server] Model ${modelName} failed, trying next:`, mErr?.message || mErr);
+        }
+      }
+
+      throw lastModelError || new Error('All candidate Gemini models returned empty response or failed.');
+    } catch (err: any) {
+      console.error('[Server] Gemini generation failed:', err);
+      // If error occurs, gracefully fallback so the user always receives a personalized workout plan
+      const fallback = generateFallbackWorkoutPlan(params);
+      const bannedRules = extractBannedMovements(
+        [params.notes || '', params.injuryNotes || '', ...(params.injuries || [])].join(' '),
+        params.injuries || []
+      );
+      const fixedFallback = validateAndFixSplitLogic(fallback, bannedRules);
+      const sanitizedFallback = sanitizePlanAgainstLimitations(fixedFallback, bannedRules);
+      return res.json({
+        success: true,
+        data: sanitizedFallback,
+        source: 'local_engine_fallback',
+        warning: err?.message || 'Gemini service note: delivered calibrated tactical template.',
+      });
+    }
+  });
+
+  // POST /api/gemini/generate-single-workout
+  app.post('/api/gemini/generate-single-workout', async (req, res) => {
+    const params: SingleWorkoutRequest = req.body;
+
+    if (!params || !params.workoutType) {
+      return res.status(400).json({
+        error: 'Missing required parameter: workoutType.',
+      });
+    }
+
+    const duration = params.durationMinutes || 45;
+    const equipmentMode = resolveSingleWorkoutEquipmentMode(params);
+    const effectiveEquipmentList =
+      equipmentMode === 'bw_only'
+        ? ['Bodyweight & Pull-Up Bar Only (Zero Weighted Equipment)']
+        : equipmentMode === 'db_only'
+        ? ['Dumbbells Only']
+        : equipmentMode === 'kb_only'
+        ? ['Kettlebells Only']
+        : params.equipment || [];
+    const effectiveParams: SingleWorkoutRequest = {
+      ...params,
+      equipment: effectiveEquipmentList,
+    };
+
+    const ai = getGeminiClient();
+
+    // If Gemini client is not initialized or API key is absent, return the calibrated fallback single workout
+    if (!ai) {
+      console.log('[Server] No GEMINI_API_KEY configured. Serving high-fidelity single-day workout.');
+      const fallback = generateFallbackSingleWorkout(effectiveParams);
+      return res.json({
+        success: true,
+        data: fallback,
+        source: 'local_engine',
+      });
+    }
+
+    try {
+      const injuriesList = [
+        ...(params.injuries || []),
+        params.injuryNotes || '',
+        params.customPrompt || '',
+      ].filter((s) => s && s.trim().length > 0);
+      const injuryReported = injuriesList.join('; ');
+
+      const injuryDirectives = injuryReported ? `
+================================================================================
+CRITICAL MEDICAL SAFETY & INJURY ADAPTATION DIRECTIVE (ZERO-TOLERANCE MANDATE):
+The athlete has reported the following injury/condition: "${injuryReported}".
+YOU ARE STRICTLY FORBIDDEN FROM PRESCRIBING ANY EXERCISES THAT AGGRAVATE THIS CONDITION.
+1. HIP LABRUM TEAR / FAI / HIP IMPINGEMENT:
+   - STRICTLY FORBIDDEN: Barbell Back Squats (heavy, deep, or standard), Front Squats past 90°, 45-degree leg press, deep walking lunges, Bulgarian split squats with deep hip flexion.
+   - MANDATORY SUBSTITUTES: Box Squats to parallel or above 90° (vertical shins), Belt Squats, Spanish Squats, High-Handle Trap Bar RDLs (restricted hinge depth), Glute Bridges/Hip Thrusts with neutral pelvis, Backward Sled Drags/Pushes.
+2. LOWER BACK / LUMBAR DISC / SCIATICA:
+   - FORBIDDEN: Heavy axial barbell squats, conventional deadlifts from floor, standing good mornings.
+   - SUBSTITUTES: Belt squats, Chest-supported rows, High-handle trap bar deadlifts, McGill Big 3.
+3. SHOULDER / ROTATOR CUFF:
+   - FORBIDDEN: Behind-the-neck presses, military presses with flared elbows, deep dips, wide bench.
+   - SUBSTITUTES: Neutral-grip DB floor presses, landmine presses, face pulls.
+4. KNEE / PATELLAR / MENISCUS:
+   - FORBIDDEN: Explosive jump squats, lunges with forward knee tracking over toes under load.
+   - SUBSTITUTES: Backward sled drags, box squats with vertical shins, hamstring curls.
+Include clinical modification cues in each exercise's 'notes' field.
+================================================================================
+` : '';
+
+      const bannedRules = extractBannedMovements(
+        [params.customPrompt || '', params.injuryNotes || '', ...(params.injuries || [])].join(' '),
+        params.injuries || []
+      );
+
+      const bannedSection = bannedRules.length > 0 ? `
+================================================================================
+CRITICAL ATHLETE BLACKLIST - ABSOLUTELY FORBIDDEN EXERCISES (ZERO TOLERANCE):
+The athlete has specifically instructed that they CANNOT perform or want EXCLUDED:
+${bannedRules.map((r) => `* STRICTLY BANNED: ${r.label}`).join('\n')}
+YOU MUST NOT INCLUDE ANY EXERCISE IN THE PROGRAM THAT INVOLVES THESE MOVEMENTS.
+Substitute with joint-friendly safe variations!
+================================================================================` : '';
+
+      const equipmentLockDirective =
+        equipmentMode === 'bw_only'
+          ? `
+================================================================================
+CRITICAL EQUIPMENT LOCK: BODYWEIGHT ONLY (ZERO TOLERANCE)
+The athlete has STRICTLY requested a BODYWEIGHT-ONLY session (zero weighted equipment).
+- FORBIDDEN: Dumbbells, barbells, kettlebells, cables, machines, trap bars, sandbags, sleds, resistance bands, weight vests, rucks, farmer carries, medicine balls, or cardio ergometers (rower/assault bike).
+- ALLOWED ONLY: Bodyweight calisthenics (push-ups, pull-ups, chin-ups, inverted rows, dips, pike push-ups, bodyweight squats/lunges/split squats, glute bridges, core work, planks) and running/sprints if cardio is requested.
+If ANY weighted or external gear exercise is output, the workout fails validation.
+================================================================================`
+          : equipmentMode === 'db_only'
+          ? `
+================================================================================
+CRITICAL EQUIPMENT LOCK: DUMBBELLS ONLY (ZERO TOLERANCE)
+The athlete ONLY has DUMBBELLS (and bodyweight).
+- FORBIDDEN: Barbells, kettlebells, cable machines, Smith machines, trap bars, sandbags, sleds, or cardio ergometers (assault bike/rower).
+- ALLOWED ONLY: Dumbbell exercises + bodyweight movements (plus outdoor/track running if running cardio was requested).
+================================================================================`
+          : equipmentMode === 'kb_only'
+          ? `
+================================================================================
+CRITICAL EQUIPMENT LOCK: KETTLEBELLS ONLY (ZERO TOLERANCE)
+The athlete ONLY has KETTLEBELLS (and bodyweight).
+- FORBIDDEN: Barbells, dumbbells, cable machines, Smith machines, trap bars, sandbags, sleds, or cardio ergometers (assault bike/rower).
+- ALLOWED ONLY: Kettlebell exercises + bodyweight movements (plus outdoor/track running if running cardio was requested).
+================================================================================`
+          : '';
+
+      const targetExerciseCount = duration <= 25 ? '3 to 4' : duration <= 45 ? '4 to 6' : '5 to 7';
+
+      const singleCardioDirective = params.cardioPreference === 'running' ? `
+================================================================================
+MANDATORY CARDIO INTEGRATION (RUNNING):
+The athlete requested RUNNING to be incorporated into this single-day workout.
+Running Preference / Distance: ${params.runningDistancePreference || 'Tactical Aerobic Run (1.5 - 2.5 Miles)'}.
+Include dedicated running (e.g. tactical run finisher, interval sprint repeats, or warmup/cooldown run).
+Designate exercise type as "cardio" with target distance/time.
+================================================================================` : params.cardioPreference === 'cardio_circuits' ? `
+================================================================================
+MANDATORY CARDIO INTEGRATION (CARDIO CIRCUITS):
+The athlete requested CARDIO CIRCUITS in this single-day workout.
+Circuit Style: ${params.cardioCircuitType || 'Combat Metabolic Circuit'}.
+${equipmentMode === 'bw_only' ? 'MUST use 100% BODYWEIGHT calisthenics/agility stations ONLY (NO kettlebells, NO dumbbells, NO ergs).' : equipmentMode === 'db_only' ? 'MUST use ONLY dumbbell & bodyweight stations.' : equipmentMode === 'kb_only' ? 'MUST use ONLY kettlebell & bodyweight stations.' : 'Include a fast-paced cardio circuit or metabolic finisher (e.g. 3-4 rounds of KB swings, burpees, sprint erg intervals).'}
+================================================================================` : params.cardioPreference === 'hybrid' ? `
+================================================================================
+MANDATORY CARDIO INTEGRATION (HYBRID RUNNING + CIRCUITS):
+Include both running endurance intervals and high-density cardio circuits in this session${equipmentMode === 'bw_only' ? ' using ONLY bodyweight movements and running' : equipmentMode === 'db_only' ? ' using ONLY dumbbells, bodyweight, and running' : equipmentMode === 'kb_only' ? ' using ONLY kettlebells, bodyweight, and running' : ''}.
+================================================================================` : '';
+
+      const systemPrompt = `You are the Head Tactical Strength & Conditioning Coach at The Tactical Standard, specializing in military physical preparation, armed forces combat fitness, and athletic periodization.
+An athlete wants to generate a SINGLE-DAY on-demand training session because they want SOMETHING DIFFERENT today.
+
+Athlete Request & Session Parameters:
+- Session Type / Focus: ${params.workoutType}
+- Time Window: Exactly ${duration} minutes
+- Equipment Available: ${effectiveEquipmentList.join(', ') || 'Standard gym equipment'}
+- Desired Intensity: ${params.intensity || 'High'}
+- Fitness Level: ${params.fitnessLevel || 'Intermediate'}
+- Cardio / Running Request: ${params.cardioPreference ? `${params.cardioPreference.toUpperCase()} (${params.runningDistancePreference || params.cardioCircuitType || 'Integrated'})` : 'Default'}
+- Reported Injuries / Limitations: ${injuryReported || 'None reported'}
+- Custom Service Member Request: ${params.customPrompt || 'None'}
+${equipmentLockDirective}
+${singleCardioDirective}
+${injuryDirectives}
+${bannedSection}
+
+RULES:
+1. Build an executable, high-impact, single-day session fitting strictly within ${duration} minutes.
+2. Select ${targetExerciseCount} specific exercises calibrated to the duration.
+3. For ALL dynamic resistance, barbell, dumbbell, kettlebell, cable, and dynamic calisthenic exercises (bench press, rows, squats, curls, triceps extensions, face pulls, push-ups, pull-ups, dips, hip thrusts, etc.), ALWAYS set type to "strength" and format to "straight", and specify rep ranges (e.g., "8-10 reps", "12-15 reps"). For ALL isometric or timed hold exercises (planks, side planks, Copenhagen side planks, wall sits, hollow body holds, dead hangs), ALWAYS prescribe a time duration in targetReps (e.g., "45s hold", "30s per side", "60s") — NEVER rep counts — and set type to "core" and format to "straight".
+4. If running or cardio conditioning is requested, set exercise type to "cardio" and format to "straight" with target distance/time. If programming a circuit, set type to "circuit" and format to "circuit" and list numbered stations in notes (e.g. "Circuit Stations: 1. [Movement 1], 2. [Movement 2]..."). If programming a superset, set type to "superset" and format to "superset".
+5. STRICTLY match the available equipment: ${effectiveEquipmentList.join(', ')}. Never prescribe equipment they don't have.
+6. Provide engaging tactical names, sets, reps, rest timers, target RPE, and tactical coaching cues in 'notes'.
+7. Category MUST be one of: 'Strength', 'Hypertrophy', 'Athletic Conditioning', 'Power', 'Hybrid'.
+8. recommendedWarmupId should be one of: 'warmup-dime-mandatory', 'warmup-apex-sop', 'warmup-upper-primer', 'warmup-lower-prep', 'warmup-universal-tactical', 'warmup-express-primer'.`;
+
+      const candidateModels = [
+        'gemini-2.5-flash',
+        'gemini-2.0-flash',
+        'gemini-3.8-flash',
+      ];
+
+      let lastModelError: any = null;
+
+      for (const modelName of candidateModels) {
+        try {
+          const response = await callWithTimeout(
+            ai.models.generateContent({
+              model: modelName,
+              contents: systemPrompt,
+            config: {
+              responseMimeType: 'application/json',
+              responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                  id: { type: Type.STRING },
+                  title: { type: Type.STRING },
+                  subtitle: { type: Type.STRING },
+                  category: {
+                    type: Type.STRING,
+                    enum: ['Strength', 'Hypertrophy', 'Athletic Conditioning', 'Power', 'Hybrid'],
+                  },
+                  frequency: { type: Type.STRING },
+                  estimatedDurationMinutes: { type: Type.INTEGER },
+                  description: { type: Type.STRING },
+                  recommendedWarmupId: { type: Type.STRING },
+                  exercises: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        id: { type: Type.STRING },
+                        name: { type: Type.STRING },
+                        muscleGroup: {
+                          type: Type.STRING,
+                          enum: ['Chest', 'Back', 'Quads', 'Hamstrings & Glutes', 'Shoulders', 'Arms', 'Core', 'Full Body'],
+                        },
+                        type: {
+                          type: Type.STRING,
+                          enum: ['strength', 'cardio', 'core', 'circuit', 'superset', 'emom', 'amrap'],
+                        },
+                        format: {
+                          type: Type.STRING,
+                          enum: ['straight', 'superset', 'emom', 'amrap', 'circuit'],
+                        },
+                        defaultSets: { type: Type.INTEGER },
+                        targetReps: { type: Type.STRING },
+                        restPeriodSeconds: { type: Type.INTEGER },
+                        targetRpe: { type: Type.INTEGER },
+                        notes: { type: Type.STRING },
+                      },
+                      required: ['id', 'name', 'muscleGroup', 'type', 'format', 'defaultSets', 'targetReps', 'restPeriodSeconds'],
+                    },
+                  },
+                },
+                required: [
+                  'id',
+                  'title',
+                  'subtitle',
+                  'category',
+                  'estimatedDurationMinutes',
+                  'description',
+                  'exercises',
+                ],
+              },
+            },
+          }), 8000);
+
+          const responseText = response.text;
+          if (responseText) {
+            const parsedWorkout = JSON.parse(responseText);
+            if (!parsedWorkout.id) {
+              parsedWorkout.id = `ai-single-${Date.now().toString(36)}`;
+            }
+            if (!parsedWorkout.frequency) {
+              parsedWorkout.frequency = 'Single Day Session';
+            }
+            const sanitizedList = sanitizeExerciseList(parsedWorkout.exercises || [], bannedRules);
+            const normalizedList = sanitizedList.map((ex: any) => {
+              const exFormat = ex.format || (ex.type === 'circuit' || ex.type === 'superset' || ex.type === 'emom' || ex.type === 'amrap' ? ex.type : 'straight');
+              const combinedText = `${ex.name || ''} ${ex.targetReps || ''}`;
+              const isTimedHoldOrCardio = /\b(plank|side plank|copenhagen|wall sit|hollow body|hollow hold|dead hang|isometric|iso hold|run|jog|sprint|mile|miles|rower|skierg|assault bike|airdyne|carry|farmer|ruck)\b/i.test(combinedText) ||
+                /\b\d+(?:\.\d+)?\s*(?:s|sec|secs|second|seconds|min|mins|minute|minutes|mile|miles)\b/i.test(String(ex.targetReps || ''));
+              const isRepBased = /\breps?\b/i.test(String(ex.targetReps || '')) && !isTimedHoldOrCardio;
+              const resolvedType =
+                exFormat !== 'straight'
+                  ? exFormat
+                  : isTimedHoldOrCardio
+                  ? (ex.muscleGroup === 'Core' ? 'core' : 'cardio')
+                  : isRepBased
+                  ? 'strength'
+                  : ex.type || 'strength';
+              return {
+                ...ex,
+                format: exFormat,
+                type: resolvedType,
+              };
+            });
+            parsedWorkout.exercises = enforceEquipmentModeOnExercises(normalizedList, equipmentMode);
+
+            return res.json({
+              success: true,
+              data: parsedWorkout,
+              source: modelName,
+            });
+          }
+        } catch (mErr: any) {
+          lastModelError = mErr;
+          console.warn(`[Server] Single workout model ${modelName} failed, trying next:`, mErr?.message || mErr);
+        }
+      }
+
+      throw lastModelError || new Error('All candidate Gemini models failed.');
+    } catch (err: any) {
+      console.error('[Server] Single-day workout Gemini generation failed:', err);
+      const fallback = generateFallbackSingleWorkout(effectiveParams);
+      return res.json({
+        success: true,
+        data: fallback,
+        source: 'local_engine_fallback',
+        warning: err?.message || 'Gemini service note: delivered calibrated tactical template.',
+      });
+    }
+  });
+
+  // POST /api/gemini/stream (Server-Sent Events streaming)
+  app.post('/api/gemini/stream', async (req, res) => {
+    const { prompt, systemInstruction } = req.body || {};
+    if (!prompt) {
+      return res.status(400).json({ error: 'Missing prompt parameter.' });
+    }
+
+    const ai = getGeminiClient();
+    if (!ai) {
+      return res.status(503).json({ error: 'Gemini API key is not configured.' });
+    }
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    try {
+      const stream = await ai.models.generateContentStream({
+        model: 'gemini-3.8-flash',
+        contents: prompt,
+        config: systemInstruction ? { systemInstruction } : undefined,
+      });
+
+      for await (const chunk of stream) {
+        if (chunk.text) {
+          res.write(`data: ${JSON.stringify({ text: chunk.text })}\n\n`);
+        }
+      }
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      res.end();
+    } catch (err: any) {
+      console.error('[Server] Gemini streaming failed:', err);
+      res.write(`data: ${JSON.stringify({ error: err?.message || 'Streaming failed' })}\n\n`);
+      res.end();
+    }
+  });
+
+  const server = http.createServer(app);
+
+  // WebSocket Server for Gemini Live API real-time bidirectional audio/video
+  const wss = new WebSocketServer({ noServer: true });
+
+  server.on('upgrade', (request, socket, head) => {
+    const host = request.headers.host || 'localhost:3000';
+    const pathname = request.url ? new URL(request.url, `http://${host}`).pathname : '';
+    if (pathname === '/api/gemini/live' || pathname === '/live') {
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit('connection', ws, request);
+      });
+    }
+  });
+
+  wss.on('connection', async (clientWs: WebSocket) => {
+    console.log('[Server] Gemini Live WebSocket client connected');
+    const ai = getGeminiClient();
+    if (!ai) {
+      clientWs.send(JSON.stringify({ error: 'Gemini API not configured on server' }));
+      clientWs.close();
+      return;
+    }
+
+    try {
+      const session = await ai.live.connect({
+        model: 'gemini-3.8-live',
+        config: {
+          responseModalities: [Modality.AUDIO],
+          speechConfig: {
+            voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } },
+          },
+          systemInstruction: 'You are the Head Tactical Strength & Conditioning Coach at The Tactical Standard, coaching military service members and tactical warfighters with clear, encouraging, science-backed guidance.',
+        },
+        callbacks: {
+          onmessage: (message: LiveServerMessage) => {
+            for (const part of message.serverContent?.modelTurn?.parts ?? []) {
+              if (part.inlineData?.data) {
+                clientWs.send(JSON.stringify({ audio: part.inlineData.data }));
+              }
+            }
+            if (message.serverContent?.interrupted) {
+              clientWs.send(JSON.stringify({ interrupted: true }));
+            }
+          },
+          onclose: () => {
+            if (clientWs.readyState === WebSocket.OPEN) {
+              clientWs.close();
+            }
+          },
+        },
+      });
+
+      clientWs.on('message', (data: any) => {
+        try {
+          const msg = JSON.parse(data.toString());
+          if (msg.audio) {
+            session.sendRealtimeInput({
+              audio: { data: msg.audio, mimeType: 'audio/pcm;rate=16000' },
+            });
+          } else if (msg.text) {
+            session.sendClientContent({
+              turns: [{ role: 'user', parts: [{ text: msg.text }] }],
+              turnComplete: true,
+            });
+          }
+        } catch (e) {
+          console.warn('[Server] Live WS message parsing error:', e);
+        }
+      });
+
+      clientWs.on('close', () => {
+        try {
+          session.close();
+        } catch {}
+      });
+    } catch (err: any) {
+      console.error('[Server] Gemini Live API connection failed:', err);
+      clientWs.send(JSON.stringify({ error: err?.message || 'Failed to initialize Gemini Live session' }));
+      clientWs.close();
+    }
+  });
+
+  const distPath = path.resolve(__dirname, 'dist');
+  const isProduction = process.env.NODE_ENV === 'production' || fs.existsSync(distPath);
+
+  if (isProduction) {
+    app.use(express.static(distPath));
+    app.use((req, res, next) => {
+      if (req.method === 'GET' && !req.path.startsWith('/api')) {
+        return res.sendFile(path.resolve(distPath, 'index.html'));
+      }
+      next();
+    });
+  } else {
+    const vite = await createViteServer({
+      server: {
+        middlewareMode: true,
+        hmr: false,
+      },
+      appType: 'spa',
+    });
+    app.use(vite.middlewares);
+  }
+
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`[The Tactical Standard Server] Full-stack application running on port ${PORT}`);
+  });
+}
+
+startServer().catch((err) => {
+  console.error('[Server] Fatal startup error:', err);
+  process.exit(1);
+});

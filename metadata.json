@@ -1,0 +1,8 @@
+{
+  "name": "The Tactical Standard",
+  "description": "Elite workout programming, dynamic warm-ups, weight tracking logs and calculators, rest period timer, and performance visualization by an active-duty US Army, ISSA certified coach.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

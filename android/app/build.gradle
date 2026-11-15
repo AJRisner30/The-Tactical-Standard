@@ -1,0 +1,43 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.tacticalstandard.performance'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.tacticalstandard.performance"
+        minSdk 23
+        targetSdk 35
+        versionCode 1
+        versionName "1.0.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        manifestPlaceholders = [
+            hostName: "thetacticalstandard.com",
+            defaultUrl: "https://thetacticalstandard.com/?source=android_app",
+            launcherName: "TacStandard",
+            assetStatements: '[{ "relation": ["delegate_permission/common.handle_all_urls"], "target": { "namespace": "web", "site": "https://thetacticalstandard.com"} }]',
+            enableNotification: "true",
+            twaThemeColor: "#0E1217",
+            twaNavigationColor: "#090B0D"
+        ]
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.5.0'
+    implementation 'androidx.core:core:1.15.0'
+}

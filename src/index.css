@@ -1,0 +1,145 @@
+@import "tailwindcss";
+
+:root {
+  --font-heading: 'Barlow Condensed', sans-serif;
+  --font-sans: 'Outfit', sans-serif;
+  --color-tactical-obsidian: #090b0d;
+  --color-tactical-gunmetal: #0e1217;
+  --color-tactical-slate-card: #141a21;
+  --color-tactical-gold: #f59e0b;
+  --color-tactical-gold-light: #fbbf24;
+  --color-tactical-border: #232b35;
+  /* Legacy aliases mapped to Military Gunmetal & Brass */
+  --color-patrol-navy: #090b0d;
+  --color-patrol-navy-surface: #0e1217;
+  --color-patrol-slate-card: #141a21;
+  --color-patrol-blue: #f59e0b;
+  --color-patrol-blue-light: #fbbf24;
+  --color-patrol-gold: #f59e0b;
+  --color-patrol-border: #232b35;
+  --color-overland-gold: #f59e0b;
+  --color-overland-gold-light: #fbbf24;
+  --color-overland-slate: #0e1217;
+  --color-overland-slate-card: #141a21;
+  --color-overland-border: #232b35;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: #090b0d;
+  color: #f1f5f9;
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  background-image: 
+    radial-gradient(ellipse 90% 40% at 50% -10%, rgba(245, 158, 11, 0.09), transparent 70%),
+    radial-gradient(ellipse 60% 30% at 50% 100%, rgba(217, 119, 6, 0.04), transparent 60%);
+  background-attachment: fixed;
+}
+
+::selection {
+  background-color: #f59e0b;
+  color: #000000;
+}
+
+h1, h2, h3, .font-athletic {
+  font-family: var(--font-heading);
+  letter-spacing: 0.03em;
+}
+
+/* Custom scrollbar for The Tactical Standard military dark theme */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #090b0d;
+}
+::-webkit-scrollbar-thumb {
+  background: #232b35;
+  border-radius: 9999px;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #f59e0b;
+}
+
+/* Custom horizontal scrollbar for top bars on PC/Desktop */
+.topbar-scroll {
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(245, 158, 11, 0.45) rgba(9, 11, 13, 0.4);
+}
+.topbar-scroll::-webkit-scrollbar {
+  height: 4px;
+}
+.topbar-scroll::-webkit-scrollbar-track {
+  background: rgba(9, 11, 13, 0.4);
+  border-radius: 9999px;
+}
+.topbar-scroll::-webkit-scrollbar-thumb {
+  background: rgba(245, 158, 11, 0.4);
+  border-radius: 9999px;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+.topbar-scroll::-webkit-scrollbar-thumb:hover {
+  background: #f59e0b;
+}
+
+/* Subtle Entry Animations & Tab Content Fade-In */
+@keyframes tabContentFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-tab-fade {
+  animation: tabContentFadeIn 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: opacity, transform;
+}
+
+/* Tab indicator subtle micro-entrance */
+@keyframes tabIndicatorFade {
+  0% {
+    opacity: 0;
+    transform: scaleX(0.5);
+  }
+  100% {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+
+.animate-tab-indicator {
+  animation: tabIndicatorFade 180ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: opacity, transform;
+}
+
+/* Nav Tab interactive smooth transitions */
+.nav-tab-interactive {
+  transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.nav-tab-interactive:active {
+  transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-tab-fade,
+  .animate-tab-indicator {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .nav-tab-interactive {
+    transition: none !important;
+    transform: none !important;
+  }
+}
+

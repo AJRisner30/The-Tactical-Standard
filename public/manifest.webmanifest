@@ -1,0 +1,60 @@
+{
+  "id": "/?android_app=1",
+  "name": "The Tactical Standard",
+  "short_name": "TacStandard",
+  "description": "The Tactical Standard — Military physical fitness & combat readiness. Elite warfighter strength, combat chassis durability, ruck endurance, sprint velocity, and tactical load carriage.",
+  "start_url": "/?source=android_app",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "portrait-primary",
+  "theme_color": "#0e1217",
+  "background_color": "#090b0d",
+  "categories": ["fitness", "health", "sports", "productivity"],
+  "dir": "ltr",
+  "lang": "en-US",
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Today's Mission Workout",
+      "short_name": "Workouts",
+      "description": "Launch today's combat readiness workout session",
+      "url": "/?tab=workouts",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Command Portal",
+      "short_name": "Command",
+      "description": "Access your confidential unit & mission protocol",
+      "url": "/?tab=officer_portal",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "PT Readiness Test",
+      "short_name": "Readiness",
+      "description": "Calculate PT readiness scoring & combat ratings",
+      "url": "/?tab=calculator",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+    }
+  ]
+}

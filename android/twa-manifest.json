@@ -1,0 +1,62 @@
+{
+  "packageId": "com.tacticalstandard.performance",
+  "host": "thetacticalstandard.com",
+  "name": "The Tactical Standard",
+  "launcherName": "TacStandard",
+  "themeColor": "#0E1217",
+  "themeColorDark": "#090B0D",
+  "navigationColor": "#090B0D",
+  "navigationColorDark": "#090B0D",
+  "navigationDividerColor": "#00000000",
+  "navigationDividerColorDark": "#00000000",
+  "backgroundColor": "#090B0D",
+  "enableNotifications": true,
+  "startUrl": "/?source=android_app",
+  "iconUrl": "https://thetacticalstandard.com/pwa-512x512.png",
+  "maskableIconUrl": "https://thetacticalstandard.com/pwa-maskable-512x512.png",
+  "monochromeIconUrl": "https://thetacticalstandard.com/pwa-512x512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./android.keystore",
+    "alias": "tacticalstandard"
+  },
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": [
+    {
+      "name": "Today's Workout",
+      "short_name": "Workouts",
+      "url": "https://thetacticalstandard.com/?tab=workouts",
+      "chosen_icon": "https://thetacticalstandard.com/pwa-192x192.png"
+    },
+    {
+      "name": "Command Portal",
+      "short_name": "Command",
+      "url": "https://thetacticalstandard.com/?tab=officer_portal",
+      "chosen_icon": "https://thetacticalstandard.com/pwa-192x192.png"
+    },
+    {
+      "name": "PT Readiness Test",
+      "short_name": "Readiness",
+      "url": "https://thetacticalstandard.com/?tab=calculator",
+      "chosen_icon": "https://thetacticalstandard.com/pwa-192x192.png"
+    }
+  ],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://thetacticalstandard.com/manifest.json",
+  "fallbackType": "customtabs",
+  "features": {
+    "locationDelegation": {
+      "enabled": false
+    },
+    "playBilling": {
+      "enabled": false
+    }
+  },
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false
+}

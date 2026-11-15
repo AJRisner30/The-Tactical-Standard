@@ -1,0 +1,50 @@
+import {StrictMode} from 'react';
+import {createRoot} from 'react-dom/client';
+import App from './App.tsx';
+import './index.css';
+import {registerSW} from 'virtual:pwa-register';
+import {FirebaseProvider} from './context/FirebaseContext.tsx';
+
+// Register PWA Service Worker for offline capability & automatic background updates
+registerSW({
+  immediate: true,
+  onNeedRefresh() {
+    console.log('[Tactical Standard PWA] New update available.');
+  },
+  onOfflineReady() {
+    console.log('[Tactical Standard PWA] App is cached and ready for offline use.');
+  },
+  onRegisteredSW(swScriptUrl, registration) {
+    console.log('[Tactical Standard PWA] Service worker active:', swScriptUrl, registration);
+  },
+  onRegisterError(error) {
+    console.warn('[Tactical Standard PWA] Service worker registration error, attempting direct /sw.js:', error);
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch((err) => {
+        console.warn('[Tactical Standard PWA] Direct /sw.js fallback registration error:', err);
+      });
+    }
+  },
+});
+
+// Direct service worker fallback guarantee for standard browser PWA install checks
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.getRegistration().then((reg) => {
+      if (!reg) {
+        navigator.serviceWorker.register('/sw.js').catch((err) => {
+          console.log('[Tactical Standard PWA] Standalone registration fallback note:', err);
+        });
+      }
+    });
+  });
+}
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <FirebaseProvider>
+      <App />
+    </FirebaseProvider>
+  </StrictMode>,
+);
+

@@ -1,0 +1,534 @@
+import { AthleteProfile, WorkoutSessionLog } from '../types';
+import { auth } from '../firebase';
+
+export type { AthleteProfile };
+
+const CURRENT_ATHLETE_KEY = 'rpa_current_athlete_id';
+const ATHLETES_KEY = 'rpa_athletes_list';
+const COACH_AUTH_SESSION_KEY = 'rpa_coach_auth_session';
+
+export const DEFAULT_ATHLETES: AthleteProfile[] = [
+  {
+    id: 'athlete-default',
+    name: 'Tactical Athlete',
+    email: '',
+    pin: '',
+    avatarColor: 'from-amber-600 to-slate-900',
+    joinedDate: 'Jan 2026',
+    experienceLevel: 'Intermediate',
+    primaryGoal: 'Hybrid Athlete',
+    weightLbs: 185,
+    restingHr: 54,
+    maxHr: 190,
+    notes: 'Personal training profile. Customize your metrics in My Stats, log sessions, and track progressive overload.',
+  }
+];
+
+// Coach private profile - only activated upon explicit PIN authentication, never listed for public selection
+export const COACH_PROFILE: AthleteProfile = {
+  id: 'athlete-aj-risner',
+  name: 'Aryan "AJ" Risner',
+  email: 'risneraryan@gmail.com',
+  pin: '1234',
+  avatarColor: 'from-amber-500 to-stone-900',
+  joinedDate: 'Jan 2026',
+  experienceLevel: 'Elite',
+  primaryGoal: 'Hybrid Athlete',
+  weightLbs: 195,
+  restingHr: 48,
+  maxHr: 192,
+  notes: 'Founder & Head Coach. Hybrid strength & conditioning protocol focus.',
+};
+
+export const MASTER_EXEMPT_EMAIL = 'risneraryan@gmail.com';
+
+/**
+ * Checks if an email is the single exempt Coach/Owner account with permanent full access
+ */
+export function isMasterExemptAccount(email?: string | null): boolean {
+  if (!email) return false;
+  return email.trim().toLowerCase() === MASTER_EXEMPT_EMAIL.toLowerCase();
+}
+
+export const TRIAL_STORAGE_PREFIX = 'rpa_trial_v2_';
+export const RESETTABLE_TEST_PROFILE_EMAIL = 'risnerathletics@gmail.com';
+
+/**
+ * Resets the 14-day free trial exclusively for the authorized test profile (risnerathletics@gmail.com).
+ * Normal user accounts will NEVER be reset and will remain locked upon expiration.
+ */
+export function resetAthleteTrial(targetEmailOrId = RESETTABLE_TEST_PROFILE_EMAIL, days = 14) {
+  const startedAtMs = Date.now();
+  const trialEndMs = startedAtMs + days * 24 * 60 * 60 * 1000;
+  const trialState = {
+    startedAtMs,
+    trialEndMs,
+    hasSelectedPlan: true,
+    tier: 'pro' as const,
+    status: 'trialing' as const,
+    resetVersion: 2,
+    resetAt: new Date().toISOString(),
+  };
+
+  if (typeof window !== 'undefined') {
+    const norm = targetEmailOrId.trim().toLowerCase();
+    try {
+      localStorage.setItem(`${TRIAL_STORAGE_PREFIX}${norm}`, JSON.stringify(trialState));
+      localStorage.removeItem(`patrol_ready_trial_${norm}`);
+      localStorage.removeItem(`patrol_ready_user_trial_${norm}`);
+    } catch {}
+
+    try {
+      const athletes = getAthletes();
+      for (const a of athletes) {
+        if ((a.email && a.email.trim().toLowerCase() === norm) || a.id === targetEmailOrId) {
+          updateAthleteProfile(a.id, {
+            trialState,
+            trialActivation: {
+              code: 'TEST_RESET',
+              activatedAt: new Date().toISOString(),
+              startedAtMs,
+              trialEndMs,
+              daysGranted: days,
+              hasSelectedPlan: true,
+              tier: 'pro' as const,
+              status: 'trialing' as const,
+              resetVersion: 2,
+            },
+          });
+        }
+      }
+    } catch {}
+
+    try {
+      window.dispatchEvent(new CustomEvent('trial_state_changed', { detail: trialState }));
+    } catch {}
+  }
+
+  return trialState;
+}
+
+export function getAthleteTrialState(athleteId: string, email?: string): {
+  startedAtMs: number;
+  trialEndMs: number;
+  hasSelectedPlan: boolean;
+  tier: 'pro' | 'standard';
+  status: 'trialing' | 'active_subscriber' | 'expired' | 'unpaid';
+  resetVersion?: number;
+} | null {
+  if (typeof window === 'undefined') return null;
+  if (email && isMasterExemptAccount(email)) {
+    return {
+      startedAtMs: Date.now() - 86400000,
+      trialEndMs: Date.now() + 365 * 86400000,
+      hasSelectedPlan: true,
+      tier: 'pro',
+      status: 'active_subscriber',
+    };
+  }
+
+  // Dedicated test account auto-reset: risnerathletics@gmail.com
+  if (email && email.trim().toLowerCase() === RESETTABLE_TEST_PROFILE_EMAIL) {
+    const emailKey = `${TRIAL_STORAGE_PREFIX}${RESETTABLE_TEST_PROFILE_EMAIL}`;
+    const rawEmail = localStorage.getItem(emailKey);
+    if (rawEmail) {
+      try {
+        const parsed = JSON.parse(rawEmail);
+        if (parsed.resetVersion === 2 && typeof parsed.trialEndMs === 'number' && parsed.trialEndMs > Date.now()) {
+          return parsed;
+        }
+      } catch {}
+    }
+    // Automatically reset and initialize fresh 14 days for test account
+    return resetAthleteTrial(RESETTABLE_TEST_PROFILE_EMAIL, 14);
+  }
+
+  try {
+    // 1. Strict per-user email lookup
+    if (email && email.trim()) {
+      const emailKey = `${TRIAL_STORAGE_PREFIX}${email.trim().toLowerCase()}`;
+      const rawEmail = localStorage.getItem(emailKey);
+      if (rawEmail) return JSON.parse(rawEmail);
+    }
+    // 2. Lookup by non-default athleteId or Firebase UID
+    if (athleteId && athleteId !== 'athlete-default') {
+      const raw = localStorage.getItem(`${TRIAL_STORAGE_PREFIX}${athleteId}`);
+      if (raw) return JSON.parse(raw);
+    }
+    // 3. Fallback to athlete profile ONLY if the profile email matches or is a dedicated registered profile
+    const athlete = getCurrentAthlete();
+    if (athlete && athlete.id !== 'athlete-default' && athlete.trialState) {
+      if (!email || (athlete.email && athlete.email.trim().toLowerCase() === email.trim().toLowerCase())) {
+        return athlete.trialState;
+      }
+    }
+  } catch {}
+  return null;
+}
+
+export function startAthleteFreeTrial(athleteId: string, days = 14, email?: string): {
+  startedAtMs: number;
+  trialEndMs: number;
+  hasSelectedPlan: boolean;
+  tier: 'pro';
+  status: 'trialing' | 'unpaid';
+} {
+  const isTestAccount = email && email.trim().toLowerCase() === RESETTABLE_TEST_PROFILE_EMAIL;
+  if (isTestAccount) {
+    return resetAthleteTrial(RESETTABLE_TEST_PROFILE_EMAIL, days);
+  }
+
+  const existing = getAthleteTrialState(athleteId, email);
+  let startedAtMs: number;
+  let trialEndMs: number;
+
+  if (existing && existing.trialEndMs) {
+    // Preserve the user's authentic activation timestamp! NEVER reset the 14 days!
+    startedAtMs = existing.startedAtMs || (existing.trialEndMs - days * 24 * 60 * 60 * 1000);
+    trialEndMs = existing.trialEndMs;
+  } else {
+    startedAtMs = Date.now();
+    trialEndMs = startedAtMs + days * 24 * 60 * 60 * 1000;
+  }
+
+  const isExpired = Date.now() >= trialEndMs;
+  const trialState = {
+    startedAtMs,
+    trialEndMs,
+    hasSelectedPlan: true,
+    tier: 'pro' as const,
+    status: (isExpired ? 'unpaid' : 'trialing') as 'trialing' | 'unpaid',
+  };
+
+  try {
+    if (typeof window !== 'undefined') {
+      if (email && email.trim()) {
+        localStorage.setItem(`${TRIAL_STORAGE_PREFIX}${email.trim().toLowerCase()}`, JSON.stringify(trialState));
+      }
+      if (athleteId && athleteId !== 'athlete-default') {
+        localStorage.setItem(`${TRIAL_STORAGE_PREFIX}${athleteId}`, JSON.stringify(trialState));
+      }
+    }
+    const athlete = getCurrentAthlete();
+    if (athlete && (athlete.id === athleteId || (email && athlete.email?.toLowerCase() === email.toLowerCase()))) {
+      updateAthleteProfile(athlete.id, {
+        ...athlete,
+        trialState,
+        trialActivation: {
+          code: 'FREE_TRIAL',
+          activatedAt: new Date(trialState.startedAtMs).toISOString(),
+          startedAtMs: trialState.startedAtMs,
+          trialEndMs: trialState.trialEndMs,
+          daysGranted: days,
+          hasSelectedPlan: true,
+          tier: 'pro',
+          status: trialState.status,
+        },
+      });
+    }
+    window.dispatchEvent(new CustomEvent('trial_state_changed', { detail: trialState }));
+  } catch {}
+  return trialState;
+}
+
+/**
+ * Checks if the current session is explicitly authenticated as Coach AJ (strictly risneraryan@gmail.com)
+ */
+export function isCoachSession(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const isCoachFlag = sessionStorage.getItem(COACH_AUTH_SESSION_KEY) === 'true';
+    if (!isCoachFlag) return false;
+    const currentEmail = auth.currentUser?.email?.trim().toLowerCase();
+    return currentEmail === MASTER_EXEMPT_EMAIL.toLowerCase();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Returns the sanitized athletes list with Jordan Rivera completely purged,
+ * and ensuring Coach Aryan Risner is never exposed in the general list.
+ */
+export function getAthletes(): AthleteProfile[] {
+  try {
+    const raw = typeof window !== 'undefined' ? localStorage.getItem(ATHLETES_KEY) : null;
+    let list: AthleteProfile[] = DEFAULT_ATHLETES;
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        list = parsed;
+      }
+    }
+
+    // Permanently purge Jordan Rivera or legacy records
+    const cleaned = list.filter((a) => {
+      if (!a || !a.name) return false;
+      const lower = a.name.toLowerCase();
+      const emailLower = (a.email || '').toLowerCase();
+      if (
+        a.id === 'athlete-jordan-r' ||
+        lower.includes('jordan rivera') ||
+        lower.includes('jordan r') ||
+        emailLower.includes('jordan')
+      ) {
+        return false;
+      }
+      return true;
+    });
+
+    if (cleaned.length === 0) {
+      cleaned.push(DEFAULT_ATHLETES[0]);
+    }
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(ATHLETES_KEY, JSON.stringify(cleaned));
+    }
+
+    return cleaned;
+  } catch (err) {
+    console.error('Failed to load athletes:', err);
+    return DEFAULT_ATHLETES;
+  }
+}
+
+/**
+ * Returns only the athletes that the current user is permitted to select from.
+ * Strict Isolation: Standard service members can ONLY see their own profile.
+ * Only Coach Aryan Risner (explicit admin session) can view other athletes.
+ */
+export function getSelectableAthletes(allowAdminRoster = false): AthleteProfile[] {
+  const isCoach = allowAdminRoster || isCoachSession();
+  const current = getCurrentAthlete();
+
+  // If not authenticated as coach, isolate strictly to the service member's own account!
+  if (!isCoach) {
+    return [current];
+  }
+
+  const all = getAthletes();
+  return all.filter((a) => {
+    if (a.id === 'athlete-aj-risner') return false;
+    const lower = (a.name || '').toLowerCase();
+    const emailLower = (a.email || '').toLowerCase();
+    if (
+      lower.includes('aryan') ||
+      lower.includes('risner') ||
+      emailLower.includes('risneraryan')
+    ) {
+      return false;
+    }
+    return true;
+  });
+}
+
+const COACH_PROFILE_STORAGE_KEY = 'rpa_coach_profile_v1';
+
+function getStoredCoachProfile(): AthleteProfile {
+  if (typeof window === 'undefined') return COACH_PROFILE;
+  try {
+    const raw = localStorage.getItem(COACH_PROFILE_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return { ...COACH_PROFILE, ...parsed, id: COACH_PROFILE.id };
+    }
+  } catch {}
+  return COACH_PROFILE;
+}
+
+export function getCurrentAthlete(): AthleteProfile {
+  if (typeof window === 'undefined') return DEFAULT_ATHLETES[0];
+
+  const currentId = localStorage.getItem(CURRENT_ATHLETE_KEY);
+
+  // If previous session had Jordan, wipe it immediately
+  if (currentId === 'athlete-jordan-r') {
+    localStorage.setItem(CURRENT_ATHLETE_KEY, DEFAULT_ATHLETES[0].id);
+    return DEFAULT_ATHLETES[0];
+  }
+
+  // If currentId is Coach AJ, check if this session was explicitly authenticated with PIN
+  if (currentId === 'athlete-aj-risner') {
+    if (isCoachSession()) {
+      return getStoredCoachProfile();
+    }
+    // Standard visitor: reset to Tactical Athlete so nobody sees Aryan's name selected!
+    localStorage.setItem(CURRENT_ATHLETE_KEY, DEFAULT_ATHLETES[0].id);
+    return DEFAULT_ATHLETES[0];
+  }
+
+  const athletes = getAthletes();
+  const found = athletes.find((a) => a.id === currentId);
+  if (found) {
+    const lower = found.name.toLowerCase();
+    if ((lower.includes('aryan') || lower.includes('risner')) && !isCoachSession()) {
+      localStorage.setItem(CURRENT_ATHLETE_KEY, DEFAULT_ATHLETES[0].id);
+      return DEFAULT_ATHLETES[0];
+    }
+    return found;
+  }
+
+  const defaultAthlete = athletes.find((a) => a.id === 'athlete-default') || athletes[0] || DEFAULT_ATHLETES[0];
+  localStorage.setItem(CURRENT_ATHLETE_KEY, defaultAthlete.id);
+  return defaultAthlete;
+}
+
+export function setCurrentAthlete(athleteId: string): AthleteProfile {
+  if (athleteId === 'athlete-aj-risner') {
+    if (isCoachSession()) {
+      const storedCoach = getStoredCoachProfile();
+      localStorage.setItem(CURRENT_ATHLETE_KEY, storedCoach.id);
+      window.dispatchEvent(new CustomEvent('athlete_changed', { detail: storedCoach }));
+      return storedCoach;
+    }
+    return getCurrentAthlete();
+  }
+
+  const athletes = getAthletes();
+  const found = athletes.find((a) => a.id === athleteId);
+  if (found) {
+    localStorage.setItem(CURRENT_ATHLETE_KEY, found.id);
+    window.dispatchEvent(new CustomEvent('athlete_changed', { detail: found }));
+    return found;
+  }
+  return getCurrentAthlete();
+}
+
+export function registerAthlete(params: {
+  name: string;
+  email: string;
+  pin?: string;
+  experienceLevel: AthleteProfile['experienceLevel'];
+  primaryGoal: AthleteProfile['primaryGoal'];
+  weightLbs?: number;
+  restingHr?: number;
+}): AthleteProfile {
+  const athletes = getAthletes();
+  
+  const avatarGradients = [
+    'from-amber-600 to-stone-900',
+    'from-yellow-600 to-slate-900',
+    'from-emerald-700 to-slate-900',
+    'from-slate-700 to-zinc-900',
+    'from-orange-600 to-stone-900',
+    'from-amber-500 to-zinc-800',
+  ];
+  const colorIndex = athletes.length % avatarGradients.length;
+
+  const newAthlete: AthleteProfile = {
+    id: `athlete-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    name: params.name.trim(),
+    email: params.email.trim().toLowerCase(),
+    pin: params.pin || '',
+    avatarColor: avatarGradients[colorIndex],
+    joinedDate: new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+    experienceLevel: params.experienceLevel,
+    primaryGoal: params.primaryGoal,
+    weightLbs: params.weightLbs || 180,
+    restingHr: params.restingHr || 60,
+    maxHr: params.restingHr ? 220 - 28 : 190,
+  };
+
+  const updated = [...athletes, newAthlete];
+  localStorage.setItem(ATHLETES_KEY, JSON.stringify(updated));
+  localStorage.setItem(CURRENT_ATHLETE_KEY, newAthlete.id);
+  window.dispatchEvent(new CustomEvent('athlete_changed', { detail: newAthlete }));
+  return newAthlete;
+}
+
+export function loginAthlete(emailOrName: string, pin?: string): AthleteProfile | null {
+  const query = emailOrName.trim().toLowerCase();
+
+  // Explicit Coach Login: ONLY permitted if the authenticated Firebase account is risneraryan@gmail.com
+  if (
+    query === 'risneraryan@gmail.com' ||
+    query === 'aryan risner' ||
+    query === 'coach aj' ||
+    query === 'aj risner'
+  ) {
+    const currentEmail = auth.currentUser?.email?.trim().toLowerCase();
+    if (currentEmail !== MASTER_EXEMPT_EMAIL.toLowerCase()) {
+      return null;
+    }
+    if (COACH_PROFILE.pin && pin && pin !== COACH_PROFILE.pin) {
+      return null;
+    }
+    try {
+      sessionStorage.setItem(COACH_AUTH_SESSION_KEY, 'true');
+    } catch {}
+    const storedCoach = getStoredCoachProfile();
+    localStorage.setItem(CURRENT_ATHLETE_KEY, storedCoach.id);
+    window.dispatchEvent(new CustomEvent('athlete_changed', { detail: storedCoach }));
+    return storedCoach;
+  }
+
+  const athletes = getAthletes();
+  const found = athletes.find(
+    (a) => a.email.toLowerCase() === query || a.name.toLowerCase() === query
+  );
+
+  if (!found) return null;
+
+  if (found.pin && pin && found.pin !== pin) {
+    return null;
+  }
+
+  setCurrentAthlete(found.id);
+  return found;
+}
+
+export function updateAthleteProfile(
+  athleteId: string,
+  updates: Partial<AthleteProfile>
+): AthleteProfile | null {
+  if (athleteId === 'athlete-aj-risner') {
+    const storedCoach = getStoredCoachProfile();
+    const updatedCoach = { ...storedCoach, ...updates, id: COACH_PROFILE.id };
+    Object.assign(COACH_PROFILE, updatedCoach);
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(COACH_PROFILE_STORAGE_KEY, JSON.stringify(updatedCoach));
+      }
+    } catch {}
+    window.dispatchEvent(new CustomEvent('athlete_changed', { detail: updatedCoach }));
+    return updatedCoach;
+  }
+
+  const athletes = getAthletes();
+  const index = athletes.findIndex((a) => a.id === athleteId);
+  if (index === -1) {
+    const upserted: AthleteProfile = {
+      ...DEFAULT_ATHLETES[0],
+      ...updates,
+      id: athleteId,
+    };
+    const nextList = [...athletes, upserted];
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(ATHLETES_KEY, JSON.stringify(nextList));
+      localStorage.setItem(CURRENT_ATHLETE_KEY, athleteId);
+      window.dispatchEvent(new CustomEvent('athlete_changed', { detail: upserted }));
+    }
+    return upserted;
+  }
+
+  athletes[index] = { ...athletes[index], ...updates };
+  localStorage.setItem(ATHLETES_KEY, JSON.stringify(athletes));
+  
+  const currentId = localStorage.getItem(CURRENT_ATHLETE_KEY);
+  if (currentId === athleteId) {
+    window.dispatchEvent(new CustomEvent('athlete_changed', { detail: athletes[index] }));
+  }
+  return athletes[index];
+}
+
+export function getAthleteSessionLogs(
+  athleteId: string,
+  allLogs: WorkoutSessionLog[]
+): WorkoutSessionLog[] {
+  return allLogs.filter((log) => {
+    if (log.athleteId) {
+      return log.athleteId === athleteId;
+    }
+    return athleteId === 'athlete-default' || athleteId === 'athlete-aj-risner';
+  });
+}

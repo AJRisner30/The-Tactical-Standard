@@ -1,0 +1,338 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 700" width="100%" height="100%">
+  <defs>
+    <!-- Tactical Brass / Military Gold Metallic Gradients -->
+    <linearGradient id="brassBevel" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FEF3C7" />
+      <stop offset="25%" stop-color="#F59E0B" />
+      <stop offset="50%" stop-color="#B45309" />
+      <stop offset="75%" stop-color="#FBBF24" />
+      <stop offset="100%" stop-color="#78350F" />
+    </linearGradient>
+
+    <linearGradient id="brassGold" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FEF3C7" />
+      <stop offset="35%" stop-color="#FBBF24" />
+      <stop offset="70%" stop-color="#D97706" />
+      <stop offset="100%" stop-color="#92400E" />
+    </linearGradient>
+
+    <linearGradient id="brassHoriz" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#92400E" />
+      <stop offset="25%" stop-color="#F59E0B" />
+      <stop offset="50%" stop-color="#FEF3C7" />
+      <stop offset="75%" stop-color="#F59E0B" />
+      <stop offset="100%" stop-color="#78350F" />
+    </linearGradient>
+
+    <linearGradient id="gunmetalSilver" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#F8FAFC" />
+      <stop offset="45%" stop-color="#CBD5E1" />
+      <stop offset="75%" stop-color="#64748B" />
+      <stop offset="100%" stop-color="#94A3B8" />
+    </linearGradient>
+
+    <!-- Gunmetal Obsidian Shield Gradients -->
+    <linearGradient id="obsidianShieldBg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1E242B" />
+      <stop offset="40%" stop-color="#11161C" />
+      <stop offset="100%" stop-color="#07090B" />
+    </linearGradient>
+
+    <linearGradient id="innerBrassGlow" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.22" />
+      <stop offset="45%" stop-color="#92400E" stop-opacity="0.10" />
+      <stop offset="100%" stop-color="#090B0D" stop-opacity="0.92" />
+    </linearGradient>
+
+    <!-- Star & Chevron 3D Gradients -->
+    <linearGradient id="starGoldLight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FEF3C7" />
+      <stop offset="50%" stop-color="#FBBF24" />
+      <stop offset="100%" stop-color="#B45309" />
+    </linearGradient>
+    <linearGradient id="starGoldDark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#92400E" />
+      <stop offset="100%" stop-color="#451A03" />
+    </linearGradient>
+
+    <!-- Drop Shadows & Filters -->
+    <filter id="badgeGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="16" flood-color="#D97706" flood-opacity="0.35" />
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#000000" flood-opacity="0.8" />
+    </filter>
+
+    <filter id="textGlow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#000000" flood-opacity="0.95" />
+    </filter>
+  </defs>
+
+  <!-- SHIELD CREST GROUP (Center: X=400) -->
+  <g filter="url(#badgeGlow)">
+    <!-- Outer Shield Brass Metallic Layer -->
+    <path d="M 400 32 
+             L 485 52 
+             L 565 82 
+             L 565 240 
+             C 565 315, 490 380, 400 425 
+             C 310 380, 235 315, 235 240 
+             L 235 82 
+             L 315 52 Z"
+          fill="url(#brassBevel)" 
+          stroke="#050608" stroke-width="3" />
+
+    <!-- Secondary Gunmetal Inset Border -->
+    <path d="M 400 42 
+             L 480 60 
+             L 552 88 
+             L 552 238 
+             C 552 308, 482 370, 400 412 
+             C 318 370, 248 308, 248 238 
+             L 248 88 
+             L 320 60 Z"
+          fill="#090B0D" 
+          stroke="url(#brassHoriz)" stroke-width="2" />
+
+    <!-- Main Gunmetal Obsidian Field -->
+    <path d="M 400 48 
+             L 476 66 
+             L 544 92 
+             L 544 235 
+             C 544 302, 476 362, 400 404 
+             C 324 362, 256 302, 256 235 
+             L 256 92 
+             L 324 66 Z"
+          fill="url(#obsidianShieldBg)" />
+
+    <!-- Inner Radial Brass Spotlight -->
+    <path d="M 400 48 
+             L 476 66 
+             L 544 92 
+             L 544 235 
+             C 544 302, 476 362, 400 404 
+             C 324 362, 256 302, 256 235 
+             L 256 92 
+             L 324 66 Z"
+          fill="url(#innerBrassGlow)" />
+
+    <!-- Tactical Gold Inset Line -->
+    <path d="M 400 58 
+             L 468 74 
+             L 534 98 
+             L 534 232 
+             C 534 294, 470 350, 400 392 
+             C 330 350, 266 294, 266 232 
+             L 266 98 
+             L 332 74 Z"
+          fill="none" 
+          stroke="#F59E0B" stroke-width="1.8" stroke-opacity="0.85" />
+
+    <!-- 5-POINT COMMAND STAR AT APEX (Center 400, 84) -->
+    <g transform="translate(400, 84)">
+      <circle cx="0" cy="0" r="22" fill="none" stroke="#D97706" stroke-width="1" stroke-dasharray="2,2" opacity="0.7"/>
+      <polygon points="0,-18 5,-5 18,-5 8,4 12,17 0,9 -12,17 -8,4 -18,-5 -5,-5" fill="url(#starGoldLight)"/>
+      <polygon points="0,-18 0,9 12,17 8,4" fill="url(#starGoldDark)" opacity="0.45"/>
+      <polygon points="0,-18 0,9 -12,17 -8,4" fill="#FEF3C7" opacity="0.6"/>
+    </g>
+
+    <!-- MILITARY RANK CHEVRONS BELOW STAR -->
+    <path d="M 370 125 L 400 108 L 430 125 L 424 133 L 400 119 L 376 133 Z" 
+          fill="url(#brassGold)" stroke="#090B0D" stroke-width="1" />
+    <path d="M 374 138 L 400 123 L 426 138 L 420 146 L 400 134 L 380 146 Z" 
+          fill="url(#brassGold)" stroke="#090B0D" stroke-width="1" />
+
+    <!-- LAUREL WREATH BRANCHES -->
+    <g fill="url(#brassGold)" opacity="0.88">
+      <path d="M 290 320 Q 275 260 285 200 Q 295 160 310 135" fill="none" stroke="#D97706" stroke-width="2"/>
+      <path d="M 292 315 C 280 315 272 308 274 300 C 282 300 290 307 292 315 Z"/>
+      <path d="M 296 305 C 298 295 306 292 312 296 C 308 304 300 308 296 305 Z"/>
+      <path d="M 285 285 C 272 284 266 275 268 268 C 277 268 284 276 285 285 Z"/>
+      <path d="M 290 270 C 294 260 302 258 308 263 C 304 271 296 274 290 270 Z"/>
+      <path d="M 280 250 C 268 247 264 238 267 232 C 276 233 282 241 280 250 Z"/>
+      <path d="M 286 235 C 291 225 300 224 305 229 C 300 237 292 240 286 235 Z"/>
+      <path d="M 280 215 C 270 210 268 200 272 195 C 280 197 284 206 280 215 Z"/>
+      <path d="M 288 200 C 294 190 303 191 307 197 C 301 204 293 206 288 200 Z"/>
+      <path d="M 285 180 C 276 173 277 163 283 159 C 289 163 291 172 285 180 Z"/>
+      <path d="M 295 165 C 302 156 312 158 315 165 C 308 171 300 171 295 165 Z"/>
+      <path d="M 295 145 C 290 137 294 128 302 126 C 306 132 304 141 295 145 Z"/>
+    </g>
+
+    <g fill="url(#brassGold)" opacity="0.88">
+      <path d="M 510 320 Q 525 260 515 200 Q 505 160 490 135" fill="none" stroke="#D97706" stroke-width="2"/>
+      <path d="M 508 315 C 520 315 528 308 526 300 C 518 300 510 307 508 315 Z"/>
+      <path d="M 504 305 C 502 295 494 292 488 296 C 492 304 500 308 504 305 Z"/>
+      <path d="M 515 285 C 528 284 534 275 532 268 C 523 268 516 276 515 285 Z"/>
+      <path d="M 510 270 C 506 260 498 258 492 263 C 496 271 504 274 510 270 Z"/>
+      <path d="M 520 250 C 532 247 536 238 533 232 C 524 233 518 241 520 250 Z"/>
+      <path d="M 514 235 C 509 225 500 224 495 229 C 500 237 508 240 514 235 Z"/>
+      <path d="M 520 215 C 530 210 532 200 528 195 C 520 197 516 206 520 215 Z"/>
+      <path d="M 512 200 C 506 190 497 191 493 197 C 499 204 507 206 512 200 Z"/>
+      <path d="M 515 180 C 524 173 523 163 517 159 C 511 163 509 172 515 180 Z"/>
+      <path d="M 505 165 C 498 156 488 158 485 165 C 492 171 500 171 505 165 Z"/>
+      <path d="M 505 145 C 510 137 506 128 498 126 C 494 132 496 141 505 145 Z"/>
+    </g>
+
+    <!-- SPRINTING WARFIGHTER / SERVICE MEMBER SILHOUETTE -->
+    <g transform="translate(400, 240)" id="tacticalWarfighter">
+      <ellipse cx="0" cy="80" rx="65" ry="12" fill="#000000" opacity="0.45" />
+
+      <!-- Back Leg & Combat Boot -->
+      <path d="M -12,48 L -24,80 L -38,105 L -48,108 L -52,118 L -32,118 L -22,100 L -6,62 Z" 
+            fill="#1E242B" stroke="#090B0D" stroke-width="1.5" />
+      <path d="M -50,116 L -34,116 L -36,112 L -48,112 Z" fill="#92400E" />
+
+      <!-- Front Leg & Combat Boot -->
+      <path d="M 10,48 L 26,72 L 32,95 L 26,110 L 16,114 L 35,116 L 44,112 L 42,95 L 32,70 L 18,45 Z" 
+            fill="#2B333C" stroke="#090B0D" stroke-width="1.5" />
+      <path d="M 18,113 L 40,113 L 42,109 L 22,109 Z" fill="#B45309" />
+
+      <!-- Torso with Plate Carrier -->
+      <path d="M -22,2 L 22,-4 L 20,52 L -18,50 Z" fill="#11161C" />
+      <path d="M -20,4 L 20,-2 L 18,44 L -16,46 Z" 
+            fill="#262F38" stroke="#D97706" stroke-width="1.2" />
+      <!-- MOLLE Webbing -->
+      <line x1="-14" y1="18" x2="14" y2="14" stroke="#94A3B8" stroke-width="2" stroke-dasharray="5,2" />
+      <line x1="-14" y1="26" x2="14" y2="22" stroke="#94A3B8" stroke-width="2" stroke-dasharray="5,2" />
+      <line x1="-14" y1="34" x2="14" y2="30" stroke="#94A3B8" stroke-width="2" stroke-dasharray="5,2" />
+
+      <!-- 'USA' Chest Patch -->
+      <rect x="-14" y="6" width="28" height="8" rx="1.5" fill="#090B0D" stroke="#F59E0B" stroke-width="0.8" />
+      <text x="0" y="12.5" font-family="'Impact', 'Arial Black', sans-serif" font-weight="900" font-size="6.5" 
+            fill="#FBBF24" text-anchor="middle" letter-spacing="1.5">TACSTD</text>
+
+      <!-- Tactical Load Belt -->
+      <path d="M -18,44 L 18,40 L 19,48 L -17,52 Z" fill="#090B0D" stroke="#64748B" stroke-width="1" />
+      <rect x="-12" y="44" width="6" height="7" rx="1" fill="#334155" />
+      <rect x="4" y="41" width="7" height="8" rx="1" fill="#334155" />
+      <rect x="13" y="42" width="6" height="9" rx="1" fill="#1E242B" stroke="#D97706" stroke-width="0.5" />
+
+      <!-- Left & Right Arms -->
+      <path d="M -18,4 L -32,-6 L -44,-4 L -42,8 L -32,8 L -24,20 L -18,12 Z" 
+            fill="#1E242B" stroke="#090B0D" stroke-width="1.2" />
+      <circle cx="-42" cy="2" r="5" fill="#CBD5E1" />
+
+      <path d="M 18,2 L 32,8 L 44,-2 L 40,-12 L 26,-8 L 18,-2 Z" 
+            fill="#2B333C" stroke="#090B0D" stroke-width="1.2" />
+      <circle cx="43" cy="-7" r="5.5" fill="#E2E8F0" />
+
+      <!-- Head & Ballistic ACH Helmet Silhouette -->
+      <path d="M -4,-2 L 6,-6 L 8,-12 L -2,-10 Z" fill="#CBD5E1" />
+      <path d="M 4,-12 L 14,-14 L 16,-20 L 14,-26 L 8,-28 L 0,-26 L -2,-18 L 2,-12 Z" 
+            fill="#E2E8F0" stroke="#090B0D" stroke-width="1" />
+      <!-- Tactical High-Cut Helmet -->
+      <path d="M -3,-22 Q 4,-33 16,-28 L 17,-21 L 4,-20 L -2,-17 Z" fill="#334155" stroke="#D97706" stroke-width="0.8" />
+    </g>
+
+    <!-- LOWER RIBBON BANNER: '★ MILITARY ★' -->
+    <path d="M 305 342 L 290 355 L 305 368 L 305 342 Z" fill="#090B0D" />
+    <path d="M 495 342 L 510 355 L 495 368 L 495 342 Z" fill="#090B0D" />
+
+    <path d="M 300 342 
+             C 345 334, 455 334, 500 342 
+             L 492 372 
+             C 455 364, 345 364, 308 372 Z" 
+          fill="url(#brassHoriz)" 
+          stroke="#090B0D" stroke-width="2" />
+
+    <path d="M 308 346 
+             C 350 338, 450 338, 492 346 
+             L 486 368 
+             C 450 360, 350 360, 314 368 Z" 
+          fill="none" 
+          stroke="#451A03" stroke-width="1" stroke-opacity="0.7" />
+
+    <text x="400" y="361" 
+          font-family="'Impact', 'Arial Black', sans-serif" 
+          font-size="18" 
+          font-weight="900" 
+          fill="#090B0D" 
+          text-anchor="middle" 
+          letter-spacing="3.5">
+      &#9733; MILITARY &#9733;
+    </text>
+
+    <!-- LOWER SHIELD POINT: 'TTS' (The Tactical Standard) -->
+    <text x="400" y="394" 
+          font-family="'Impact', 'Arial Black', sans-serif" 
+          font-size="14" 
+          font-weight="900" 
+          fill="url(#brassGold)" 
+          stroke="#090B0D" stroke-width="0.8" 
+          text-anchor="middle" 
+          letter-spacing="3">
+      TTS
+    </text>
+  </g>
+
+  <!-- LOWER BRANDING TYPOGRAPHY GROUP -->
+  <g filter="url(#textGlow)">
+    <!-- 'THE TACTICAL' -->
+    <text x="400" y="492" 
+          font-family="'Impact', 'Arial Black', sans-serif" 
+          font-size="60" 
+          font-weight="900" 
+          fill="#050608" 
+          text-anchor="middle" 
+          letter-spacing="3">
+      THE TACTICAL
+    </text>
+    <text x="400" y="488" 
+          font-family="'Impact', 'Arial Black', sans-serif" 
+          font-size="60" 
+          font-weight="900" 
+          fill="#11161C" 
+          stroke="url(#brassHoriz)" 
+          stroke-width="4.5" 
+          stroke-linejoin="round"
+          text-anchor="middle" 
+          letter-spacing="3">
+      THE TACTICAL
+    </text>
+    <text x="400" y="488" 
+          font-family="'Impact', 'Arial Black', sans-serif" 
+          font-size="60" 
+          font-weight="900" 
+          fill="url(#gunmetalSilver)" 
+          text-anchor="middle" 
+          letter-spacing="3">
+      THE TACTICAL
+    </text>
+
+    <!-- 'STANDARD' FRAMED BOX -->
+    <g transform="translate(400, 545)">
+      <path d="M -235 -24 L 235 -24 L 245 -14 L 245 16 L 235 24 L -235 24 L -245 14 L -245 -14 Z" 
+            fill="#090B0D" stroke="url(#brassHoriz)" stroke-width="2.5" />
+      <line x1="-240" y1="-8" x2="-240" y2="8" stroke="#F59E0B" stroke-width="3" />
+      <line x1="240" y1="-8" x2="240" y2="8" stroke="#F59E0B" stroke-width="3" />
+      <text x="0" y="8" 
+            font-family="'Impact', 'Arial Black', sans-serif" 
+            font-size="30" 
+            font-weight="900" 
+            fill="url(#brassGold)" 
+            letter-spacing="12" 
+            text-anchor="middle">
+        STANDARD
+      </text>
+    </g>
+
+    <!-- '••• MILITARY COMBAT READINESS •••' -->
+    <g transform="translate(400, 608)">
+      <circle cx="-195" cy="-4" r="3.5" fill="#F59E0B" />
+      <circle cx="-182" cy="-4" r="4.5" fill="url(#brassGold)" />
+      <circle cx="-169" cy="-4" r="3.5" fill="#F59E0B" />
+
+      <text x="0" y="1" 
+            font-family="'Impact', 'Arial Black', sans-serif" 
+            font-size="16" 
+            font-weight="900" 
+            fill="#E2E8F0" 
+            letter-spacing="4" 
+            text-anchor="middle">
+        MILITARY COMBAT READINESS
+      </text>
+
+      <circle cx="169" cy="-4" r="3.5" fill="#F59E0B" />
+      <circle cx="182" cy="-4" r="4.5" fill="url(#brassGold)" />
+      <circle cx="195" cy="-4" r="3.5" fill="#F59E0B" />
+    </g>
+  </g>
+</svg>
