@@ -1,8 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { 
   getAuth, 
-  GoogleAuthProvider,
-  signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
@@ -29,9 +27,6 @@ const app = initializeApp({
 
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId); /* CRITICAL: The app will break without this line */
 export const auth = getAuth(app);
-
-export const googleProvider = new GoogleAuthProvider();
-googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 // Suppress internal Firestore connection retry logs so harmless offline/reconnection attempts do not pollute console
 try {
@@ -64,6 +59,9 @@ export interface LocalAuthUserRecord {
   createdAt: string;
 }
 
+let cachedFallbackRaw: string | null = null;
+let cachedFallbackUser: User | null = null;
+
 function generateDeterministicUid(email: string): string {
   const clean = email.trim().toLowerCase();
   if (clean === 'risneraryan@gmail.com') return 'coach-aj-risner-uid';
@@ -77,7 +75,7 @@ function generateDeterministicUid(email: string): string {
 }
 
 export function buildFallbackUserObject(record: LocalAuthUserRecord): User {
-  const nowIso = new Date().toISOString();
+  const createdIso = record.createdAt || '2026-01-01T00:00:00.000Z';
   const futureIso = new Date(Date.now() + 30 * 86400000).toISOString();
   return {
     uid: record.uid,
@@ -86,8 +84,8 @@ export function buildFallbackUserObject(record: LocalAuthUserRecord): User {
     emailVerified: true,
     isAnonymous: false,
     metadata: {
-      creationTime: record.createdAt || nowIso,
-      lastSignInTime: nowIso,
+      creationTime: createdIso,
+      lastSignInTime: createdIso,
     },
     providerData: [
       {
@@ -109,8 +107,8 @@ export function buildFallbackUserObject(record: LocalAuthUserRecord): User {
         email: record.email,
         email_verified: true,
       },
-      authTime: nowIso,
-      issuedAtTime: nowIso,
+      authTime: createdIso,
+      issuedAtTime: createdIso,
       expirationTime: futureIso,
       signInProvider: 'password',
       signInSecondFactor: null,
@@ -144,10 +142,23 @@ export function saveStoredLocalAuthUsers(users: Record<string, LocalAuthUserReco
 export function getFallbackAuthUser(): User | null {
   try {
     const raw = localStorage.getItem(LOCAL_AUTH_SESSION_KEY);
-    if (!raw) return null;
+    if (!raw) {
+      cachedFallbackRaw = null;
+      cachedFallbackUser = null;
+      return null;
+    }
+    if (raw === cachedFallbackRaw && cachedFallbackUser) {
+      return cachedFallbackUser;
+    }
     const record = JSON.parse(raw) as LocalAuthUserRecord;
-    if (!record || !record.email || !record.uid) return null;
-    return buildFallbackUserObject(record);
+    if (!record || !record.email || !record.uid) {
+      cachedFallbackRaw = null;
+      cachedFallbackUser = null;
+      return null;
+    }
+    cachedFallbackRaw = raw;
+    cachedFallbackUser = buildFallbackUserObject(record);
+    return cachedFallbackUser;
   } catch {
     return null;
   }
@@ -157,13 +168,17 @@ export function setFallbackAuthSession(record: LocalAuthUserRecord | null): User
   try {
     if (!record) {
       localStorage.removeItem(LOCAL_AUTH_SESSION_KEY);
+      cachedFallbackRaw = null;
+      cachedFallbackUser = null;
       window.dispatchEvent(new CustomEvent('local_auth_state_changed', { detail: null }));
       return null;
     }
-    localStorage.setItem(LOCAL_AUTH_SESSION_KEY, JSON.stringify(record));
-    const userObj = buildFallbackUserObject(record);
-    window.dispatchEvent(new CustomEvent('local_auth_state_changed', { detail: userObj }));
-    return userObj;
+    const serialized = JSON.stringify(record);
+    localStorage.setItem(LOCAL_AUTH_SESSION_KEY, serialized);
+    cachedFallbackRaw = serialized;
+    cachedFallbackUser = buildFallbackUserObject(record);
+    window.dispatchEvent(new CustomEvent('local_auth_state_changed', { detail: cachedFallbackUser }));
+    return cachedFallbackUser;
   } catch {
     return null;
   }
@@ -304,8 +319,6 @@ export async function testFirestoreConnection(): Promise<boolean> {
 }
 
 export { 
-  GoogleAuthProvider,
-  signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,

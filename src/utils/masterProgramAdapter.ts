@@ -14,6 +14,7 @@ import {
   getApexWeekData,
   getTacticalHypertrophyWeekData,
   getUniversalPatWeekData,
+  getAftWeekData,
 } from '../data/protocolData';
 import {
   extractBannedMovements,
@@ -52,27 +53,27 @@ export interface MasterProgramMetadata {
 export const MASTER_PROGRAMS_CATALOG: MasterProgramMetadata[] = [
   {
     key: 'apex_protocol',
-    title: '52-Week Military Combat Fitness & Readiness Program',
+    title: 'Military 52-Week Fitness & Readiness Program',
     shortTitle: '52-Week Military Readiness',
-    subtitle: '4-Quarter Periodized Strength, Running Stamina, Sprint Velocity & Combat Readiness',
+    subtitle: 'A Year-Long Guide to Building Strength, Endurance, Power & Injury Resilience',
     nativeWeeks: 52,
     recommendedWeeksOptions: [4, 8, 12, 26, 52],
-    frequency: '5-6 Days / Week',
+    frequency: '6 Days / Week (Day 1–Day 6 Training + Day 7 Rest)',
     category: 'Hybrid',
-    summary: 'Comprehensive 52-week annual military periodization across 4 Quarters (Aerobic Base & Core, Running Stamina & Grappling Strength, Limit Strength & Combat Sprint Speed, and Combat Simulation Peak) with mandatory 10-minute DIME warm-ups and low-end set/rep progression.',
-    defaultEquipment: 'Full Commercial Gym (Barbells, DBs, Cables, Sandbag/Sled)',
+    summary: 'Comprehensive 52-week annual military periodization across 4 Quarters (Q1 Aerobic Base & Movement Foundation, Q2 Running Stamina & Base Strength, Q3 Peak Strength, Sprint Speed & Tempo Runs, and Q4 Combat Readiness & Annual Peak) with 3–4 runs/rucks per week, mandatory 10-minute DIME warm-ups, and every-4th-week 40% deloads.',
+    defaultEquipment: 'Full Commercial Gym (Barbells, DBs, Cables, Sandbag, Sled, Ruck)',
   },
   {
     key: 'tactical_hypertrophy',
     title: '12-Week Military Tactical Bodybuilding Program',
     shortTitle: 'Tactical Bodybuilding',
-    subtitle: '3-Phase Power-Building, Speed & Conditioning Split (Starts Sunday • Mandatory Daily DIME)',
+    subtitle: 'Warfighter Strength, Hypertrophy & Field Readiness (7-Day Garrison Cycle • Mandatory 8m DIME)',
     nativeWeeks: 12,
     recommendedWeeksOptions: [4, 8, 12],
-    frequency: '6 Days / Week (Starts Sunday • 4 Lift + 2 Speed/Cond)',
+    frequency: '6 Days / Week (7-Day Garrison Cycle • 4 Lift + Day 3 Bounding + Day 6 Ruck/Arms)',
     category: 'Hypertrophy',
-    summary: '12-week Sunday–Saturday periodization across Phase 1 (Armor & Base), Phase 2 (Power-Building), and Phase 3 (Peak & Velocity) with Double Progression (+5 upper / +10 lower), Deload Weeks 4/8/12 (-40% sets), Field Fatigue Protocol, Mandatory Daily 8-Min DIME Warm-Up, and Zero Olympic Lift, Burpee, Sandbag, or Jump Rope guardrails.',
-    defaultEquipment: 'Full Commercial Gym (Barbells, DBs, Cables, Sled, Med Ball)',
+    summary: '12-week 7-Day Garrison Cycle periodization across Phase 1 (Armor & Base), Phase 2 (Power-Building), and Phase 3 (Peak & Combat Velocity) with Double Progression (+5 upper / +10 lower), Unit PT Adjustment Rule, FTX/Range Protocol, Deload Weeks 4/8/12 (-40% sets, 2-mi unweighted walk), Mandatory 8-Min DIME Warm-Up, and Zero Olympic Lift, Burpee, or High-Impact Jump Rope guardrails.',
+    defaultEquipment: 'Full Commercial Gym (Barbells, Trap Bar, DBs, Cables, Sled, Med Ball, Ruck)',
   },
   {
     key: 'hybrid_protocol',
@@ -87,15 +88,27 @@ export const MASTER_PROGRAMS_CATALOG: MasterProgramMetadata[] = [
     defaultEquipment: 'Full Gym or AI-Adapted Dumbbells & Bodyweight',
   },
   {
+    key: 'aft_protocol',
+    title: 'Army Fitness Test (AFT) 8-Week Training Program',
+    shortTitle: '8-Week AFT Plan',
+    subtitle: 'Focused 8-Week Peaking Plan for All Five AFT Events & 2-Mile Run Endurance (Injury-Only Adaptation)',
+    nativeWeeks: 8,
+    recommendedWeeksOptions: [8],
+    frequency: '5 Days / Week + Optional Easy Run (Day 1–Day 6 + Day 7 Rest)',
+    category: 'Athletic Conditioning',
+    summary: 'Focused 8-week peaking plan for all five Army Fitness Test (AFT) events: 3-Rep Max Deadlift (MDL), Hand-Release Push-Ups (HRP), 250m Sprint-Drag-Carry (SDC), Forearm Plank (PLK), and 2-Mile Run (2MR). Excluded from ability, equipment, and cardio scaling—only clinical injury swaps apply.',
+    defaultEquipment: 'Trap Bar, Barbell, Dumbbells, 90-lb Sled, Two 40-lb KBs, Pull-Up Bar, Track',
+  },
+  {
     key: 'universal_pat',
-    title: 'Universal Military PT Test & Selection Readiness (ACFT / PFT / CFT)',
-    shortTitle: 'Military PT & Selection',
-    subtitle: '8-Week Armed Forces PT Test & Selection Preparation',
+    title: 'General Military PFT & Selection Readiness (PFT / CFT / PRT)',
+    shortTitle: 'General PFT & Selection',
+    subtitle: '8-Week General Armed Forces PFT, CFT & Selection Preparation',
     nativeWeeks: 8,
     recommendedWeeksOptions: [4, 8, 12],
     frequency: '5 Days / Week',
     category: 'Athletic Conditioning',
-    summary: 'Targeted preparation for military physical readiness and selection standards: 1.5-mile & 2-mile benchmark runs, 300m–400m anaerobic sprints, 180 lb casualty drag / sled simulation, box jumps, and cadence hand-release push-up/plank density.',
+    summary: 'Targeted preparation for general military physical readiness and selection standards (PFT / CFT / PRT): 1.5-mile & 3-mile benchmark runs, 300m anaerobic shuttle sprints, 180 lb casualty drag simulation, box jumps, pull-ups, and cadence push-up/plank density.',
     defaultEquipment: 'Full Commercial Gym (Barbells, DBs, Cables, Machines)',
   },
 ];
@@ -317,6 +330,24 @@ function adaptExerciseForEquipment(
   }
   if (lower.includes('trap bar farmer')) {
     return { name: "Heavy Dumbbell Farmer's Walks", adapted: true, reason: 'Swapped Trap Bar for Dumbbells' };
+  }
+  if (lower.includes('front squat or hack squat') || lower.includes('hack squat')) {
+    return { name: 'Heel-Elevated Dumbbell Goblet Squat or Dual-DB Front Squat', adapted: true, reason: 'Swapped Barbell/Hack Squat for Dumbbells' };
+  }
+  if (lower.includes('seal row')) {
+    return { name: 'Chest-Supported Dual-Dumbbell Row', adapted: true, reason: 'Swapped T-Bar/Seal Row for Dumbbells' };
+  }
+  if (lower.includes('deficit deadlift')) {
+    return { name: 'Deficit Dual-Dumbbell Deadlift (Standing on Plates)', adapted: true, reason: 'Swapped Barbell for Dumbbells' };
+  }
+  if (lower.includes('sandbag clean & press')) {
+    return { name: 'Dual-Dumbbell Clean & Push Press', adapted: true, reason: 'Swapped Sandbag for Dumbbells' };
+  }
+  if (lower.includes('sandbag bear-hug')) {
+    return { name: 'Heavy Goblet or Dual-Dumbbell Front-Rack Carry', adapted: true, reason: 'Swapped Sandbag for Dumbbells' };
+  }
+  if (lower.includes('backward sled') || lower.includes('reverse sled')) {
+    return { name: 'Heavy Dumbbell Reverse Walking Lunges + Split-Stance Marches', adapted: true, reason: 'Swapped Sled for Dumbbells' };
   }
 
   return { name: exerciseName, adapted: false };
@@ -625,6 +656,11 @@ function getMasterPhaseForWeek(baseKey: ProgramKey, weekNum: number, totalWeeksR
   if (baseKey === 'tactical_hypertrophy') {
     const cycleWeek = ((weekNum - 1) % 12) + 1;
     return getTacticalHypertrophyWeekData(cycleWeek);
+  }
+
+  if (baseKey === 'aft_protocol') {
+    const cycleWeek = ((weekNum - 1) % 8) + 1;
+    return getAftWeekData(cycleWeek);
   }
 
   if (baseKey === 'universal_pat') {
@@ -1114,6 +1150,11 @@ export function adaptMasterProgram(params: WorkoutGenerationRequest): GeneratedW
 
   const is52WeekBuiltIn = baseKey === 'apex_protocol';
   const isTacticalBodybuilding = baseKey === 'tactical_hypertrophy';
+  const isAftInjuryOnly = baseKey === 'aft_protocol';
+
+  if (isAftInjuryOnly) {
+    weeksCount = 8;
+  }
 
   // Enforce 12-Week Tactical Bodybuilding architectural guardrails:
   // Zero Olympic lifts, burpees, sandbags, or jump ropes.
@@ -1155,10 +1196,14 @@ export function adaptMasterProgram(params: WorkoutGenerationRequest): GeneratedW
 
   for (let weekNum = 1; weekNum <= weeksCount; weekNum++) {
     const phaseData = getMasterPhaseForWeek(baseKey, weekNum, weeksCount);
-    const isDeloadWeek = isTacticalBodybuilding
+    const isDeloadWeek = isAftInjuryOnly
+      ? weekNum === 8
+      : isTacticalBodybuilding
       ? weekNum === 4 || weekNum === 8 || weekNum === 12
       : (weekNum % 4 === 0 && weekNum !== 52) || weekNum === 51;
-    const isPeakWeek = isTacticalBodybuilding
+    const isPeakWeek = isAftInjuryOnly
+      ? weekNum === 6 || weekNum === 8
+      : isTacticalBodybuilding
       ? weekNum === 11
       : (weekNum === weeksCount && weeksCount >= 4) || weekNum === 13 || weekNum === 26 || weekNum === 39 || weekNum === 52;
 
@@ -1170,30 +1215,46 @@ export function adaptMasterProgram(params: WorkoutGenerationRequest): GeneratedW
       const hasRunBan = bannedRules.some(
         (r) => r.keyword === 'run' || r.keyword === 'jump' || r.keyword === 'lunge'
       );
-      const tacticalTuesdaySprintsInStrength =
+      const tacticalDay3SprintsInStrength =
         isTacticalBodybuilding && dayIdx === 2;
+      const apexQ2Day2RepeatsInStrength =
+        is52WeekBuiltIn && dayIdx === 1 && realStrengthStrings.some((s) => /400m\s+run\s+repeats/i.test(s));
+      const aftTrackOrSdcInStrength =
+        isAftInjuryOnly &&
+        realStrengthStrings.some((s) =>
+          /\b(400m\s+(track|pace)|800m\s+track|1,000m\s+track|4×100m\s+strides|sprint-drag-carry|backward\s+sled\s+drag)\b/i.test(s)
+        ) &&
+        !(protoDay.run || '').toLowerCase().includes('2-mile run');
 
-      // On Tactical Bodybuilding Tuesday (dayIdx === 2), the track/turf sprints & agility drills live in day.strength.
-      // Only invoke adaptMasterConditioning on Tuesday if the user explicitly switched to Cardio Circuits or has a Run Ban.
+      // On Tactical Bodybuilding Day 3, 52-Week Q2 Day 2, and AFT Track/SDC days, the intervals live in day.strength.
+      // For AFT, cardio preference is locked to 'running' unless hasRunBan is active (injury adaptation only).
+      const effectiveCardioPref = isAftInjuryOnly
+        ? hasRunBan
+          ? 'cardio_circuits'
+          : 'running'
+        : params.cardioPreference;
+
       const effectiveDayRunForAdapter =
-        tacticalTuesdaySprintsInStrength && (params.cardioPreference === 'cardio_circuits' || hasRunBan)
-          ? 'Tuesday Track / Turf Speed & Combat Conditioning'
+        tacticalDay3SprintsInStrength && (effectiveCardioPref === 'cardio_circuits' || hasRunBan)
+          ? 'Day 3 Track / Field Tactical Speed & Bounding Conditioning'
           : protoDay.run;
 
       const conditioningExercises =
-        tacticalTuesdaySprintsInStrength && params.cardioPreference !== 'cardio_circuits' && !hasRunBan
+        (tacticalDay3SprintsInStrength || apexQ2Day2RepeatsInStrength || aftTrackOrSdcInStrength) &&
+        effectiveCardioPref !== 'cardio_circuits' &&
+        !hasRunBan
           ? []
           : adaptMasterConditioning(
               effectiveDayRunForAdapter,
               protoDay.pace,
               globalDayNum,
               weekNum,
-              is52WeekBuiltIn ? 'Intermediate' : fitnessLevel,
+              is52WeekBuiltIn || isAftInjuryOnly ? 'Intermediate' : fitnessLevel,
               programBannedRules,
-              params.cardioPreference,
-              params.runningDistancePreference,
+              effectiveCardioPref,
+              isAftInjuryOnly ? undefined : params.runningDistancePreference,
               params.cardioCircuitType,
-              isTacticalBodybuilding || is52WeekBuiltIn
+              isTacticalBodybuilding || is52WeekBuiltIn || isAftInjuryOnly
             );
 
       conditioningExercises.forEach((cEx) => {
@@ -1209,7 +1270,7 @@ export function adaptMasterProgram(params: WorkoutGenerationRequest): GeneratedW
       if (isRestDay) {
         schedule.push({
           day: globalDayNum,
-          focus: `Week ${weekNum} • ${protoDay.day}: ${protoDay.focus}`,
+          focus: `Day ${globalDayNum} (Wk ${weekNum}): ${protoDay.focus}`,
           isRestDay: true,
           warmup: protoDay.warmup,
           exercises: [],
@@ -1220,12 +1281,12 @@ export function adaptMasterProgram(params: WorkoutGenerationRequest): GeneratedW
       const dayExercises: GeneratedExercise[] = [];
 
       realStrengthStrings.forEach((exStr, exIdx) => {
-        // On Tactical Bodybuilding Tuesday, if athlete switched to Cardio Circuits or has a Run Ban,
-        // skip the sprint/agility items inside realStrengthStrings so the swapped circuit takes over cleanly.
+        // On Tactical Bodybuilding Day 3 or 52-Wk Q2 Day 2, if athlete switched to Cardio Circuits or has a Run Ban,
+        // skip the sprint/agility/400m items inside realStrengthStrings so the swapped circuit takes over cleanly.
         if (
-          tacticalTuesdaySprintsInStrength &&
+          (tacticalDay3SprintsInStrength || apexQ2Day2RepeatsInStrength) &&
           (params.cardioPreference === 'cardio_circuits' || hasRunBan) &&
-          /\b(sprint|sprints|pro\s+agility|t-drill)\b/i.test(exStr)
+          /\b(sprint|sprints|pro\s+agility|t-drill|imt\s+bound|400m\s+run)\b/i.test(exStr)
         ) {
           return;
         }
@@ -1233,7 +1294,7 @@ export function adaptMasterProgram(params: WorkoutGenerationRequest): GeneratedW
         const parsed = parseExerciseString(exStr);
         const originalName = parsed.name;
 
-        // Superset Support inside Master Programs (e.g. Tactical Bodybuilding Sun/Mon/Wed supersets)
+        // Superset Support inside Master Programs (e.g. Tactical Bodybuilding Day 1/2/4/5/6 supersets)
         if (isSupersetExercise({ name: originalName, notes: parsed.notes })) {
           const parsedSS = parseSupersetDetails({
             name: originalName,
@@ -1246,20 +1307,31 @@ export function adaptMasterProgram(params: WorkoutGenerationRequest): GeneratedW
 
           const adaptedMovements: SupersetMovementItem[] = parsedSS.movements.map((mov) => {
             const movMg = mov.muscleGroup || inferMovementMuscleGroup(mov.name);
-            const res = adaptSingleMovement(mov.name, movMg, parsed.notes, params.equipment || [], programBannedRules);
+            const effectiveEquipForMov = isAftInjuryOnly
+              ? ['Full Commercial Gym (Barbells, DBs)']
+              : params.equipment || [];
+            const res = adaptSingleMovement(mov.name, movMg, parsed.notes, effectiveEquipForMov, programBannedRules);
             if (res.eqSwapped) equipmentSwapsCount++;
             if (res.clinicalSwapped) clinicalSwapsCount++;
 
-            const scaledMov = scalePrescriptionForAbility(
-              parsedSS.rounds,
-              mov.targetReps || '12-15',
-              parsed.restSeconds || 75,
-              fitnessLevel,
-              false,
-              isDeloadWeek,
-              isPeakWeek,
-              weekNum
-            );
+            const scaledMov = is52WeekBuiltIn || isAftInjuryOnly
+              ? {
+                  sets: parsedSS.rounds,
+                  reps: mov.targetReps || '12-15',
+                  rest: parsed.restSeconds || 75,
+                  rpe: parsed.targetRpe || 8,
+                  scalingSummary: undefined,
+                }
+              : scalePrescriptionForAbility(
+                  parsedSS.rounds,
+                  mov.targetReps || '12-15',
+                  parsed.restSeconds || 75,
+                  fitnessLevel,
+                  false,
+                  isDeloadWeek,
+                  isPeakWeek,
+                  weekNum
+                );
 
             return {
               ...mov,
@@ -1271,17 +1343,25 @@ export function adaptMasterProgram(params: WorkoutGenerationRequest): GeneratedW
             };
           });
 
-          const scaledRounds = scalePrescriptionForAbility(
-            parsedSS.rounds,
-            parsed.targetReps,
-            parsed.restSeconds || 75,
-            fitnessLevel,
-            false,
-            isDeloadWeek,
-            isPeakWeek,
-            weekNum
-          );
-          if (scaledRounds.sets !== parsedSS.rounds || fitnessLevel !== 'Intermediate') {
+          const scaledRounds = is52WeekBuiltIn || isAftInjuryOnly
+            ? {
+                sets: parsedSS.rounds,
+                reps: parsed.targetReps,
+                rest: parsed.restSeconds || 75,
+                rpe: parsed.targetRpe || 8,
+                scalingSummary: undefined,
+              }
+            : scalePrescriptionForAbility(
+                parsedSS.rounds,
+                parsed.targetReps,
+                parsed.restSeconds || 75,
+                fitnessLevel,
+                false,
+                isDeloadWeek,
+                isPeakWeek,
+                weekNum
+              );
+          if (!is52WeekBuiltIn && !isAftInjuryOnly && (scaledRounds.sets !== parsedSS.rounds || fitnessLevel !== 'Intermediate')) {
             scaledExercisesCount++;
           }
 
@@ -1313,8 +1393,10 @@ export function adaptMasterProgram(params: WorkoutGenerationRequest): GeneratedW
         const mg = inferMuscleGroupFromName(originalName);
         const isCompound = exIdx === 0 || exIdx === 1 || parsed.restSeconds >= 120;
 
-        // 1. Equipment adaptation check
-        const eqResult = adaptExerciseForEquipment(originalName, params.equipment || []);
+        // 1. Equipment adaptation check (Excluded for AFT plan, which allows injury adaptation only)
+        const eqResult = isAftInjuryOnly
+          ? { name: originalName, adapted: false, reason: undefined }
+          : adaptExerciseForEquipment(originalName, params.equipment || []);
         let workingName = eqResult.name;
         let adaptationReason = eqResult.reason;
         if (eqResult.adapted) {
@@ -1342,7 +1424,7 @@ export function adaptMasterProgram(params: WorkoutGenerationRequest): GeneratedW
         }
 
         // 3. Ability level set/rep/RPE scaling
-        // Excluded for the 52-Week Program since its progression, low-end start & deloads are already built in.
+        // Excluded for the 52-Week Program and the 8-Week AFT Program (injury-only adaptation).
         let finalSets = parsed.defaultSets;
         let finalReps = parsed.targetReps;
         let finalRest = parsed.restSeconds;
@@ -1352,7 +1434,7 @@ export function adaptMasterProgram(params: WorkoutGenerationRequest): GeneratedW
         const isSprintOrConditioningDrill =
           /\b(sprint|sprints|pro\s+agility|t-drill|assault\s+bike|zone\s*2|med-ball|box\s+jumps|sled)\b/i.test(workingName);
 
-        if (!is52WeekBuiltIn) {
+        if (!is52WeekBuiltIn && !isAftInjuryOnly) {
           if (isSprintOrConditioningDrill && workingName.toLowerCase().includes('zone 2')) {
             // Preserve Zone 2 Flush duration target cleanly while allowing Beginner scaling
             finalSets = 1;
@@ -1455,7 +1537,11 @@ export function adaptMasterProgram(params: WorkoutGenerationRequest): GeneratedW
       ? ` • Adapted for ${activeInjuryLabels.slice(0, 2).join(' & ')}`
       : '';
 
-  const effectiveAbilityLabel = is52WeekBuiltIn ? 'Built-In 52-Wk Progression' : fitnessLevel;
+  const effectiveAbilityLabel = isAftInjuryOnly
+    ? 'AFT 8-Wk Standard (Injury-Only)'
+    : is52WeekBuiltIn
+    ? 'Built-In 52-Wk Progression'
+    : fitnessLevel;
 
   const adaptationStats: AdaptationSummaryStats = {
     baseProgramKey: baseKey,
@@ -1471,15 +1557,29 @@ export function adaptMasterProgram(params: WorkoutGenerationRequest): GeneratedW
   };
 
   return {
-    title: is52WeekBuiltIn
+    title: isAftInjuryOnly
+      ? `${meta.shortTitle} (${activeInjuryLabels.length > 0 ? 'Injury-Adapted' : 'Official AFT Standard'})`
+      : is52WeekBuiltIn
       ? `${meta.shortTitle} (${activeInjuryLabels.length > 0 ? 'Injury-Adapted' : 'Built-In Progression'})`
       : `${meta.shortTitle} (${fitnessLevel} Adapted)`,
     subtitle: `Coach Risner Master Protocol • ${weeksCount} Weeks • ${effectiveAbilityLabel}${injuryBadge}`,
     category: meta.category,
     frequency: meta.frequency,
-    scheduleDuration: `${weeksCount}-Week ${is52WeekBuiltIn ? '52-Wk Built-In Progression' : 'Adapted Master Protocol'} (${meta.shortTitle})`,
+    scheduleDuration: `${weeksCount}-Week ${
+      isAftInjuryOnly
+        ? 'AFT Peaking Plan (Injury-Only Adaptation)'
+        : is52WeekBuiltIn
+        ? '52-Wk Built-In Progression'
+        : 'Adapted Master Protocol'
+    } (${meta.shortTitle})`,
     estimatedDurationMinutes: params.sessionDurationMinutes || 60,
-    description: is52WeekBuiltIn
+    description: isAftInjuryOnly
+      ? `Preserves the official 8-Week Army Fitness Test (AFT) peaking blocks, sets, reps, event weights, and 4 weekly runs untouched across all 8 weeks (${schedule.length} days)${
+          activeInjuryLabels.length > 0
+            ? `, applying only ${clinicalSwapsCount} clinical injury movement swaps protecting: ${activeInjuryLabels.join(', ')}`
+            : ' (excluded from ability, equipment, and cardio scaling)'
+        }.`
+      : is52WeekBuiltIn
       ? `Preserves Coach Risner's exact prescribed sets, reps, and built-in 52-week progression from "${meta.title}" across ${weeksCount} weeks (${schedule.length} days)${
           activeInjuryLabels.length > 0
             ? `, with ${clinicalSwapsCount} clinical movement swaps protecting: ${activeInjuryLabels.join(', ')}`
@@ -1490,28 +1590,36 @@ export function adaptMasterProgram(params: WorkoutGenerationRequest): GeneratedW
             ? ` with ${clinicalSwapsCount} clinical movement swaps protecting: ${activeInjuryLabels.join(', ')}`
             : ''
         }${equipmentSwapsCount > 0 ? ` and ${equipmentSwapsCount} equipment substitutions` : ''}.`,
-    coachingPhilosophy: is52WeekBuiltIn
-      ? `Built-In 52-Week Progression + Joint/Equipment Protection: Sets and reps remain 100% faithful to the 52-week program's built-in 4-quarter progression, low-end range initialization, and 4th-week 40% deloads—while movements automatically adapt for your injuries and available gear.`
+    coachingPhilosophy: isAftInjuryOnly
+      ? `Official 8-Week AFT Peaking Architecture + Clinical Injury Protection Only: Excluded from ability-level, equipment, and cardio scaling so all four 2-week blocks (Weeks 1–2 Technique & Base, Weeks 3–4 Heavy Strength & Threshold, Weeks 5–6 Peak 3RM Deadlift & Full 250m SDC, Week 7 Dress Rehearsal, and Week 8 Taper & Record Test) remain 100% faithful to the Army Fitness Test standard—only swapping movements that aggravate your selected injuries.`
+      : is52WeekBuiltIn
+      ? `Built-In 52-Week Progression + Joint/Equipment Protection: Sets and reps remain 100% faithful to the Military 52-Week Fitness & Readiness Program's 4-quarter progression (Aerobic Base & Movement Foundation → Running Stamina & Base Strength → Peak Strength, Sprint Speed & Tempo Runs → Combat Readiness & Annual Peak), low-end range initialization, and 4th-week 40% deloads—while movements automatically adapt for your injuries and available gear.`
       : isTacticalBodybuilding
-      ? `12-Week Military Tactical Bodybuilding Architecture: Preserves the Sunday–Saturday split (Armor & Base → Power-Building → Peak & Velocity), Mandated Daily 8-Min DIME Warm-Up, Deload Weeks 4/8/12 (-40% sets), Field Fatigue Protocol, and strict Zero Olympic/Burpee/Sandbag/Jump-Rope guardrails while adapting equipment, injuries, and RPE to ${fitnessLevel}.`
+      ? `12-Week Military Tactical Bodybuilding Architecture: Preserves the 7-Day Garrison Cycle split (Armor & Base → Power-Building → Peak & Combat Velocity), Mandatory 8-Min DIME Warm-Up, Deload Weeks 4/8/12 (-40% sets, 2-mi unweighted walk), Unit PT Adjustment Rule, FTX/Range Protocol, and strict Zero Olympic/Burpee/Jump-Rope guardrails while adapting equipment, injuries, and RPE to ${fitnessLevel}.`
       : `Master Program Integrity + Individualized Biomechanics: Instead of random exercises, you are running Coach Risner's exact ${meta.title} split and progression laws—with movements, sets, reps, target RPE, and conditioning calibrated to your current ability tier and joint profile.`,
     weeklyProgressionTips: [
-      is52WeekBuiltIn
-        ? `Built-In 3-Step Overload: Starts at the low end of prescribed set/rep ranges — 1. Reps First (hit top of rep range) → 2. Weight Second (+2.5–5 lbs upper / +5–10 lbs lower) → 3. Sets Third.`
+      isAftInjuryOnly
+        ? `AFT 4-Step Progression Law: 1. Reps First (+1–2 reps/set from Week 1 to Week 2 of each block) → 2. Weight Second (+2.5–5 lbs upper / +5–10 lbs deadlifts & squats) → 3. Sets Third (+1 set in Week 2 of block; cut volume 50% in Week 8) → 4. Running & SDC (+0.5 mi easy run every 2 wks; shave 3–5s off 250m SDC in Wks 5–7).`
+        : is52WeekBuiltIn
+        ? `Built-In 3-Step Overload: Starts at the low end of prescribed set/rep ranges — 1. Reps First (hit top of rep range with 1–2 RIR) → 2. Weight Second (+2.5–5 lbs upper / +5–10 lbs lower) → 3. Sets Third.`
         : isTacticalBodybuilding
-        ? `Double Progression & Field Fatigue Protocol: Add +5 lbs (upper) or +10 lbs (lower) once hitting top reps with 1–2 RIR. Off extended field ops/4h sleep: halve secondary accessory sets, lift main compound @ 3 RIR, swap sprints for 20m Zone 2 flush.`
+        ? `Double Progression & Unit PT Rule: Add +5 lbs (upper) or +10 lbs (lower) once hitting top reps with 1–2 RIR. If morning unit PT includes >3 mi running or high-rep leg calisthenics, drop 1 working set from lower-body accessories.`
         : `Master Overload Law: Follow the prescribed rep targets on every compound lift. When you hit the top of the rep range at or below target RPE, add +5 lbs (upper) or +10 lbs (lower).`,
       activeInjuryLabels.length > 0
         ? `Clinical Joint Guardrail Active: ${clinicalSwapsCount} movements in ${meta.shortTitle} were automatically swapped to joint-sparing variations (${activeInjuryLabels.join(', ')}). Never force range of motion through pain.`
+        : isAftInjuryOnly
+        ? `Excluded from Non-Injury Adaptation: Ability scaling, equipment substitutions, and cardio modifications are disabled for the 8-Week AFT Program so all five event standards (MDL, HRP, SDC, PLK, 2MR) remain exact.`
         : is52WeekBuiltIn
-        ? `Built-In Sets & Reps Preserved: Rep and set prescriptions are excluded from ability scaling so your 52-week progression and Set 1 auto-pacing remain exact.`
+        ? `Built-In Sets & Reps Preserved: Rep and set prescriptions are excluded from ability scaling so your 52-week progression, ruck rules, and Set 1 auto-pacing remain exact.`
         : isTacticalBodybuilding
-        ? `Mandated Daily DIME & Guardrails: Complete the 8-Minute DIME Warm-Up before EVERY session. Zero Olympic lifts, burpees, sandbags, or jump ropes allowed.`
+        ? `Mandated 8-Min DIME & FTX Protocol: Complete the 8-Minute DIME Warm-Up before EVERY session. During multi-day field exercises (FTX), pause heavy barbell loading and maintain with 15–20m bodyweight PT.`
         : `Ability Tier Scaling (${fitnessLevel}): Sets, target RPE, and running volume have been calibrated to your ${fitnessLevel} recovery capacity.`,
-      is52WeekBuiltIn
+      isAftInjuryOnly
+        ? `Mandatory 10-Min DIME Warm-Up & Spine Safety: Perform the 9-move DIME warm-up before every session. Hinge at the hips with a flat 360-degree braced back on every deadlift/squat and avoid straight-leg sit-ups or standing trunk twists.`
+        : is52WeekBuiltIn
         ? `Every-4th-Week 40% Deloads & Set 1 Pacing: Weeks 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, and 48 cut volume 40%, while Set 1 auto-pacing calculates subsequent set weights in real time.`
         : isTacticalBodybuilding
-        ? `12-Week Periodized Deload Rhythm: Weeks 4, 8, and 12 automatically cut working sets by 40% (~80% prior load, crisp speed) before transitioning between Phases 1–3.`
+        ? `12-Week Periodized Deload Rhythm: Weeks 4, 8, and 12 automatically cut working sets by 40% (~80% prior load) and cap Day 6 rucking at 2 miles unweighted.`
         : `Deload & Peak Rhythm: Week 4 and Week 8 automatically reduce working sets and cap RPE at 6.5 to flush systemic fatigue before the next intensification block.`,
     ],
     nutritionAdvice:

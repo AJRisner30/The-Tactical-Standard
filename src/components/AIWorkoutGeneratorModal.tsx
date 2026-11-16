@@ -78,7 +78,7 @@ export const AIWorkoutGeneratorModal: React.FC<AIWorkoutGeneratorModalProps> = (
     if (initialBaseProgramKey) {
       setBaseProgramKey(initialBaseProgramKey);
       const meta = getMasterProgramMetadata(initialBaseProgramKey);
-      const defaultWks = meta.key === 'universal_pat' ? 8 : 12;
+      const defaultWks = meta.key === 'universal_pat' || meta.key === 'aft_protocol' ? 8 : 12;
       setScheduleWeeks(defaultWks);
       setScheduleDuration(`${defaultWks}weeks`);
       setFrequency(meta.frequency);
@@ -90,7 +90,7 @@ export const AIWorkoutGeneratorModal: React.FC<AIWorkoutGeneratorModalProps> = (
     const normalizedKey = progKey === 'hybrid_db' ? 'hybrid_protocol' : progKey;
     setBaseProgramKey(normalizedKey);
     const meta = getMasterProgramMetadata(normalizedKey);
-    const defaultWks = normalizedKey === 'universal_pat' ? 8 : 12;
+    const defaultWks = normalizedKey === 'universal_pat' || normalizedKey === 'aft_protocol' ? 8 : 12;
     setScheduleWeeks(defaultWks);
     setScheduleDuration(`${defaultWks}weeks`);
     setFrequency(meta.frequency);
@@ -528,6 +528,8 @@ export const AIWorkoutGeneratorModal: React.FC<AIWorkoutGeneratorModalProps> = (
     ? [4, 8, 12, 26, 52]
     : baseProgramKey === 'tactical_hypertrophy'
     ? [4, 8, 12]
+    : baseProgramKey === 'aft_protocol'
+    ? [8]
     : baseProgramKey === 'universal_pat'
     ? [4, 6, 8, 12]
     : [4, 6, 8, 12];
@@ -597,7 +599,9 @@ export const AIWorkoutGeneratorModal: React.FC<AIWorkoutGeneratorModalProps> = (
                   Adapting {selectedMasterMeta.shortTitle}
                 </h3>
                 <p className="text-xs text-zinc-400 mt-1 max-w-md mx-auto">
-                  {!selectedCustomProgram && baseProgramKey === 'apex_protocol'
+                  {!selectedCustomProgram && baseProgramKey === 'aft_protocol'
+                    ? 'Preserving all 8 weeks of official AFT event standards, sets, reps, equipment, and 4 weekly runs while applying clinical injury swaps only.'
+                    : !selectedCustomProgram && baseProgramKey === 'apex_protocol'
                     ? 'Preserving the 52-Week Program’s built-in sets, reps, and quarterly progression while adapting exercises for injuries and equipment.'
                     : `Preserving Coach Risner’s authentic split & mesocycle structure while swapping contraindicated movements and scaling volume to ${fitnessLevel} ability.`}
                 </p>
@@ -615,7 +619,11 @@ export const AIWorkoutGeneratorModal: React.FC<AIWorkoutGeneratorModalProps> = (
                   generationStep >= 2 ? 'bg-amber-950/40 border-amber-500/50 text-amber-200' : 'bg-zinc-900 border-zinc-800 text-zinc-500'
                 }`}>
                   <CheckCircle2 className={`w-4 h-4 ${generationStep >= 2 ? 'text-amber-400' : 'text-zinc-600'}`} />
-                  <span>2. Swapping injury-aggravating &amp; unavailable equipment lifts</span>
+                  <span>
+                    {!selectedCustomProgram && baseProgramKey === 'aft_protocol'
+                      ? '2. Applying clinical injury & joint-sparing movement swaps only'
+                      : '2. Swapping injury-aggravating & unavailable equipment lifts'}
+                  </span>
                 </div>
 
                 <div className={`p-2.5 rounded-xl border flex items-center gap-2.5 transition-all ${
@@ -623,7 +631,9 @@ export const AIWorkoutGeneratorModal: React.FC<AIWorkoutGeneratorModalProps> = (
                 }`}>
                   <CheckCircle2 className={`w-4 h-4 ${generationStep >= 3 ? 'text-amber-400' : 'text-zinc-600'}`} />
                   <span>
-                    {!selectedCustomProgram && baseProgramKey === 'apex_protocol'
+                    {!selectedCustomProgram && baseProgramKey === 'aft_protocol'
+                      ? '3. Locking official AFT 8-week sets, reps, weights & 4 weekly runs'
+                      : !selectedCustomProgram && baseProgramKey === 'apex_protocol'
                       ? '3. Preserving built-in 52-week sets, reps & progression rules'
                       : `3. Scaling sets, reps, RPE & conditioning to ${fitnessLevel}`}
                   </span>
@@ -655,7 +665,9 @@ export const AIWorkoutGeneratorModal: React.FC<AIWorkoutGeneratorModalProps> = (
                       </span>
                       <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold flex items-center gap-1 border bg-amber-950/80 text-amber-300 border-amber-500/40">
                         <Award className="w-3 h-3 text-amber-400" />
-                        {generatedPlan.baseProgramKey === 'apex_protocol'
+                        {generatedPlan.baseProgramKey === 'aft_protocol'
+                          ? 'AFT Official Standard (Injury-Only)'
+                          : generatedPlan.baseProgramKey === 'apex_protocol'
                           ? 'Built-In 52-Wk Progression'
                           : `${fitnessLevel} Scaling`}
                       </span>
@@ -715,7 +727,9 @@ export const AIWorkoutGeneratorModal: React.FC<AIWorkoutGeneratorModalProps> = (
                     <div className="p-2.5 rounded-xl bg-[#090b0d] border border-amber-500/30">
                       <span className="text-[10px] font-mono uppercase text-zinc-400 block">Sets &amp; Reps Progression</span>
                       <span className="text-xs font-black text-amber-300 font-mono block mt-0.5">
-                        {generatedPlan.baseProgramKey === 'apex_protocol'
+                        {generatedPlan.baseProgramKey === 'aft_protocol'
+                          ? 'AFT 8-Wk Locked (Injury-Only)'
+                          : generatedPlan.baseProgramKey === 'apex_protocol'
                           ? 'Built-In 52-Wk Preserved'
                           : `${generatedPlan.adaptationStats.fitnessLevel || fitnessLevel} (${generatedPlan.adaptationStats.scaledExercisesCount} Lifts Scaled)`}
                       </span>
@@ -1398,13 +1412,27 @@ export const AIWorkoutGeneratorModal: React.FC<AIWorkoutGeneratorModalProps> = (
                     <span>Ability Level (Scales Sets, Reps, Rest &amp; Target RPE)</span>
                   </label>
                   <span className="text-[11px] font-mono text-amber-400">
-                    {!selectedCustomProgram && baseProgramKey === 'apex_protocol'
+                    {!selectedCustomProgram && baseProgramKey === 'aft_protocol'
+                      ? 'Excluded for AFT Plan (Injury-Only)'
+                      : !selectedCustomProgram && baseProgramKey === 'apex_protocol'
                       ? 'Excluded for 52-Week Program'
                       : 'Auto-calibrates intensity & volume'}
                   </span>
                 </div>
 
-                {!selectedCustomProgram && baseProgramKey === 'apex_protocol' ? (
+                {!selectedCustomProgram && baseProgramKey === 'aft_protocol' ? (
+                  <div className="p-3.5 rounded-2xl bg-amber-950/40 border border-amber-500/50 text-xs text-zinc-200 flex items-start gap-3">
+                    <ShieldCheck className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <span className="font-black uppercase text-amber-300 font-athletic tracking-wide block">
+                        AFT Plan Excluded from Ability, Equipment &amp; Cardio Adaptation (Injury Adaptation Only)
+                      </span>
+                      <p className="text-[11px] text-zinc-300 leading-relaxed">
+                        The <strong>Army Fitness Test (AFT) 8-Week Training Program</strong> is locked to its official four 2-week peaking blocks, prescribed sets/reps, official event loads (3RM Trap-Bar Deadlift, 90-lb Sled Drag, 40-lb KBs), and 4 weekly runs. Only <strong>Step 3 (Injuries, Joint Limitations &amp; Banned Exercises)</strong> below will modify exercises to protect your joints.
+                      </p>
+                    </div>
+                  </div>
+                ) : !selectedCustomProgram && baseProgramKey === 'apex_protocol' ? (
                   <div className="p-3.5 rounded-2xl bg-emerald-950/35 border border-emerald-500/40 text-xs text-zinc-200 flex items-start gap-3">
                     <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
                     <div className="space-y-1">
@@ -1536,106 +1564,123 @@ export const AIWorkoutGeneratorModal: React.FC<AIWorkoutGeneratorModalProps> = (
               </div>
 
               {/* STEP 4: EQUIPMENT & RUNNING / CONDITIONING ADAPTATION */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Equipment Loadout */}
-                <div className="space-y-2.5 p-4 rounded-2xl bg-[#0e1217] border border-zinc-800">
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm font-black uppercase tracking-wide text-white font-athletic flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-md bg-amber-500 text-black text-[11px] font-mono flex items-center justify-center">4</span>
-                      <span>Available Equipment</span>
-                    </label>
+              {!selectedCustomProgram && baseProgramKey === 'aft_protocol' ? (
+                <div className="p-4 rounded-2xl bg-[#0e1217] border border-amber-500/35 space-y-3">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <span className="text-xs font-black uppercase tracking-wide text-amber-300 font-athletic flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-amber-400" />
+                      <span>Step 4: Equipment &amp; Running Scaling Excluded for 8-Week AFT Plan</span>
+                    </span>
+                    <span className="text-[10px] font-mono text-amber-400 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded font-bold uppercase">
+                      Official AFT Event Standards Locked
+                    </span>
                   </div>
-                  <p className="text-[11px] text-zinc-400">
-                    If you don&apos;t have a full barbell gym, barbell lifts in the master program will automatically convert to dumbbell or bodyweight equivalents.
+                  <p className="text-[11px] text-zinc-300 leading-relaxed">
+                    To preserve full readiness across all five official AFT events (3RM Deadlift, Hand-Release Push-Ups, 250m Sprint-Drag-Carry, Forearm Plank, and 2-Mile Run), equipment and cardio scaling are disabled for this program. Only your selected injuries and banned exercises in Step 3 above will alter movements.
                   </p>
-                  <div className="space-y-1.5">
-                    {equipmentOptions.map((eq) => {
-                      const isSelected = equipment.includes(eq);
-                      return (
-                        <button
-                          key={eq}
-                          type="button"
-                          onClick={() => toggleEquipment(eq)}
-                          className={`w-full p-2 rounded-xl text-left border transition cursor-pointer flex items-center gap-2.5 text-xs ${
-                            isSelected
-                              ? 'bg-amber-950/70 border-amber-500 text-white font-bold ring-1 ring-amber-500/40'
-                              : 'bg-[#090b0d] hover:bg-zinc-800 border-zinc-800 text-zinc-300'
-                          }`}
-                        >
-                          <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
-                            isSelected ? 'bg-amber-600 border-amber-400 text-white' : 'border-zinc-700 bg-zinc-900'
-                          }`}>
-                            {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
-                          </div>
-                          <span className="leading-snug">{eq}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
                 </div>
-
-                {/* Conditioning & Running Adaptation */}
-                <div className="space-y-3 p-4 rounded-2xl bg-[#0e1217] border border-zinc-800 flex flex-col justify-between">
-                  <div className="space-y-2.5">
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Equipment Loadout */}
+                  <div className="space-y-2.5 p-4 rounded-2xl bg-[#0e1217] border border-zinc-800">
                     <div className="flex items-center justify-between">
                       <label className="text-sm font-black uppercase tracking-wide text-white font-athletic flex items-center gap-2">
-                        <Activity className="w-4 h-4 text-amber-400" />
-                        <span>Running &amp; Conditioning Scaling</span>
+                        <span className="w-5 h-5 rounded-md bg-amber-500 text-black text-[11px] font-mono flex items-center justify-center">4</span>
+                        <span>Available Equipment</span>
                       </label>
                     </div>
                     <p className="text-[11px] text-zinc-400">
-                      Choose how to handle the prescribed runs and conditioning finishers inside {selectedMasterMeta.shortTitle}.
+                      If you don&apos;t have a full barbell gym, barbell lifts in the master program will automatically convert to dumbbell or bodyweight equivalents.
                     </p>
-
-                    <div className="grid grid-cols-1 gap-2">
-                      {[
-                        { id: 'running', label: 'Keep & Scale Master Program Runs', desc: 'Scales run distances, intervals & paces to your ability level' },
-                        { id: 'cardio_circuits', label: 'Swap Runs to Low-Impact Tactical Circuits', desc: 'Replaces impact running with joint-sparing conditioning circuits' },
-                        { id: 'hybrid', label: 'Hybrid (Alternate Runs & Tactical Circuits)', desc: 'Combines scaled runs with metabolic work capacity circuits' },
-                        { id: 'none', label: 'Strength Only (Remove Conditioning)', desc: 'Strips conditioning runs to focus 100% on lifting blocks' },
-                      ].map((opt) => {
-                        const isSelected = cardioPreference === opt.id;
+                    <div className="space-y-1.5">
+                      {equipmentOptions.map((eq) => {
+                        const isSelected = equipment.includes(eq);
                         return (
                           <button
-                            key={opt.id}
+                            key={eq}
                             type="button"
-                            onClick={() => setCardioPreference(opt.id as any)}
-                            className={`p-2.5 rounded-xl text-left border transition cursor-pointer flex items-center justify-between gap-2 ${
+                            onClick={() => toggleEquipment(eq)}
+                            className={`w-full p-2 rounded-xl text-left border transition cursor-pointer flex items-center gap-2.5 text-xs ${
                               isSelected
-                                ? 'bg-amber-950/80 border-amber-400 text-white ring-1 ring-amber-500/50'
+                                ? 'bg-amber-950/70 border-amber-500 text-white font-bold ring-1 ring-amber-500/40'
                                 : 'bg-[#090b0d] hover:bg-zinc-800 border-zinc-800 text-zinc-300'
                             }`}
                           >
-                            <div>
-                              <span className="font-bold text-xs uppercase font-athletic text-white block">
-                                {opt.label}
-                              </span>
-                              <span className="text-[10px] text-zinc-400 leading-snug block">
-                                {opt.desc}
-                              </span>
+                            <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
+                              isSelected ? 'bg-amber-600 border-amber-400 text-white' : 'border-zinc-700 bg-zinc-900'
+                            }`}>
+                              {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
                             </div>
-                            {isSelected && <Check className="w-4 h-4 text-amber-400 shrink-0" />}
+                            <span className="leading-snug">{eq}</span>
                           </button>
                         );
                       })}
                     </div>
                   </div>
 
-                  {/* Additional Notes */}
-                  <div className="pt-2 border-t border-zinc-800/80">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-300 block mb-1">
-                      Additional Adaptation Requests (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      placeholder="e.g. Emphasize pull-up endurance and casualty drag readiness..."
-                      className="w-full px-3 py-2 rounded-xl bg-[#090b0d] border border-zinc-800 text-white placeholder-zinc-500 text-xs focus:outline-none focus:border-amber-500 font-sans"
-                    />
+                  {/* Conditioning & Running Adaptation */}
+                  <div className="space-y-3 p-4 rounded-2xl bg-[#0e1217] border border-zinc-800 flex flex-col justify-between">
+                    <div className="space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm font-black uppercase tracking-wide text-white font-athletic flex items-center gap-2">
+                          <Activity className="w-4 h-4 text-amber-400" />
+                          <span>Running &amp; Conditioning Scaling</span>
+                        </label>
+                      </div>
+                      <p className="text-[11px] text-zinc-400">
+                        Choose how to handle the prescribed runs and conditioning finishers inside {selectedMasterMeta.shortTitle}.
+                      </p>
+
+                      <div className="grid grid-cols-1 gap-2">
+                        {[
+                          { id: 'running', label: 'Keep & Scale Master Program Runs', desc: 'Scales run distances, intervals & paces to your ability level' },
+                          { id: 'cardio_circuits', label: 'Swap Runs to Low-Impact Tactical Circuits', desc: 'Replaces impact running with joint-sparing conditioning circuits' },
+                          { id: 'hybrid', label: 'Hybrid (Alternate Runs & Tactical Circuits)', desc: 'Combines scaled runs with metabolic work capacity circuits' },
+                          { id: 'none', label: 'Strength Only (Remove Conditioning)', desc: 'Strips conditioning runs to focus 100% on lifting blocks' },
+                        ].map((opt) => {
+                          const isSelected = cardioPreference === opt.id;
+                          return (
+                            <button
+                              key={opt.id}
+                              type="button"
+                              onClick={() => setCardioPreference(opt.id as any)}
+                              className={`p-2.5 rounded-xl text-left border transition cursor-pointer flex items-center justify-between gap-2 ${
+                                isSelected
+                                  ? 'bg-amber-950/80 border-amber-400 text-white ring-1 ring-amber-500/50'
+                                  : 'bg-[#090b0d] hover:bg-zinc-800 border-zinc-800 text-zinc-300'
+                              }`}
+                            >
+                              <div>
+                                <span className="font-bold text-xs uppercase font-athletic text-white block">
+                                  {opt.label}
+                                </span>
+                                <span className="text-[10px] text-zinc-400 leading-snug block">
+                                  {opt.desc}
+                                </span>
+                              </div>
+                              {isSelected && <Check className="w-4 h-4 text-amber-400 shrink-0" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Additional Notes */}
+                    <div className="pt-2 border-t border-zinc-800/80">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-300 block mb-1">
+                        Additional Adaptation Requests (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        placeholder="e.g. Emphasize pull-up endurance and casualty drag readiness..."
+                        className="w-full px-3 py-2 rounded-xl bg-[#090b0d] border border-zinc-800 text-white placeholder-zinc-500 text-xs focus:outline-none focus:border-amber-500 font-sans"
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* GENERATE ACTION BUTTON */}
               <div className="pt-2">

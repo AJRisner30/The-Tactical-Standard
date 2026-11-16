@@ -6,10 +6,10 @@ import {
   ChevronLeft, ChevronRight, CheckCircle2,
   SlidersHorizontal, ArrowRight, Activity, Award, RotateCcw,
   LogOut, RefreshCw, BatteryCharging, Compass,
-  Layers, Edit3, Trash2, EyeOff, Plus, Sparkles
+  Layers, Edit3, Trash2, EyeOff, Plus, Sparkles, FileText
 } from 'lucide-react';
 import { WorkoutProgram, ExerciseTemplate, MuscleGroup, AthleteProfile, ProgramKey, WorkoutSessionLog, WorkoutFormat, isBodyweightExercise, isExerciseTimed } from '../types';
-import { PROTOCOL_DATA, COACH_RULES, ProtocolDay, getDefaultRestPeriod, parseExerciseString, getApexWeekData, getTacticalHypertrophyWeekData, getUniversalPatWeekData } from '../data/protocolData';
+import { PROTOCOL_DATA, COACH_RULES, ProtocolDay, getDefaultRestPeriod, parseExerciseString, getApexWeekData, getTacticalHypertrophyWeekData, getUniversalPatWeekData, getAftWeekData } from '../data/protocolData';
 import { soundManager } from '../utils/audio';
 import { useRestTimer } from '../hooks/useRestTimer';
 import { TacticalStandardCompanyEmblem } from './BrandingLogos';
@@ -153,6 +153,10 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
   // Active week inside Universal PAT Protocol (Weeks 1 to 8)
   const [activePatWeek, setActivePatWeek] = useState<number>(1);
 
+  // Active block & week inside Army Fitness Test (AFT) 8-Week Training Program
+  const [activeAftBlockKey, setActiveAftBlockKey] = useState<'aft_block1' | 'aft_block2' | 'aft_block3' | 'aft_block4'>('aft_block1');
+  const [activeAftWeek, setActiveAftWeek] = useState<number>(1);
+
   // Active quarter inside Law Enforcement 52-Week Fitness & Readiness Program (4 Quarters)
   const [activeApexPhaseKey, setActiveApexPhaseKey] = useState<
     'apex_phase1' | 'apex_phase2' | 'apex_phase3' | 'apex_phase4'
@@ -200,11 +204,14 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
     if (selectedProgram === 'tactical_hypertrophy') {
       return getTacticalHypertrophyWeekData(activeTacticalWeek);
     }
+    if (selectedProgram === 'aft_protocol') {
+      return getAftWeekData(activeAftWeek);
+    }
     if (selectedProgram === 'universal_pat') {
       return getUniversalPatWeekData(activePatWeek);
     }
     return PROTOCOL_DATA[activeProtocolPhaseKey] || PROTOCOL_DATA.phase1;
-  }, [selectedProgram, activeApexWeek, activeTacticalWeek, activePatWeek, activeProtocolPhaseKey]);
+  }, [selectedProgram, activeApexWeek, activeTacticalWeek, activeAftWeek, activePatWeek, activeProtocolPhaseKey]);
 
   const getExerciseRest = (exerciseString: string): number => {
     const cleanStr = exerciseString.replace(/\[.*?\]/g, '').trim();
@@ -644,7 +651,12 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
       (ex) =>
         ex.type === 'cardio' &&
         (ex.name.toLowerCase() === day.run.trim().toLowerCase() ||
-          (day.run.toLowerCase().includes('zone 2') && ex.name.toLowerCase().includes('zone 2')))
+          (day.run.toLowerCase().includes('zone 2') && ex.name.toLowerCase().includes('zone 2')) ||
+          (day.run.toLowerCase().includes('400m run repeats') && ex.name.toLowerCase().includes('400m run repeats')) ||
+          (day.run.toLowerCase().includes('track intervals') && ex.name.toLowerCase().includes('track intervals')) ||
+          (day.run.toLowerCase().includes('sprint-drag-carry') && ex.name.toLowerCase().includes('sprint-drag-carry')) ||
+          (day.run.toLowerCase().includes('1-mile time trial') && ex.name.toLowerCase().includes('1-mile time trial')) ||
+          (day.run.toLowerCase().includes('event 5: 2-mile run') && ex.name.toLowerCase().includes('event 5: 2-mile run')))
     );
 
     // If day has conditioning (run / pursuit / sprints) and is not already explicitly listed inside day.strength, append as trackable cardio
@@ -742,7 +754,9 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
       ? `12-Week Military Tactical Bodybuilding (${currentPhase.weeks} • ${day.day}: ${day.focus})`
       : selectedProgram === 'hybrid_protocol'
       ? `The Tactical Standard Hybrid Protocol (${currentPhase.title.split(':')[0]} • ${day.day}: ${day.focus})`
-      : `Universal Military PT Test (${currentPhase.weeks} • ${day.day}: ${day.focus})`;
+      : selectedProgram === 'aft_protocol'
+      ? `Army Fitness Test (AFT) 8-Week Program (${currentPhase.weeks} • ${day.day}: ${day.focus})`
+      : `General Military PFT & Selection (${currentPhase.weeks} • ${day.day}: ${day.focus})`;
 
     // Mandatory DIME Warm-Up is recommended for all programs (8-min protocol dedicated on Tactical Bodybuilding)
     const recommendedWarmupId =
@@ -778,32 +792,32 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
     onStartWorkout(program);
   };
 
-  // Quarter phase options for the 52-Week Military Combat Fitness & Readiness Program
+  // Quarter phase options for the Military 52-Week Fitness & Readiness Program
   const apexMesocycles = [
     {
       id: 'apex_phase1' as const,
-      label: 'Quarter 1: Aerobic Base, Posture & Core',
+      label: 'Quarter 1: Aerobic Base & Movement Foundation',
       weeks: 'Q1: Wks 1–13',
-      badge: 'Aerobic Base & Core',
-      focus: 'Zone 2 Aerobic Base, Thoracic/Hip Mobility & Movement Mechanics (RPE 7)',
+      badge: 'Aerobic Base & Ruck Foundation',
+      focus: 'Zone 2 Aerobic Base, High-Rep Structural Strength & 4–6 Mi Ruck (35–40 lbs) (RPE 7)',
       weekRange: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
       defaultWeek: 1
     },
     {
       id: 'apex_phase2' as const,
-      label: 'Quarter 2: Running Stamina & Grappling Strength',
+      label: 'Quarter 2: Running Stamina & Base Strength',
       weeks: 'Q2: Wks 14–26',
-      badge: 'Stamina & Grappling',
-      focus: 'Tempo Runs, 400m Intervals, Barbell Strength & Loaded Carries (RPE 8)',
+      badge: 'Stamina & Base Strength',
+      focus: '400m Run Repeats, Barbell Strength (5–8 Reps), Loaded Carries & 6–8 Mi Ruck (45 lbs) (RPE 8)',
       weekRange: [14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26],
       defaultWeek: 14
     },
     {
       id: 'apex_phase3' as const,
-      label: 'Quarter 3: Limit Strength, Combat Speed & Threshold',
+      label: 'Quarter 3: Peak Strength, Sprint Speed & Tempo Runs',
       weeks: 'Q3: Wks 27–39',
-      badge: 'Limit Strength & Speed',
-      focus: 'Maximal Strength (80–85% 1RM), 200m–800m Track Repeats & Rotational Power (RPE 8.5)',
+      badge: 'Peak Strength & Tempo',
+      focus: 'Heavy Strength (3–5 Reps @ 80–85% 1RM), 200m–800m Track Repeats, 20-Min Tempo & 8–10 Mi Ruck (50–55 lbs) (RPE 8.5)',
       weekRange: [27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39],
       defaultWeek: 27
     },
@@ -811,21 +825,57 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
       id: 'apex_phase4' as const,
       label: 'Quarter 4: Combat Readiness & Annual Peak',
       weeks: 'Q4: Wks 40–52',
-      badge: 'Combat Circuit & Peak',
-      focus: 'Strength Maintenance, High-HR Decision-Making & Combat Readiness Simulation Circuits',
+      badge: 'Combat Circuit & Annual Peak',
+      focus: 'Strength Maintenance, Combat Readiness Simulation Circuit & 6–12 Mi Peak Ruck (55–65 lbs)',
       weekRange: [40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52],
       defaultWeek: 40
     },
   ];
 
-  // Phase options for the 12-Week Military Tactical Bodybuilding Program (Starts Sunday)
+  // 2-Week Block options for the Army Fitness Test (AFT) 8-Week Training Program
+  const aftMesocycles = [
+    {
+      id: 'aft_block1' as const,
+      label: 'Block 1: Event Technique & Base',
+      weeks: 'Weeks 1–2',
+      badge: 'Base Strength & Aerobic Foundation',
+      weekRange: [1, 2],
+      defaultWeek: 1,
+    },
+    {
+      id: 'aft_block2' as const,
+      label: 'Block 2: Heavy Strength & Threshold',
+      weeks: 'Weeks 3–4',
+      badge: '80% MDL & 800m Repeats (Wk 4 Deload)',
+      weekRange: [3, 4],
+      defaultWeek: 3,
+    },
+    {
+      id: 'aft_block3' as const,
+      label: 'Block 3: Peak 3RM MDL & Full SDC',
+      weeks: 'Weeks 5–6',
+      badge: '85–90% 3RM MDL & Full 250m SDC',
+      weekRange: [5, 6],
+      defaultWeek: 5,
+    },
+    {
+      id: 'aft_block4' as const,
+      label: 'Block 4: Dress Rehearsal & AFT Test',
+      weeks: 'Weeks 7–8',
+      badge: 'Wk 7 Rehearsal • Wk 8 Official AFT',
+      weekRange: [7, 8],
+      defaultWeek: 7,
+    },
+  ];
+
+  // Phase options for the 12-Week Military Tactical Bodybuilding Program (7-Day Garrison Cycle)
   const tacticalMesocycles = [
     {
       id: 'tb_phase1' as const,
       label: 'Phase 1: Armor & Base',
       weeks: 'Weeks 1–4',
-      badge: 'Base Volume & Acceleration',
-      focus: 'Main 8–10 • Acc 10–12 • Split 10/leg • Rest 120s/75s • Wk 4 Deload (-40% sets)',
+      badge: 'Base Hypertrophy & IMT Speed',
+      focus: 'Main 8–10 • Acc 10–12 • Split 10/leg • Day 3 10–20m Starts & 3-5s Bounds • Day 6 4-Mi Ruck (35 lbs) + Arms • Wk 4 Deload',
       weekRange: [1, 2, 3, 4],
       defaultWeek: 1
     },
@@ -833,8 +883,8 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
       id: 'tb_phase2' as const,
       label: 'Phase 2: Power-Building',
       weeks: 'Weeks 5–8',
-      badge: 'Force & Agility',
-      focus: 'Main 5–6 • Acc 8–10 • Split 8/leg • Rest 150s/90s • Pro Agility & Bike • Wk 8 Deload',
+      badge: 'Heavy Force & Shuttle Agility',
+      focus: 'Main 5–6 • Acc 8–10 • Split 8/leg • Day 3 Pro-Agility 5-10-5 & 25m Shuttle • Day 6 5-Mi Ruck (45 lbs) + Arms • Wk 8 Deload',
       weekRange: [5, 6, 7, 8],
       defaultWeek: 5
     },
@@ -842,8 +892,8 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
       id: 'tb_phase3' as const,
       label: 'Phase 3: Peak & Velocity',
       weeks: 'Weeks 9–12',
-      badge: 'Heavy & Combat Speed',
-      focus: 'Main 3–5 • Acc 6–8 • Split 6/leg • Rest 180s • 60m Broken Sprints & T-Drill • Wk 12 Deload',
+      badge: 'Peak Strength & Combat Speed',
+      focus: 'Main 3–5 • Acc 6–8 • Split 6/leg • Day 3 60m Prone-to-Sprint & T-Drill • Day 6 6-Mi Ruck (55 lbs) + Arms • Wk 12 Deload',
       weekRange: [9, 10, 11, 12],
       defaultWeek: 9
     },
@@ -1619,18 +1669,43 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
                       <span className="text-amber-400">Custom Track:</span> {activeCustomProgram.title}
                     </>
                   ) : selectedProgram === 'apex_protocol' ? (
-                    <>52-Week Military <span className="text-amber-400">Combat Fitness &amp; Readiness Program</span></>
+                    <>Military 52-Week <span className="text-amber-400">Fitness &amp; Readiness Program</span></>
                   ) : selectedProgram === 'tactical_hypertrophy' ? (
                     <>12-Week Military <span className="text-amber-400">Tactical Bodybuilding Program</span></>
                   ) : selectedProgram === 'hybrid_protocol' ? (
                     <>The Tactical Standard <span className="text-amber-400">12-Week Hybrid Protocol</span></>
+                  ) : selectedProgram === 'aft_protocol' ? (
+                    <>Army Fitness Test (AFT) <span className="text-amber-400">8-Week Specific Training Program</span></>
                   ) : (
-                    <>Universal Military <span className="text-amber-400">PT Test &amp; Selection (ACFT / PFT / CFT)</span></>
+                    <>General Military <span className="text-amber-400">PFT &amp; Selection Readiness (PFT / CFT / PRT)</span></>
                   )}
                 </span>
                 <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-300 border border-zinc-700">
                   {selectedProgram === 'custom_ai' && activeCustomProgram ? activeCustomProgram.frequency : currentPhase.weeks}
                 </span>
+                {(selectedProgram === 'apex_protocol' || selectedProgram === 'tactical_hypertrophy' || selectedProgram === 'aft_protocol') && (
+                  <a
+                    href={
+                      selectedProgram === 'apex_protocol'
+                        ? '/assets/aistudio/Military_52-Week_Fitness___Readiness_Program_262b659a.pdf'
+                        : selectedProgram === 'tactical_hypertrophy'
+                        ? '/assets/aistudio/12-Week_Military_Tactical_Bodybuilding_Program_9f273eb2.pdf'
+                        : '/assets/aistudio/Army_Fitness_Test__AFT__8-Week_Specific_Training_Program_0b4b7b88.pdf'
+                    }
+                    download={
+                      selectedProgram === 'apex_protocol'
+                        ? 'Military_52-Week_Fitness_Readiness_Program.pdf'
+                        : selectedProgram === 'tactical_hypertrophy'
+                        ? '12-Week_Military_Tactical_Bodybuilding_Program.pdf'
+                        : 'Army_Fitness_Test_AFT_8-Week_Training_Program.pdf'
+                    }
+                    className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 transition-colors"
+                    title="Download Official Program Manual PDF"
+                  >
+                    <FileText className="w-3 h-3 text-amber-400" />
+                    <span>PDF Manual</span>
+                  </a>
+                )}
               </h1>
             </div>
           </div>
@@ -1721,9 +1796,9 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
           </div>
         </div>
 
-        {/* Program Selector: 4-Program Grid for Coach AJ, or Prescribed Protocol Header for Regular Users */}
+        {/* Program Selector: 5-Program Grid for Coach AJ, or Prescribed Protocol Header for Regular Users */}
         {isMasterExempt ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mt-3 pt-3 border-t border-zinc-800/80">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 mt-3 pt-3 border-t border-zinc-800/80">
             {/* Program 1: 52-Week Military Combat Fitness & Readiness Program */}
             <button
               type="button"
@@ -1739,7 +1814,7 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
                   <span className={`w-2 h-2 rounded-full ${selectedProgram === 'apex_protocol' ? 'bg-amber-400' : 'bg-zinc-600'}`} />
                   <span className="text-xs font-black uppercase tracking-wide truncate font-athletic">52-Wk Military Readiness</span>
                 </div>
-                <span className="text-[10px] text-zinc-400 block font-mono truncate">52-Wk Master • Speed, Strength &amp; Combat</span>
+                <span className="text-[10px] text-zinc-400 block font-mono truncate">7-Day Cycle • Strength, Run, Sprints &amp; 4–12 Mi Ruck</span>
               </div>
               <span className={`text-[10px] font-black px-1.5 py-0.5 rounded font-mono shrink-0 ${
                 selectedProgram === 'apex_protocol' ? 'bg-amber-500 text-black' : 'bg-zinc-800 text-zinc-400'
@@ -1763,7 +1838,7 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
                   <span className={`w-2 h-2 rounded-full ${selectedProgram === 'tactical_hypertrophy' ? 'bg-amber-400' : 'bg-zinc-600'}`} />
                   <span className="text-xs font-black uppercase tracking-wide truncate font-athletic">Military Bodybuilding</span>
                 </div>
-                <span className="text-[10px] text-zinc-400 block font-mono truncate">Starts Sun • 4 Lift + 2 Speed/Cond • Daily DIME</span>
+                <span className="text-[10px] text-zinc-400 block font-mono truncate">7-Day Cycle • 4 Lift + Day 3 Speed + Day 6 Ruck/Arms</span>
               </div>
               <span className={`text-[10px] font-black px-1.5 py-0.5 rounded font-mono shrink-0 ${
                 selectedProgram === 'tactical_hypertrophy' ? 'bg-amber-500 text-black' : 'bg-zinc-800 text-zinc-400'
@@ -1796,7 +1871,31 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
               </span>
             </button>
 
-            {/* Program 4: Universal Military PT Test */}
+            {/* Program 4: Army Fitness Test (AFT) 8-Week Specific Plan */}
+            <button
+              type="button"
+              onClick={() => handleProgramSwitch('aft_protocol')}
+              className={`px-3 py-2 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between gap-2 ${
+                selectedProgram === 'aft_protocol'
+                  ? 'bg-amber-500/15 border-amber-400 shadow-md ring-1 ring-amber-400/40 text-white'
+                  : 'bg-[#090b0d] border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className={`w-2 h-2 rounded-full ${selectedProgram === 'aft_protocol' ? 'bg-amber-400' : 'bg-zinc-600'}`} />
+                  <span className="text-xs font-black uppercase tracking-wide truncate font-athletic">Army Fitness Test (AFT)</span>
+                </div>
+                <span className="text-[10px] text-zinc-400 block font-mono truncate">8-Wk AFT Plan • MDL, HRP, SDC, PLK, 2MR</span>
+              </div>
+              <span className={`text-[10px] font-black px-1.5 py-0.5 rounded font-mono shrink-0 ${
+                selectedProgram === 'aft_protocol' ? 'bg-amber-500 text-black' : 'bg-zinc-800 text-zinc-400'
+              }`}>
+                8 WKS
+              </span>
+            </button>
+
+            {/* Program 5: General Military PFT & Selection Readiness */}
             <button
               type="button"
               onClick={() => handleProgramSwitch('universal_pat')}
@@ -1809,9 +1908,9 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
                   <span className={`w-2 h-2 rounded-full ${selectedProgram === 'universal_pat' ? 'bg-amber-400' : 'bg-zinc-600'}`} />
-                  <span className="text-xs font-black uppercase tracking-wide truncate font-athletic">Military PT Test</span>
+                  <span className="text-xs font-black uppercase tracking-wide truncate font-athletic">General PFT &amp; Selection</span>
                 </div>
-                <span className="text-[10px] text-zinc-400 block font-mono truncate">8-Wk Cycle • ACFT / PFT / CFT</span>
+                <span className="text-[10px] text-zinc-400 block font-mono truncate">8-Wk Cycle • PFT / CFT / PRT</span>
               </div>
               <span className={`text-[10px] font-black px-1.5 py-0.5 rounded font-mono shrink-0 ${
                 selectedProgram === 'universal_pat' ? 'bg-amber-500 text-black' : 'bg-zinc-800 text-zinc-400'
@@ -1890,7 +1989,7 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
       {renderCoachLibrarySection()}
 
       {/* Dynamic Program Content - Smooth CSS Fade-in Transition When Switching Programs */}
-      <div key={`${selectedProgram}-${activeApexPhaseKey}-${activeApexWeek}-${activeTacticalWeek}-${activePatWeek}`} className="animate-tab-fade space-y-6">
+      <div key={`${selectedProgram}-${activeApexPhaseKey}-${activeApexWeek}-${activeTacticalWeek}-${activeAftWeek}-${activePatWeek}`} className="animate-tab-fade space-y-6">
         {selectedProgram === 'custom_ai' ? (
           activeCustomProgram ? (
             <div className="space-y-6">
@@ -2444,14 +2543,93 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
           </div>
         )) : (
           <>
-        {/* COMPACT UNIVERSAL MILITARY PT WEEK SELECTOR RAIL */}
+        {/* COMPACT ARMY FITNESS TEST (AFT) 8-WEEK BLOCK & WEEK SELECTOR RAIL */}
+        {selectedProgram === 'aft_protocol' && (
+          <div className="bg-[#0e1217] border border-amber-500/40 rounded-2xl p-2.5 sm:p-3 shadow-md space-y-2">
+            {/* 4 Two-Week Block Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+              <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 shrink-0 flex items-center gap-1 mr-1">
+                <Activity className="w-3 h-3" />
+                AFT Block:
+              </span>
+              {aftMesocycles.map((m) => {
+                const isSelected = activeAftBlockKey === m.id;
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => {
+                      setActiveAftBlockKey(m.id);
+                      setActiveAftWeek(m.defaultWeek);
+                      setDayViewMode('all');
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer shrink-0 border flex items-center gap-1.5 ${
+                      isSelected
+                        ? 'bg-amber-500 text-black border-amber-400 shadow-sm font-black'
+                        : 'bg-[#090b0d] text-zinc-300 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800'
+                    }`}
+                  >
+                    <span>{m.label} ({m.weeks})</span>
+                    {isSelected && <CheckCircle2 className="w-3 h-3 text-black" />}
+                  </button>
+                );
+              })}
+              <span className="text-[10px] font-mono text-amber-300 bg-amber-950/50 border border-amber-500/30 px-2 py-0.5 rounded ml-auto shrink-0 hidden lg:inline">
+                5 Events: MDL • HRP • SDC • PLK • 2MR
+              </span>
+            </div>
+
+            {/* 8-Week Selector */}
+            <div className="flex items-center justify-between gap-2 flex-wrap pt-1.5 border-t border-zinc-800/80">
+              <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+                <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400 shrink-0 flex items-center gap-1 mr-1">
+                  <Calendar className="w-3 h-3 text-amber-400" />
+                  AFT Week:
+                </span>
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((w) => {
+                  const isSelectedWeek = activeAftWeek === w;
+                  const isDeload = w === 4;
+                  const isRehearsal = w === 7;
+                  const isPeak = w === 8;
+                  const blockIdForWeek = w <= 2 ? 'aft_block1' : w <= 4 ? 'aft_block2' : w <= 6 ? 'aft_block3' : 'aft_block4';
+                  return (
+                    <button
+                      key={w}
+                      type="button"
+                      onClick={() => {
+                        setActiveAftWeek(w);
+                        setActiveAftBlockKey(blockIdForWeek);
+                        setDayViewMode('all');
+                      }}
+                      className={`px-3 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer border flex items-center gap-1 tabular-nums ${
+                        isSelectedWeek
+                          ? 'bg-amber-500 text-black border-amber-400 shadow-sm font-black'
+                          : 'bg-[#090b0d] text-zinc-400 border-zinc-800 hover:text-white hover:border-zinc-700'
+                      }`}
+                    >
+                      <span>Week {w}</span>
+                      {isDeload && <span className="text-[9px] font-black uppercase bg-red-950/80 text-red-300 border border-red-500/40 px-1 rounded">Deload</span>}
+                      {isRehearsal && <span className="text-[9px] font-black uppercase bg-amber-950/80 text-amber-300 border border-amber-500/40 px-1 rounded">Rehearsal</span>}
+                      {isPeak && <span className="text-[9px] font-black uppercase bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 px-1 rounded">AFT Test</span>}
+                    </button>
+                  );
+                })}
+              </div>
+              <span className="text-[11px] font-mono text-amber-400 font-bold shrink-0">
+                Week {activeAftWeek} of 8 Active • Injury-Only Adapter Mode
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* COMPACT GENERAL MILITARY PFT & SELECTION WEEK SELECTOR RAIL */}
         {selectedProgram === 'universal_pat' && (
           <div className="bg-[#0e1217] border border-amber-500/40 rounded-2xl p-2.5 sm:p-3 shadow-md space-y-2">
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
                 <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 shrink-0 flex items-center gap-1 mr-1">
                   <Calendar className="w-3 h-3 text-amber-400" />
-                  Military PT Week:
+                  General PFT Week:
                 </span>
                 {[1, 2, 3, 4, 5, 6, 7, 8].map((w) => {
                   const isSelectedWeek = activePatWeek === w;
@@ -2479,7 +2657,7 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
                 })}
               </div>
               <span className="text-[11px] font-mono text-amber-400 font-bold shrink-0">
-                Week {activePatWeek} Active • ACFT / PFT Benchmarks Synced
+                Week {activePatWeek} Active • PFT / CFT / PRT Benchmarks Synced
               </span>
             </div>
           </div>
@@ -2517,7 +2695,7 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
                 );
               })}
               <span className="text-[10px] font-mono text-amber-300 bg-amber-950/50 border border-amber-500/30 px-2 py-0.5 rounded ml-auto shrink-0 hidden lg:inline">
-                Starts Sunday · Mandatory 8m DIME Daily
+                7-Day Garrison Cycle · Mandatory 8m DIME Daily
               </span>
             </div>
 
@@ -2681,7 +2859,9 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
                     ? `12-Week Military Tactical Bodybuilding Double Progression & Field Rules (${currentPhase.weeks})`
                     : selectedProgram === 'hybrid_protocol'
                     ? '12-Week Hybrid Protocol Auto-Overload Benchmarks'
-                    : `Military PT Test Auto-Overload Benchmarks (${currentPhase.weeks})`}
+                    : selectedProgram === 'aft_protocol'
+                    ? `Army Fitness Test (AFT) Event Benchmarks — Test Week 0 vs. Week 8 (${currentPhase.weeks})`
+                    : `General Military PFT & Selection Auto-Overload Benchmarks (${currentPhase.weeks})`}
                 </h3>
               </div>
               <span className="text-[11px] text-zinc-400 font-mono">
@@ -2703,13 +2883,13 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
               </div>
               <div className="p-2.5 bg-zinc-950/80 rounded-xl border border-zinc-800/80">
                 <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Every 4th Week Deload</span>
-                <span className="text-sm font-black text-emerald-400 font-mono tabular-nums">-40% Volume</span>
-                <span className="text-[10px] text-zinc-400 block mt-0.5">Wks 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48 cut sets/miles 40%</span>
+                <span className="text-sm font-black text-emerald-400 font-mono tabular-nums">-40% Sets / Miles / Ruck</span>
+                <span className="text-[10px] text-zinc-400 block mt-0.5">Wks 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48 cut volume 40%; Wk 51 Taper</span>
               </div>
               <div className="p-2.5 bg-zinc-950/80 rounded-xl border border-zinc-800/80">
-                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Annual Combat Benchmarks</span>
-                <span className="text-sm font-black text-emerald-400 font-mono tabular-nums">1.5-Mi &lt; 10:30 • 300m &lt; 46s</span>
-                <span className="text-[10px] text-zinc-400 block mt-0.5">TBDL 2.0x BW • Bench 1.25x BW • 12+ Pull-Ups • 50+ Push-Ups</span>
+                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Target Fitness Benchmarks</span>
+                <span className="text-sm font-black text-emerald-400 font-mono tabular-nums">3,200m &le;13:30 • 5,000m &le;21:30</span>
+                <span className="text-[10px] text-zinc-400 block mt-0.5">Sq/DL 2.0–2.5x BW • Bench 1.5x BW • OHP 1.0x BW • 12+ Pull-Ups • 40m &le;5.30s</span>
               </div>
             </div>
           ) : selectedProgram === 'tactical_hypertrophy' ? (
@@ -2720,19 +2900,42 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
                 <span className="text-[10px] text-zinc-400 block mt-0.5">Hit top reps on all sets with 1–2 RIR before adding weight</span>
               </div>
               <div className="p-2.5 bg-[#090b0d] rounded-xl border border-zinc-800/80">
-                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">3-Phase Linear Wave</span>
+                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">3-Phase Linear Wave + Ruck</span>
                 <span className="text-sm font-black text-amber-400 font-mono tabular-nums">8–10 &rarr; 5–6 &rarr; 3–5 Reps</span>
-                <span className="text-[10px] text-zinc-400 block mt-0.5">Ph 1 Armor (W1–4) • Ph 2 Power (W5–8) • Ph 3 Peak (W9–12)</span>
+                <span className="text-[10px] text-zinc-400 block mt-0.5">Day 6 Ruck: Ph 1 4-Mi (35 lb) • Ph 2 5-Mi (45 lb) • Ph 3 6-Mi (55 lb) + Arm Pump</span>
               </div>
               <div className="p-2.5 bg-[#090b0d] rounded-xl border border-zinc-800/80">
                 <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Deloads (Weeks 4, 8, 12)</span>
-                <span className="text-sm font-black text-amber-400 font-mono tabular-nums">-40% Sets • ~80% Load</span>
-                <span className="text-[10px] text-zinc-400 block mt-0.5">Cut working sets 40% &amp; move lighter loads with crisp speed</span>
+                <span className="text-sm font-black text-amber-400 font-mono tabular-nums">-40% Sets • 2-Mi Walk</span>
+                <span className="text-[10px] text-zinc-400 block mt-0.5">Cut sets 40% (~80% load) &amp; replace Day 6 Ruck with 2-mi unweighted walk</span>
               </div>
               <div className="p-2.5 bg-[#090b0d] rounded-xl border border-zinc-800/80">
-                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Field Ops &amp; DIME Rules</span>
+                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Unit PT &amp; FTX Protocol</span>
                 <span className="text-sm font-black text-amber-400 font-mono tabular-nums">Daily 8m DIME • 3 RIR Cap</span>
-                <span className="text-[10px] text-zinc-400 block mt-0.5">Field ops/4h sleep: halve accessories, swap sprints for 20m Zone 2</span>
+                <span className="text-[10px] text-zinc-400 block mt-0.5">Unit PT 3+ mi run: skip Day 3/Day 6 cardio; FTX &lt;4h sleep: halve acc &amp; 20m Zone 2</span>
+              </div>
+            </div>
+          ) : selectedProgram === 'aft_protocol' ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mt-2.5">
+              <div className="p-2.5 bg-[#090b0d] rounded-xl border border-amber-500/30">
+                <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider block">1. 3RM Deadlift (MDL)</span>
+                <span className="text-sm font-black text-amber-400 font-mono tabular-nums">180 &rarr; 260–300 &rarr; 340 lb</span>
+                <span className="text-[10px] text-zinc-400 block mt-0.5">Min Pass: 180–200 • Combat Readiness: 260–300 • Max: 340 lbs</span>
+              </div>
+              <div className="p-2.5 bg-[#090b0d] rounded-xl border border-amber-500/30">
+                <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider block">2. Hand-Release Push-Ups (2m)</span>
+                <span className="text-sm font-black text-amber-400 font-mono tabular-nums">25–30 &rarr; 42–50 &rarr; 57–60+</span>
+                <span className="text-[10px] text-zinc-400 block mt-0.5">Index fingers inside shoulder edge; 45° elbows; 1-sec breathing rest in plank</span>
+              </div>
+              <div className="p-2.5 bg-[#090b0d] rounded-xl border border-amber-500/30">
+                <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider block">3. 250m Sprint-Drag-Carry (SDC)</span>
+                <span className="text-sm font-black text-amber-400 font-mono tabular-nums">&le;2:10 &rarr; &le;1:45 &rarr; &le;1:29</span>
+                <span className="text-[10px] text-zinc-400 block mt-0.5">50m Sprint • 50m 90-lb Drag • 50m Shuffle • 50m 2x40-lb Carry • 50m Sprint</span>
+              </div>
+              <div className="p-2.5 bg-[#090b0d] rounded-xl border border-amber-500/30">
+                <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider block">4. Plank (PLK) &amp; 5. 2-Mile Run</span>
+                <span className="text-sm font-black text-amber-400 font-mono tabular-nums">3:40+ PLK • &le;13:22 2MR</span>
+                <span className="text-[10px] text-zinc-400 block mt-0.5">Plank: 2:00 / 2:45–3:15 / 3:40+ • 2MR: &le;18:00 / &le;15:30 / &le;13:22</span>
               </div>
             </div>
           ) : selectedProgram === 'universal_pat' ? (
@@ -2753,9 +2956,9 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
                 <span className="text-[10px] text-zinc-400 block mt-0.5">Relentless posterior drive</span>
               </div>
               <div className="p-2.5 bg-[#090b0d] rounded-xl border border-amber-500/30">
-                <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider block">Military 1.5–2 Mi Run Standard</span>
-                <span className="text-sm font-black text-amber-400 font-mono tabular-nums">Sub-11:00 / 13:30</span>
-                <span className="text-[10px] text-zinc-400 block mt-0.5">Selection &amp; PT test benchmark</span>
+                <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider block">General PFT 1.5–3 Mi Run</span>
+                <span className="text-sm font-black text-amber-400 font-mono tabular-nums">Sub-10:30 / 19:30</span>
+                <span className="text-[10px] text-zinc-400 block mt-0.5">PFT / CFT / PRT &amp; Selection standard</span>
               </div>
             </div>
           ) : (
@@ -2825,14 +3028,20 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-[10px] font-mono uppercase tracking-wider text-amber-300 font-black px-2 py-0.5 rounded bg-amber-500/20 border border-amber-500/40">
-                  Clinical &amp; Ability Program Adapter
+                  {selectedProgram === 'aft_protocol'
+                    ? 'Injury-Only Program Adapter (AFT Plan)'
+                    : 'Clinical & Ability Program Adapter'}
                 </span>
                 <span className="text-xs font-bold text-white font-athletic uppercase">
-                  Need to Modify This Program for Injuries or Ability Level?
+                  {selectedProgram === 'aft_protocol'
+                    ? 'Need to Modify the 8-Week AFT Plan for Injuries or Joint Limitations?'
+                    : 'Need to Modify This Program for Injuries or Ability Level?'}
                 </span>
               </div>
               <p className="text-[11px] text-zinc-300 mt-0.5">
-                Automatically swap movements that aggravate your joints, adjust sets/reps/RPE to your experience level, or scale running distances while keeping Coach Risner&apos;s exact weekly structure.
+                {selectedProgram === 'aft_protocol'
+                  ? 'The 8-Week AFT Plan is excluded from ability-level, equipment, and running scaling to preserve exact AFT event standards (MDL, HRP, SDC, PLK, 2MR) — only clinical injury and joint substitutions are applied.'
+                  : "Automatically swap movements that aggravate your joints, adjust sets/reps/RPE to your experience level, or scale running distances while keeping Coach Risner's exact weekly structure."}
               </p>
             </div>
           </div>
@@ -2842,7 +3051,7 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
             className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-black uppercase text-xs font-athletic tracking-wider shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 shrink-0 self-start sm:self-auto whitespace-nowrap"
           >
             <SlidersHorizontal className="w-3.5 h-3.5 text-black" />
-            <span>Adapt This Program &rarr;</span>
+            <span>{selectedProgram === 'aft_protocol' ? 'Adapt for Injuries \u2192' : 'Adapt This Program \u2192'}</span>
           </button>
         </div>
       )}
@@ -2906,7 +3115,9 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
                     : 'bg-[#090b0d] text-zinc-200 border-zinc-700 hover:border-amber-400 hover:text-white'
                 }`}
               >
-                <span>{`Day ${idx + 1}`}</span>
+                <span>
+                  {`Day ${idx + 1}`}
+                </span>
                 {isRest && (
                   <span className="text-[9px] uppercase font-mono opacity-80">(Rest)</span>
                 )}
@@ -2933,7 +3144,7 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
             </button>
 
             <span className="text-xs sm:text-sm font-black text-white px-2">
-              Day {dayViewMode + 1} · {currentPhase.days[dayViewMode]?.focus}
+              {`Day ${dayViewMode + 1}`} · {currentPhase.days[dayViewMode]?.focus}
             </span>
 
             <button

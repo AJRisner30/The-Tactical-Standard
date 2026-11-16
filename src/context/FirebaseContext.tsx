@@ -2,8 +2,6 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, onAuthStateChanged } from 'firebase/auth';
 import { 
   auth, 
-  googleProvider,
-  signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
@@ -36,7 +34,6 @@ interface FirebaseContextType {
   isCloudConnected: boolean;
   authError: AuthErrorInfo | null;
   clearAuthError: () => void;
-  signInWithGoogle: () => Promise<User | null>;
   signInWithEmail: (email: string, password: string) => Promise<User | null>;
   signUpWithEmail: (email: string, password: string, displayName?: string) => Promise<User | null>;
   sendPasswordSetupEmail: (email: string, directNewPassword?: string) => Promise<User | null>;
@@ -68,17 +65,13 @@ export function parseAuthError(err: any): AuthErrorInfo {
   if (isAccountExists) {
     message = 'An account already exists with this email. Please sign in or use "Set Password" to update your password.';
   } else if (isInvalidCredential) {
-    message = 'Incorrect password or account credentials. If you previously signed in with Google, click "Continue with Google" or set a password under "Set Password".';
+    message = 'Incorrect password or account credentials. Use "Set Password" if you need to set or reset your password.';
   } else if (isUserNotFound) {
     message = 'No account found with this email. If this is your first time, please create an account.';
   } else if (isWeakPassword) {
     message = 'Password must be at least 6 characters long.';
   } else if (isInvalidEmail) {
     message = 'Please enter a valid email address.';
-  } else if (code === 'auth/popup-closed-by-user') {
-    message = 'Google sign-in window was closed before completing sign in. Please try again or sign in with your email and password below.';
-  } else if (code === 'auth/popup-blocked') {
-    message = 'Sign-in popup was blocked by your browser. Please allow popups or sign in directly with your email and password below.';
   } else if (code === 'auth/too-many-requests') {
     message = 'Access temporarily restricted due to multiple failed login attempts. Please reset your password or wait a few minutes.';
   }
@@ -101,7 +94,6 @@ const FirebaseContext = createContext<FirebaseContextType>({
   isCloudConnected: false,
   authError: null,
   clearAuthError: () => {},
-  signInWithGoogle: async () => null,
   signInWithEmail: async () => null,
   signUpWithEmail: async () => null,
   sendPasswordSetupEmail: async () => null,
@@ -127,8 +119,20 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
+    // Safety timeout in case IndexedDB auth state check is delayed inside a preview iframe
+    const authTimeout = setTimeout(() => {
+      setLoading((prev) => {
+        if (prev) {
+          const fallback = auth.currentUser || getFallbackAuthUser();
+          if (fallback) setUser(fallback);
+        }
+        return false;
+      });
+    }, 1500);
+
     // 2. Auth state listener (tracks Firebase user session or seamless local fallback session)
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      clearTimeout(authTimeout);
       if (currentUser) {
         setFallbackAuthSession(null);
         setUser(currentUser);
@@ -149,38 +153,13 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     window.addEventListener('local_auth_state_changed', handleLocalAuthChange);
 
     return () => {
+      clearTimeout(authTimeout);
       unsubscribe();
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('local_auth_state_changed', handleLocalAuthChange);
     };
   }, []);
-
-  // Sign In with Google Popup (Provisioned Default Provider)
-  const handleSignInWithGoogle = async (): Promise<User | null> => {
-    setIsAuthenticating(true);
-    setAuthError(null);
-    try {
-      const result = await signInWithPopup(auth, googleProvider);
-      if (result.user) {
-        if (result.user.email) {
-          upsertLocalUserCredentials(result.user.email, undefined, result.user.displayName || undefined);
-        }
-        setFallbackAuthSession(null);
-        setUser(result.user);
-        setIsCloudConnected(true);
-        return result.user;
-      }
-      return null;
-    } catch (err: any) {
-      console.warn('[Firebase] Google sign-in error:', err);
-      const parsed = parseAuthError(err);
-      setAuthError(parsed);
-      throw err;
-    } finally {
-      setIsAuthenticating(false);
-    }
-  };
 
   // Sign In with Email & Password (with automatic fallback if Email/Password provider is disabled in Firebase Console)
   const handleSignInWithEmail = async (email: string, password: string): Promise<User | null> => {
@@ -383,7 +362,6 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         isCloudConnected,
         authError,
         clearAuthError,
-        signInWithGoogle: handleSignInWithGoogle,
         signInWithEmail: handleSignInWithEmail,
         signUpWithEmail: handleSignUpWithEmail,
         sendPasswordSetupEmail: handleSendPasswordSetupEmail,

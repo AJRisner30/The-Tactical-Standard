@@ -965,19 +965,19 @@ export const INITIAL_PROGRAMS: WorkoutProgram[] = [
   {
     id: 'tactical-hypertrophy-conditioning-v1',
     title: '12-Week Military Tactical Bodybuilding Program',
-    subtitle: 'Starts Sunday • 4 Lift (Sun/Mon/Wed/Thu) + 2 Speed & Conditioning (Tue/Fri) + Rest (Sat)',
+    subtitle: 'Warfighter Strength, Hypertrophy & Field Readiness • 7-Day Garrison Cycle (4 Lift + Day 3 Bounding + Day 6 Ruck/Arms + Day 7 Rest)',
     category: 'Hypertrophy',
     frequency: '6 Days / Week',
     estimatedDurationMinutes: 60,
     recommendedWarmupId: 'warmup-dime-tactical-bb',
-    description: '12-week 3-phase Military Tactical Bodybuilding program (Phase 1 Armor & Base, Phase 2 Power-Building, Phase 3 Peak & Velocity). Guardrails: Zero Olympic lifts, burpees, sandbags, or jump ropes. Mandatory 8-Minute DIME Warm-Up before every session.',
+    description: '12-week 3-phase Military Tactical Bodybuilding program (Phase 1 Armor & Base, Phase 2 Power-Building, Phase 3 Peak & Combat Velocity). 7-Day Garrison Cycle with Unit PT Adjustment Rule, FTX/Range Protocol, Deload Weeks 4/8/12 (-40% sets, 2-mi unweighted walk), Mandatory 8-Minute DIME Warm-Up daily, and Zero Olympic lifts, burpees, or high-impact jump ropes.',
     schedule: [
       {
         day: 1,
-        focus: 'Sunday: Upper Body — Push & Shoulder Armor',
+        focus: 'Upper Body — Push & Plate-Carrier Armor',
         exercises: [
           {
-            id: 'tb-sun-incline-bench',
+            id: 'tb-mon-incline-bench',
             name: 'Incline Barbell or Dumbbell Bench Press',
             muscleGroup: 'Chest',
             type: 'strength',
@@ -985,23 +985,23 @@ export const INITIAL_PROGRAMS: WorkoutProgram[] = [
             targetReps: '8-10',
             targetRpe: 8,
             restPeriodSeconds: 120,
-            notes: 'Primary press; 2-sec controlled eccentric. Double Progression: +5 lbs upper upon hitting top reps with 1-2 RIR.',
+            notes: 'Builds upper-chest shelf for plate carriers; 2-sec eccentric. Double Progression: +5 lbs upper upon hitting top reps with 1-2 RIR.',
             progression_rules: { metric: 'weight_lbs', trigger: 'complete_max_reps', increment_value: 5, action: '+5 lbs upper next week' }
           },
           {
-            id: 'tb-sun-seated-ohp',
-            name: 'Seated Dumbbell Overhead Press',
+            id: 'tb-mon-standing-ohp',
+            name: 'Standing Barbell or Dumbbell Overhead Press',
             muscleGroup: 'Shoulders',
             type: 'strength',
             defaultSets: 3,
             targetReps: '10-12',
             targetRpe: 8,
             restPeriodSeconds: 75,
-            notes: 'Full range of motion; brace core without lumbar arch.',
-            progression_rules: { metric: 'weight_lbs', trigger: 'complete_max_reps', increment_value: 5, action: '+5 lbs DBs on top reps' }
+            notes: 'Strict overhead stability and trunk bracing under axial load.',
+            progression_rules: { metric: 'weight_lbs', trigger: 'complete_max_reps', increment_value: 5, action: '+5 lbs on top reps' }
           },
           {
-            id: 'tb-sun-dips-cgbp',
+            id: 'tb-mon-dips-cgbp',
             name: 'Weighted Dips or Close-Grip Bench Press',
             muscleGroup: 'Chest',
             type: 'strength',
@@ -1009,22 +1009,22 @@ export const INITIAL_PROGRAMS: WorkoutProgram[] = [
             targetReps: '10-12',
             targetRpe: 8,
             restPeriodSeconds: 75,
-            notes: 'Keep elbows tucked to protect shoulder capsule.',
+            notes: 'Tricep lockout strength for hand-release push-ups and obstacle climbs.',
             progression_rules: { metric: 'weight_lbs', trigger: 'complete_max_reps', increment_value: 5, action: '+5 lbs on top reps' }
           },
           {
-            id: 'tb-sun-medball-pass',
-            name: 'Explosive Med-Ball Chest Pass (against wall)',
+            id: 'tb-mon-medball-pass',
+            name: 'Explosive Med-Ball Chest Pass (from kneeling)',
             muscleGroup: 'Chest',
             type: 'strength',
             defaultSets: 4,
             targetReps: '5',
             targetRpe: 8.5,
             restPeriodSeconds: 60,
-            notes: 'Maximum velocity, full reset between throws (All Phases).'
+            notes: 'Simulates prone-to-sprint push-off; max velocity per throw (All Phases).'
           },
           {
-            id: 'tb-sun-superset',
+            id: 'tb-mon-superset',
             name: 'Lateral Raises + Cable Tricep Pushdowns',
             muscleGroup: 'Arms',
             type: 'superset',
@@ -1037,96 +1037,96 @@ export const INITIAL_PROGRAMS: WorkoutProgram[] = [
               { name: 'Lateral Raises', targetReps: '12-15', muscleGroup: 'Shoulders' },
               { name: 'Cable Tricep Pushdowns', targetReps: '12-15', muscleGroup: 'Arms' }
             ],
-            notes: 'Superset: Minimal rest between paired movements (All Phases).'
+            notes: 'Superset: Medial delt armor and elbow tendon resilience (All Phases).'
           }
         ]
       },
       {
         day: 2,
-        focus: 'Monday: Lower Body — Quad Drive & Acceleration',
+        focus: 'Lower Body — Quad Drive & Ruck Stability',
         exercises: [
           {
-            id: 'tb-mon-trapbar-front',
-            name: 'Trap Bar Deadlift or Front Squat',
+            id: 'tb-tue-trapbar-dl',
+            name: 'Trap Bar Deadlift',
             muscleGroup: 'Quads',
             type: 'strength',
             defaultSets: 4,
             targetReps: '8-10',
             targetRpe: 8,
             restPeriodSeconds: 120,
-            notes: 'Primary lower lift; explosive concentric drive. Double Progression: +10 lbs lower at top reps w/ 1-2 RIR.',
+            notes: 'Direct ACFT carryover and high-output lower-body force. Double Progression: +10 lbs lower at top reps w/ 1-2 RIR.',
             progression_rules: { metric: 'weight_lbs', trigger: 'complete_max_reps', increment_value: 10, action: '+10 lbs lower next week' }
           },
           {
-            id: 'tb-mon-bss',
-            name: 'Bulgarian Split Squats (Dumbbells)',
+            id: 'tb-tue-rfess',
+            name: 'Rear-Foot Elevated Split Squats (Dumbbells)',
             muscleGroup: 'Quads',
             type: 'strength',
             defaultSets: 3,
             targetReps: '10/leg',
             targetRpe: 8,
             restPeriodSeconds: 75,
-            notes: 'Maintain upright torso and knee alignment.',
+            notes: 'Bulletproofs knees and hips for uneven terrain under a ruck.',
             progression_rules: { metric: 'weight_lbs', trigger: 'complete_max_reps', increment_value: 5, action: '+5 lbs DBs' }
           },
           {
-            id: 'tb-mon-leg-press',
-            name: 'Leg Press',
+            id: 'tb-tue-front-hack-squat',
+            name: 'Front Squat or Hack Squat',
             muscleGroup: 'Quads',
             type: 'strength',
             defaultSets: 3,
-            targetReps: '12',
+            targetReps: '10-12',
             targetRpe: 8,
             restPeriodSeconds: 75,
-            notes: 'Controlled 3-second eccentric lowering phase.',
+            notes: 'Anterior core bracing and quad hypertrophy without spinal shear.',
             progression_rules: { metric: 'weight_lbs', trigger: 'complete_max_reps', increment_value: 10, action: '+10 lbs' }
           },
           {
-            id: 'tb-mon-box-jumps',
-            name: 'Box Jumps',
+            id: 'tb-tue-seated-box-jumps',
+            name: 'Seated-to-Box Jump (from 90-degree bench)',
             muscleGroup: 'Quads',
             type: 'strength',
             defaultSets: 4,
             targetReps: '4',
             targetRpe: 8.5,
             restPeriodSeconds: 90,
-            notes: 'Step down, reset; focus on soft landing mechanics (All Phases).'
+            notes: 'Eliminates stretch reflex; trains explosive get-up from cover (All Phases).'
           },
           {
-            id: 'tb-mon-superset',
-            name: 'Standing Calf Raises + Hanging Leg Raises',
+            id: 'tb-tue-superset',
+            name: 'Standing Calf Raises + Weighted Plank',
             muscleGroup: 'Core',
             type: 'superset',
             format: 'superset',
             defaultSets: 3,
-            targetReps: '12-15 / 12-15',
+            targetReps: '12-15 / 45 sec',
             targetRpe: 8.5,
             restPeriodSeconds: 60,
             supersetExercises: [
               { name: 'Standing Calf Raises', targetReps: '12-15', muscleGroup: 'Quads' },
-              { name: 'Hanging Leg Raises', targetReps: '12-15', muscleGroup: 'Core' }
+              { name: 'Weighted Plank', targetReps: '45 sec', muscleGroup: 'Core' }
             ],
-            notes: 'Superset: Full stretch at bottom of calf raise; no swinging on leg raises (All Phases).'
+            notes: 'Superset: Ankle stiffness for rucking + anti-extension trunk endurance (All Phases).'
           }
         ]
       },
       {
         day: 3,
-        focus: 'Tuesday: Speed & Combat Agility Conditioning (Track / Turf)',
+        focus: 'Tactical Speed & Bounding Conditioning (Track / Field)',
         exercises: [
           {
-            id: 'tb-tue-20m-starts',
-            name: '20m Falling-Start Sprints',
+            id: 'tb-wed-20m-prone-starts',
+            name: '20m Prone-to-Sprint Starts',
             muscleGroup: 'Full Body',
             type: 'cardio',
             defaultSets: 6,
             targetReps: '20m',
             targetRpe: 9,
             restPeriodSeconds: 90,
-            notes: 'Walk-back recovery (~90 sec rest). Field Fatigue Protocol: Swap sprints for 20-min Zone 2 flush.'
+            notes: '90s walk-back rest between starts. Focus on 3-5 second IMT rush mechanics.'
           },
           {
-            id: 'tb-tue-40m-buildup',
+            id: 'tb-wed-40m-buildup',
             name: '40m Build-Up Sprints',
             muscleGroup: 'Full Body',
             type: 'cardio',
@@ -1137,92 +1137,92 @@ export const INITIAL_PROGRAMS: WorkoutProgram[] = [
             notes: '85-90% effort, 2 min rest.'
           },
           {
-            id: 'tb-tue-sled-finisher',
-            name: '50m Sled Push Finisher',
+            id: 'tb-wed-sled-drag-finisher',
+            name: '40m Backwards Sled Drag Finisher (Casualty-Drag Simulation)',
             muscleGroup: 'Full Body',
             type: 'strength',
             defaultSets: 4,
-            targetReps: '50m',
-            targetRpe: 8,
+            targetReps: '40m',
+            targetRpe: 8.5,
             restPeriodSeconds: 60,
-            notes: 'Moderate load + 60 sec rest.'
+            notes: 'Casualty-drag simulation, 60 sec rest between rounds.'
           }
         ]
       },
       {
         day: 4,
-        focus: 'Wednesday: Upper Body — Pull & Combat Armor Posture',
+        focus: 'Upper Body — Yoke, Pull & Ruck Posture',
         exercises: [
           {
-            id: 'tb-wed-pullups',
-            name: 'Weighted Pull-Ups or Lat Pulldowns',
+            id: 'tb-thu-pullups',
+            name: 'Weighted Pull-Ups (Overhand / Tactical Grip)',
             muscleGroup: 'Back',
             type: 'strength',
             defaultSets: 4,
             targetReps: '8-10',
             targetRpe: 8,
             restPeriodSeconds: 120,
-            notes: 'Full scapular depression and chest-to-bar pull.',
+            notes: 'Wall/obstacle climb strength and lats for torso stabilization.',
             progression_rules: { metric: 'weight_lbs', trigger: 'complete_max_reps', increment_value: 5, action: '+5 lbs upper' }
           },
           {
-            id: 'tb-wed-row',
-            name: 'Chest-Supported T-Bar or Dumbbell Row',
+            id: 'tb-thu-row',
+            name: 'Chest-Supported T-Bar or Seal Row',
             muscleGroup: 'Back',
             type: 'strength',
             defaultSets: 4,
             targetReps: '10-12',
             targetRpe: 8,
             restPeriodSeconds: 75,
-            notes: 'Eliminates lower-back fatigue; squeeze shoulder blades.',
+            notes: 'Zero lower-back fatigue; builds mid-back thickness against kit pull.',
             progression_rules: { metric: 'weight_lbs', trigger: 'complete_max_reps', increment_value: 5, action: '+5 lbs' }
           },
           {
-            id: 'tb-wed-facepulls',
-            name: 'Face Pulls',
+            id: 'tb-thu-facepulls',
+            name: 'Face Pulls with External Rotation',
             muscleGroup: 'Shoulders',
             type: 'strength',
             defaultSets: 4,
             targetReps: '15',
             targetRpe: 8.5,
             restPeriodSeconds: 60,
-            notes: 'External rotation at peak contraction (All Phases).'
+            notes: 'Rotator cuff health for weapon manipulation and overhead carries (All Phases).'
           },
           {
-            id: 'tb-wed-shrugs',
-            name: 'Barbell or Heavy Dumbbell Shrugs',
+            id: 'tb-thu-shrugs',
+            name: 'Heavy Barbell or Trap-Bar Shrugs',
             muscleGroup: 'Back',
             type: 'strength',
             defaultSets: 3,
             targetReps: '10-12',
             targetRpe: 8,
             restPeriodSeconds: 60,
-            notes: '2-second pause at the top of each repetition (All Phases).'
+            notes: 'Builds upper-trap yoke to protect brachial plexus under heavy rucks (All Phases).'
           },
           {
-            id: 'tb-wed-superset',
+            id: 'tb-thu-superset',
             name: "Hammer Curls + Heavy Farmer's Carries",
             muscleGroup: 'Arms',
             type: 'superset',
             format: 'superset',
             defaultSets: 3,
-            targetReps: '10 / 40m',
+            targetReps: '10 / 50m',
             targetRpe: 8.5,
             restPeriodSeconds: 90,
             supersetExercises: [
               { name: 'Hammer Curls', targetReps: '10', muscleGroup: 'Arms' },
-              { name: "Heavy Farmer's Carries", targetReps: '40m', muscleGroup: 'Full Body' }
+              { name: "Heavy Farmer's Carries", targetReps: '50m', muscleGroup: 'Full Body' }
             ],
-            notes: 'Superset: Maintain tall posture and braced core on carries (All Phases).'
+            notes: 'Superset: Litter-carry grip stamina; keep ribs stacked over pelvis (All Phases).'
           }
         ]
       },
       {
         day: 5,
-        focus: 'Thursday: Lower Body — Posterior Chain & Top-End Speed',
+        focus: 'Lower Body — Posterior Chain & Casualty-Drag Power',
         exercises: [
           {
-            id: 'tb-thu-rdl',
+            id: 'tb-fri-rdl',
             name: 'Romanian Deadlift (Barbell or Dumbbell)',
             muscleGroup: 'Hamstrings & Glutes',
             type: 'strength',
@@ -1230,22 +1230,22 @@ export const INITIAL_PROGRAMS: WorkoutProgram[] = [
             targetReps: '8-10',
             targetRpe: 8,
             restPeriodSeconds: 120,
-            notes: 'Push hips back until deep hamstring tension; flat spine.',
+            notes: 'Eccentric hamstring resilience to prevent sprint pulls.',
             progression_rules: { metric: 'weight_lbs', trigger: 'complete_max_reps', increment_value: 10, action: '+10 lbs lower' }
           },
           {
-            id: 'tb-thu-sled',
-            name: 'Heavy Sled Push or Reverse Sled Drag',
+            id: 'tb-fri-sled',
+            name: 'Heavy Reverse Sled Drag + Forward Sled Sprint',
             muscleGroup: 'Quads',
             type: 'strength',
             defaultSets: 4,
-            targetReps: '30m',
+            targetReps: '25m rev + 25m fwd',
             targetRpe: 8.5,
             restPeriodSeconds: 90,
-            notes: '90 sec rest between trips; drive through balls of feet (All Phases).'
+            notes: '90s rest; direct Sprint-Drag-Carry metabolic conditioning (All Phases).'
           },
           {
-            id: 'tb-thu-leg-curl',
+            id: 'tb-fri-leg-curl',
             name: 'Lying or Seated Leg Curls',
             muscleGroup: 'Hamstrings & Glutes',
             type: 'strength',
@@ -1253,92 +1253,103 @@ export const INITIAL_PROGRAMS: WorkoutProgram[] = [
             targetReps: '12',
             targetRpe: 8,
             restPeriodSeconds: 75,
-            notes: 'Control the return phase; avoid hip lift.'
+            notes: '3-second controlled eccentric; isolate knee flexion.'
           },
           {
-            id: 'tb-thu-kb-swings',
-            name: 'Kettlebell Swings',
+            id: 'tb-fri-kb-swings',
+            name: 'Heavy Kettlebell Swings',
             muscleGroup: 'Hamstrings & Glutes',
             type: 'strength',
             defaultSets: 4,
             targetReps: '12',
             targetRpe: 8,
             restPeriodSeconds: 60,
-            notes: 'Explosive power hip snap; hinge, do not squat (All Phases).'
+            notes: 'Ballistic hip extension for sprinting and obstacle vaulting (All Phases).'
           },
           {
-            id: 'tb-thu-pallof',
-            name: 'Pallof Press',
+            id: 'tb-fri-pallof-legraise',
+            name: 'Pallof Press + Hanging Knee/Leg Raises',
             muscleGroup: 'Core',
-            type: 'strength',
+            type: 'superset',
+            format: 'superset',
             defaultSets: 3,
-            targetReps: '10/side',
-            targetRpe: 8,
+            targetReps: '10/side / 12',
+            targetRpe: 8.5,
             restPeriodSeconds: 60,
-            notes: 'Anti-rotation core stability; 2-second hold at full extension (All Phases).'
+            supersetExercises: [
+              { name: 'Pallof Press', targetReps: '10/side', muscleGroup: 'Core' },
+              { name: 'Hanging Knee/Leg Raises', targetReps: '12', muscleGroup: 'Core' }
+            ],
+            notes: 'Anti-rotation core stability under asymmetric weapon/pack loads (All Phases).'
           }
         ]
       },
       {
         day: 6,
-        focus: 'Friday: Athletic Conditioning & Arms ("Friday Pump + Engine")',
+        focus: 'Ruck Conditioning & Arm Hypertrophy ("Ruck + Arm Pump")',
         exercises: [
           {
-            id: 'tb-fri-ez-curls',
-            name: 'EZ-Bar Curls',
+            id: 'tb-sat-curls',
+            name: 'EZ-Bar or Dumbbell Bicep Curls',
             muscleGroup: 'Arms',
             type: 'strength',
             defaultSets: 3,
             targetReps: '10-12',
             targetRpe: 8.5,
             restPeriodSeconds: 60,
-            notes: 'Part A Arm & Core Hypertrophy (25 mins).'
+            notes: 'Part B — Arm & Rear-Delt Pump (25 mins).'
           },
           {
-            id: 'tb-fri-skullcrushers',
-            name: 'Skullcrushers or Overhead Cable Extension',
+            id: 'tb-sat-triceps',
+            name: 'Overhead Cable Tricep Extension or Skullcrushers',
             muscleGroup: 'Arms',
             type: 'strength',
             defaultSets: 3,
             targetReps: '10-12',
             targetRpe: 8.5,
             restPeriodSeconds: 60,
-            notes: 'Part A Arm & Core Hypertrophy.'
+            notes: 'Part B — Arm & Rear-Delt Pump.'
           },
           {
-            id: 'tb-fri-core',
-            name: 'Cable Crunches or Ab-Wheel Rollouts',
-            muscleGroup: 'Core',
-            type: 'strength',
+            id: 'tb-sat-pullaparts-hang',
+            name: 'Band Pull-Aparts + Dead Hang (Decompression)',
+            muscleGroup: 'Shoulders',
+            type: 'superset',
+            format: 'superset',
             defaultSets: 3,
-            targetReps: '12-15',
-            targetRpe: 8,
+            targetReps: '20 / 45 sec hang',
+            targetRpe: 7.5,
             restPeriodSeconds: 60,
-            notes: 'Part A Arm & Core Hypertrophy.'
+            supersetExercises: [
+              { name: 'Band Pull-Aparts', targetReps: '20', muscleGroup: 'Shoulders' },
+              { name: 'Dead Hang (Decompression)', targetReps: '45 sec', muscleGroup: 'Back' }
+            ],
+            notes: 'Decompress spine and restore shoulder posture post-ruck.'
           },
           {
-            id: 'tb-fri-zone2',
-            name: 'Zone 2 Run, Row, or Incline Treadmill Walk',
+            id: 'tb-sat-ruck',
+            name: 'Part A — Aerobic Ruck March (3–4 miles @ 35 lbs dry weight)',
             muscleGroup: 'Full Body',
             type: 'cardio',
             defaultSets: 1,
-            targetReps: '25-30 mins',
-            targetRpe: 6.5,
+            targetReps: '3 miles',
+            targetRpe: 7,
             restPeriodSeconds: 0,
-            pace: 'HR 130-145 BPM',
-            notes: 'Part B Aerobic Base / Operational Flush (25-30 mins): Heart rate 130-145 BPM — conversational pace.'
+            distance_miles: 3,
+            pace: '15:00/mile (Zone 2 HR 130-145 BPM)',
+            notes: 'Phase 1: 3-4 miles @ 35 lbs (15:00/mi) • Phase 2: 4-5 miles @ 45 lbs (14:30/mi) • Phase 3: 5-6 miles @ 45-55 lbs (14:00-14:30/mi). Deload Wks 4/8/12: 2-mile unweighted walk.'
           }
         ]
       },
       {
         day: 7,
-        focus: 'Saturday: Complete Rest (Optional DIME Restorative Flow)',
+        focus: 'Complete Rest & Garrison Prep',
         exercises: []
       }
     ],
     exercises: [
       {
-        id: 'tb-sun-incline-bench',
+        id: 'tb-mon-incline-bench',
         name: 'Incline Barbell or Dumbbell Bench Press',
         muscleGroup: 'Chest',
         type: 'strength',
@@ -1346,23 +1357,23 @@ export const INITIAL_PROGRAMS: WorkoutProgram[] = [
         targetReps: '8-10',
         targetRpe: 8,
         restPeriodSeconds: 120,
-        notes: 'Primary press; 2-sec controlled eccentric.',
+        notes: 'Builds upper-chest shelf for plate carriers; 2-sec eccentric.',
         progression_rules: { metric: 'weight_lbs', trigger: 'complete_max_reps', increment_value: 5, action: '+5 lbs upper next week' }
       },
       {
-        id: 'tb-sun-seated-ohp',
-        name: 'Seated Dumbbell Overhead Press',
+        id: 'tb-mon-standing-ohp',
+        name: 'Standing Barbell or Dumbbell Overhead Press',
         muscleGroup: 'Shoulders',
         type: 'strength',
         defaultSets: 3,
         targetReps: '10-12',
         targetRpe: 8,
         restPeriodSeconds: 75,
-        notes: 'Full range of motion; brace core without arch.',
-        progression_rules: { metric: 'weight_lbs', trigger: 'complete_max_reps', increment_value: 5, action: '+5 lbs DBs on top reps' }
+        notes: 'Strict overhead stability and trunk bracing under axial load.',
+        progression_rules: { metric: 'weight_lbs', trigger: 'complete_max_reps', increment_value: 5, action: '+5 lbs on top reps' }
       },
       {
-        id: 'tb-sun-dips-cgbp',
+        id: 'tb-mon-dips-cgbp',
         name: 'Weighted Dips or Close-Grip Bench Press',
         muscleGroup: 'Chest',
         type: 'strength',
@@ -1370,21 +1381,21 @@ export const INITIAL_PROGRAMS: WorkoutProgram[] = [
         targetReps: '10-12',
         targetRpe: 8,
         restPeriodSeconds: 75,
-        notes: 'Keep elbows tucked to protect shoulder capsule.'
+        notes: 'Tricep lockout strength for hand-release push-ups and obstacle climbs.'
       },
       {
-        id: 'tb-sun-medball-pass',
-        name: 'Explosive Med-Ball Chest Pass (against wall)',
+        id: 'tb-mon-medball-pass',
+        name: 'Explosive Med-Ball Chest Pass (from kneeling)',
         muscleGroup: 'Chest',
         type: 'strength',
         defaultSets: 4,
         targetReps: '5',
         targetRpe: 8.5,
         restPeriodSeconds: 60,
-        notes: 'Maximum velocity, full reset between throws.'
+        notes: 'Simulates prone-to-sprint push-off; max velocity per throw.'
       },
       {
-        id: 'tb-sun-superset',
+        id: 'tb-mon-superset',
         name: 'Lateral Raises + Cable Tricep Pushdowns',
         muscleGroup: 'Arms',
         type: 'superset',
@@ -1397,7 +1408,7 @@ export const INITIAL_PROGRAMS: WorkoutProgram[] = [
           { name: 'Lateral Raises', targetReps: '12-15', muscleGroup: 'Shoulders' },
           { name: 'Cable Tricep Pushdowns', targetReps: '12-15', muscleGroup: 'Arms' }
         ],
-        notes: 'Minimal rest between paired movements.'
+        notes: 'Medial delt armor and elbow tendon resilience.'
       }
     ]
   }

@@ -228,7 +228,7 @@ export const AbilityQuestionnaireModal: React.FC<AbilityQuestionnaireModalProps>
                         type="button"
                         onClick={() => {
                           setPreparingForPat(opt.id);
-                          if (isYes) {
+                          if (isYes && primaryGoalCategory !== 'aft_specific_testing') {
                             setPrimaryGoalCategory('universal_pat_testing');
                           }
                         }}

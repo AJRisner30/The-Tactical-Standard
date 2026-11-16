@@ -187,31 +187,45 @@ export function useUserTier(): UserTierState {
           planChosen = true;
         } else {
           const cloudTrial = cloudDocData?.trialActivation || cloudDocData?.trialState;
+          const localTrial = getAthleteTrialState(currentUser.uid || athlete?.id || 'officer', userEmail);
+          const candidateTrial = cloudTrial || localTrial;
 
-          if (isTestAccount && (!cloudTrial || cloudTrial.resetVersion !== 2 || (typeof cloudTrial.trialEndMs === 'number' && cloudTrial.trialEndMs <= Date.now()))) {
-            // Authorized test profile risnerathletics@gmail.com: reset with fresh 14-day Pro trial
-            const startedAtMs = Date.now();
-            resolvedTrialEndMs = startedAtMs + 14 * 24 * 60 * 60 * 1000;
-            effectiveTierRaw = 'pro';
-            effectiveStatusRaw = 'trialing';
-            planChosen = true;
-            const freshResetTrial = {
-              startedAtMs,
-              trialEndMs: resolvedTrialEndMs,
-              hasSelectedPlan: true,
-              tier: 'pro' as const,
-              status: 'trialing' as const,
-              resetVersion: 2,
-              resetAt: new Date().toISOString(),
-              note: 'Admin reset test account for continuous testing',
-            };
+          if (isTestAccount) {
+            if (
+              candidateTrial &&
+              candidateTrial.resetVersion === 2 &&
+              typeof candidateTrial.trialEndMs === 'number' &&
+              candidateTrial.trialEndMs > Date.now()
+            ) {
+              resolvedTrialEndMs = candidateTrial.trialEndMs;
+              effectiveTierRaw = 'pro';
+              effectiveStatusRaw = 'trialing';
+              planChosen = true;
+            } else {
+              // Authorized test profile risnerathletics@gmail.com: initialize fresh 14-day Pro trial without recursive event
+              const startedAtMs = Date.now();
+              resolvedTrialEndMs = startedAtMs + 14 * 24 * 60 * 60 * 1000;
+              effectiveTierRaw = 'pro';
+              effectiveStatusRaw = 'trialing';
+              planChosen = true;
+              const freshResetTrial = {
+                startedAtMs,
+                trialEndMs: resolvedTrialEndMs,
+                hasSelectedPlan: true,
+                tier: 'pro' as const,
+                status: 'trialing' as const,
+                resetVersion: 2,
+                resetAt: new Date().toISOString(),
+                note: 'Admin reset test account for continuous testing',
+              };
 
-            saveTrialActivationToFirestore(currentUser.uid, freshResetTrial).catch(() => {});
-            resetAthleteTrial(RESETTABLE_TEST_PROFILE_EMAIL, 14);
-            try {
-              localStorage.setItem(`${TRIAL_STORAGE_PREFIX}${userEmail.toLowerCase()}`, JSON.stringify(freshResetTrial));
-              localStorage.setItem(`${TRIAL_STORAGE_PREFIX}${currentUser.uid}`, JSON.stringify(freshResetTrial));
-            } catch {}
+              saveTrialActivationToFirestore(currentUser.uid, freshResetTrial).catch(() => {});
+              resetAthleteTrial(RESETTABLE_TEST_PROFILE_EMAIL, 14, false);
+              try {
+                localStorage.setItem(`${TRIAL_STORAGE_PREFIX}${userEmail.toLowerCase()}`, JSON.stringify(freshResetTrial));
+                localStorage.setItem(`${TRIAL_STORAGE_PREFIX}${currentUser.uid}`, JSON.stringify(freshResetTrial));
+              } catch {}
+            }
           } else if (cloudTrial && typeof cloudTrial.trialEndMs === 'number') {
             // Authentic trial record found in cloud Firestore!
             resolvedTrialEndMs = cloudTrial.trialEndMs;
@@ -228,32 +242,8 @@ export function useUserTier(): UserTierState {
               localStorage.setItem(`${TRIAL_STORAGE_PREFIX}${currentUser.uid}`, JSON.stringify(cloudTrial));
             } catch {}
           } else {
-            if (isTestAccount) {
-              const startedAtMs = Date.now();
-              resolvedTrialEndMs = startedAtMs + 14 * 24 * 60 * 60 * 1000;
-              effectiveTierRaw = 'pro';
-              effectiveStatusRaw = 'trialing';
-              planChosen = true;
-              const freshResetTrial = {
-                startedAtMs,
-                trialEndMs: resolvedTrialEndMs,
-                hasSelectedPlan: true,
-                tier: 'pro' as const,
-                status: 'trialing' as const,
-                resetVersion: 2,
-                resetAt: new Date().toISOString(),
-                note: 'Admin reset test account for continuous testing',
-              };
-              saveTrialActivationToFirestore(currentUser.uid, freshResetTrial).catch(() => {});
-              resetAthleteTrial(RESETTABLE_TEST_PROFILE_EMAIL, 14);
-              try {
-                localStorage.setItem(`${TRIAL_STORAGE_PREFIX}${userEmail.toLowerCase()}`, JSON.stringify(freshResetTrial));
-                localStorage.setItem(`${TRIAL_STORAGE_PREFIX}${currentUser.uid}`, JSON.stringify(freshResetTrial));
-              } catch {}
-            } else {
-              // Fallback: check local storage for existing trial for this user
-              const localTrial = getAthleteTrialState(currentUser.uid || athlete?.id || 'officer', userEmail);
-              if (localTrial && localTrial.hasSelectedPlan && typeof localTrial.trialEndMs === 'number') {
+            // Fallback: check local storage for existing trial for this user
+            if (localTrial && localTrial.hasSelectedPlan && typeof localTrial.trialEndMs === 'number') {
                 resolvedTrialEndMs = localTrial.trialEndMs;
                 effectiveTierRaw = localTrial.tier || 'pro';
                 const isExpired = Date.now() >= resolvedTrialEndMs;
@@ -300,7 +290,6 @@ export function useUserTier(): UserTierState {
                   localStorage.setItem(`${TRIAL_STORAGE_PREFIX}${currentUser.uid}`, JSON.stringify(freshTrial));
                 } catch {}
               }
-            }
           }
         }
       }

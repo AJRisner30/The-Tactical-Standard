@@ -373,7 +373,7 @@ function cleanCachedMasterAdaptedProgram(program: WorkoutProgram): WorkoutProgra
     );
 
     if (program.baseProgramKey === 'tactical_hypertrophy') {
-      // On Tuesday (Track / Turf), remove any duplicate summary adapt-run item since the individual sprints are already in exercises
+      // On Day 3 (Track / Field), remove any duplicate summary adapt-run item since the individual sprints are already in exercises
       filtered = filtered.filter((ex) => {
         if (ex.id.startsWith('adapt-run-')) {
           const n = ex.name.toLowerCase();
@@ -388,7 +388,7 @@ function cleanCachedMasterAdaptedProgram(program: WorkoutProgram): WorkoutProgra
         return true;
       });
 
-      // On Friday (Pump + Engine), if both a strength-parsed Zone 2 item and an adapt-run Zone 2 item exist, keep only one
+      // On Day 6 (Ruck + Pump), if both a strength-parsed Zone 2 item and an adapt-run Zone 2 item exist, keep only one
       const zone2Items = filtered.filter((ex) => ex.name.toLowerCase().includes('zone 2'));
       if (zone2Items.length > 1) {
         let keptFirstZone2 = false;
@@ -444,8 +444,15 @@ function cleanCachedMasterAdaptedProgram(program: WorkoutProgram): WorkoutProgra
       notes: ex.notes ? normalizeMilesText(ex.notes) : ex.notes,
     }));
 
+    const cleanedFocus = day.focus
+      ? day.focus
+          .replace(/\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday):\s*/gi, '')
+          .replace(/•\s*(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday):\s*/gi, '• ')
+      : day.focus;
+
     return {
       ...day,
+      focus: cleanedFocus,
       conditioning: day.conditioning ? normalizeMilesText(day.conditioning) : day.conditioning,
       exercises: normalizedExercises,
     };

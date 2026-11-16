@@ -66,6 +66,21 @@
             e.preventDefault();
           }
         }, true);
+        // Immediately purge any stale Service Worker or poisoned Cache Storage entries
+        if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            for (var i = 0; i < registrations.length; i++) {
+              registrations[i].unregister().catch(function() {});
+            }
+          }).catch(function() {});
+        }
+        if (typeof window !== 'undefined' && 'caches' in window) {
+          window.caches.keys().then(function(keys) {
+            for (var j = 0; j < keys.length; j++) {
+              window.caches.delete(keys[j]).catch(function() {});
+            }
+          }).catch(function() {});
+        }
       })();
     </script>
     <title>The Tactical Standard | Military Combat Fitness &amp; Readiness</title>
@@ -95,8 +110,20 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;0,900;1,700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   </head>
-  <body>
-    <div id="root"></div>
+  <body style="margin:0;background-color:#090b0d;color:#f4f4f5;font-family:'Outfit',system-ui,sans-serif;">
+    <div id="root">
+      <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;background:#090b0d;color:#f4f4f5;">
+        <div style="width:56px;height:56px;border-radius:16px;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.45);display:flex;align-items:center;justify-content:center;margin-bottom:16px;font-weight:900;color:#fbbf24;font-size:20px;letter-spacing:1px;">
+          TS
+        </div>
+        <div style="font-size:20px;font-weight:900;letter-spacing:1.5px;text-transform:uppercase;color:#ffffff;">
+          The Tactical <span style="color:#fbbf24;">Standard</span>
+        </div>
+        <div style="font-size:12px;color:#a1a1aa;margin-top:6px;letter-spacing:1px;text-transform:uppercase;">
+          Loading Military Combat Fitness &amp; Readiness Deck...
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -57,7 +57,7 @@ export const RESETTABLE_TEST_PROFILE_EMAIL = 'risnerathletics@gmail.com';
  * Resets the 14-day free trial exclusively for the authorized test profile (risnerathletics@gmail.com).
  * Normal user accounts will NEVER be reset and will remain locked upon expiration.
  */
-export function resetAthleteTrial(targetEmailOrId = RESETTABLE_TEST_PROFILE_EMAIL, days = 14) {
+export function resetAthleteTrial(targetEmailOrId = RESETTABLE_TEST_PROFILE_EMAIL, days = 14, emitEvent = false) {
   const startedAtMs = Date.now();
   const trialEndMs = startedAtMs + days * 24 * 60 * 60 * 1000;
   const trialState = {
@@ -80,9 +80,12 @@ export function resetAthleteTrial(targetEmailOrId = RESETTABLE_TEST_PROFILE_EMAI
 
     try {
       const athletes = getAthletes();
-      for (const a of athletes) {
+      let changed = false;
+      for (let i = 0; i < athletes.length; i++) {
+        const a = athletes[i];
         if ((a.email && a.email.trim().toLowerCase() === norm) || a.id === targetEmailOrId) {
-          updateAthleteProfile(a.id, {
+          athletes[i] = {
+            ...a,
             trialState,
             trialActivation: {
               code: 'TEST_RESET',
@@ -95,14 +98,20 @@ export function resetAthleteTrial(targetEmailOrId = RESETTABLE_TEST_PROFILE_EMAI
               status: 'trialing' as const,
               resetVersion: 2,
             },
-          });
+          };
+          changed = true;
         }
+      }
+      if (changed) {
+        localStorage.setItem(ATHLETES_KEY, JSON.stringify(athletes));
       }
     } catch {}
 
-    try {
-      window.dispatchEvent(new CustomEvent('trial_state_changed', { detail: trialState }));
-    } catch {}
+    if (emitEvent) {
+      try {
+        window.dispatchEvent(new CustomEvent('trial_state_changed', { detail: trialState }));
+      } catch {}
+    }
   }
 
   return trialState;
@@ -139,8 +148,8 @@ export function getAthleteTrialState(athleteId: string, email?: string): {
         }
       } catch {}
     }
-    // Automatically reset and initialize fresh 14 days for test account
-    return resetAthleteTrial(RESETTABLE_TEST_PROFILE_EMAIL, 14);
+    // Automatically reset and initialize fresh 14 days for test account (without firing recursive event)
+    return resetAthleteTrial(RESETTABLE_TEST_PROFILE_EMAIL, 14, false);
   }
 
   try {
@@ -175,7 +184,7 @@ export function startAthleteFreeTrial(athleteId: string, days = 14, email?: stri
 } {
   const isTestAccount = email && email.trim().toLowerCase() === RESETTABLE_TEST_PROFILE_EMAIL;
   if (isTestAccount) {
-    return resetAthleteTrial(RESETTABLE_TEST_PROFILE_EMAIL, days);
+    return resetAthleteTrial(RESETTABLE_TEST_PROFILE_EMAIL, days, true);
   }
 
   const existing = getAthleteTrialState(athleteId, email);
@@ -309,13 +318,8 @@ export function getSelectableAthletes(allowAdminRoster = false): AthleteProfile[
   const all = getAthletes();
   return all.filter((a) => {
     if (a.id === 'athlete-aj-risner') return false;
-    const lower = (a.name || '').toLowerCase();
     const emailLower = (a.email || '').toLowerCase();
-    if (
-      lower.includes('aryan') ||
-      lower.includes('risner') ||
-      emailLower.includes('risneraryan')
-    ) {
+    if (emailLower === 'risneraryan@gmail.com') {
       return false;
     }
     return true;
@@ -360,8 +364,8 @@ export function getCurrentAthlete(): AthleteProfile {
   const athletes = getAthletes();
   const found = athletes.find((a) => a.id === currentId);
   if (found) {
-    const lower = found.name.toLowerCase();
-    if ((lower.includes('aryan') || lower.includes('risner')) && !isCoachSession()) {
+    const emailLower = (found.email || '').toLowerCase();
+    if (emailLower === 'risneraryan@gmail.com' && !isCoachSession()) {
       localStorage.setItem(CURRENT_ATHLETE_KEY, DEFAULT_ATHLETES[0].id);
       return DEFAULT_ATHLETES[0];
     }

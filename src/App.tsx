@@ -185,7 +185,7 @@ export default function App() {
     if (storedKey === 'hybrid_db') {
       return 'hybrid_protocol';
     }
-    if (storedKey && ['apex_protocol', 'tactical_hypertrophy', 'hybrid_protocol', 'universal_pat'].includes(storedKey)) {
+    if (storedKey && ['apex_protocol', 'tactical_hypertrophy', 'hybrid_protocol', 'aft_protocol', 'universal_pat'].includes(storedKey)) {
       return storedKey as ProgramKey;
     }
     if (getStoredActiveCustomAIProgram()) {
@@ -351,7 +351,8 @@ export default function App() {
         setIsAthleteCloudLoaded(true);
       } else {
         const athleteName = user.displayName || user.email?.split('@')[0] || 'Service Member';
-        const athleteEmail = user.email || '';
+        const athleteEmail = (user.email || '').trim().toLowerCase();
+        const existingLocal = getCurrentAthlete();
         const initialTrial = {
           code: 'INITIAL_14D',
           activatedAt: new Date().toISOString(),
@@ -362,17 +363,29 @@ export default function App() {
           tier: 'pro' as const,
           status: 'trialing' as const,
         };
-        const newAthlete = registerAthlete({
-          name: athleteName,
-          email: athleteEmail,
-          experienceLevel: 'Intermediate',
-          primaryGoal: 'Tactical Conditioning & Pursuit',
-          weightLbs: 185,
-        });
-        newAthlete.trialActivation = initialTrial;
-        newAthlete.trialState = initialTrial;
-        setCurrentAthlete(newAthlete);
-        saveAthleteToFirestore(newAthlete, user.uid).catch((err) => {
+
+        let targetAthlete: AthleteProfile;
+        if (existingLocal && existingLocal.email && existingLocal.email.trim().toLowerCase() === athleteEmail) {
+          targetAthlete = {
+            ...existingLocal,
+            trialActivation: existingLocal.trialActivation || initialTrial,
+            trialState: existingLocal.trialState || initialTrial,
+          };
+          updateAthleteProfile(targetAthlete.id, targetAthlete);
+        } else {
+          const newAthlete = registerAthlete({
+            name: athleteName,
+            email: athleteEmail,
+            experienceLevel: 'Intermediate',
+            primaryGoal: 'Tactical Conditioning & Pursuit',
+            weightLbs: 185,
+          });
+          newAthlete.trialActivation = initialTrial;
+          newAthlete.trialState = initialTrial;
+          targetAthlete = newAthlete;
+        }
+        setCurrentAthlete(targetAthlete);
+        saveAthleteToFirestore(targetAthlete, user.uid).catch((err) => {
           console.warn('[Firebase] Initial athlete save note:', err);
         });
         setIsAthleteCloudLoaded(true);

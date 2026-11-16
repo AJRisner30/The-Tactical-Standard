@@ -238,7 +238,7 @@ export function subscribeToCoachWorkoutLogs(
  * Removes legacy fictitious mock coach logs from Firestore
  */
 export async function cleanUpLegacyMockCoachLogs(): Promise<void> {
-  if (!auth.currentUser) return;
+  if (!auth.currentUser || auth.currentUser.email?.trim().toLowerCase() !== 'risneraryan@gmail.com') return;
   const legacyIds = [
     'coach-log-combat-chassis-lower',
     'coach-log-vest-conditioning',
@@ -332,8 +332,8 @@ export async function saveAthleteToFirestore(
     const cleanAthlete: any = {
       id: userId,
       userId,
-      name: athlete.name.slice(0, 100),
-      email: (athlete.email || '').slice(0, 150),
+      name: (athlete.name || 'Service Member').slice(0, 100),
+      email: (athlete.email || auth.currentUser.email || '').slice(0, 150),
       avatarColor: (athlete.avatarColor || 'from-amber-600 to-slate-900').slice(0, 80),
       joinedDate: (athlete.joinedDate || new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })).slice(0, 40),
       experienceLevel: athlete.experienceLevel || 'Intermediate',
@@ -377,6 +377,7 @@ export async function saveAthleteToFirestore(
 
 /**
  * Saves or updates trial activation record in Firestore with merge protection
+ * Includes required athlete fields so creating a new athlete doc satisfies isValidAthlete rules.
  */
 export async function saveTrialActivationToFirestore(
   userId: string,
@@ -386,7 +387,15 @@ export async function saveTrialActivationToFirestore(
   const path = `athletes/${userId}`;
   try {
     const cleanTrial = sanitizeForFirestore(trialActivation);
+    const email = (auth.currentUser.email || '').slice(0, 150);
+    const defaultName = (auth.currentUser.displayName || email.split('@')[0] || 'Service Member').slice(0, 100);
     await setDoc(doc(db, 'athletes', userId), {
+      id: userId,
+      userId,
+      name: defaultName,
+      email,
+      experienceLevel: 'Intermediate',
+      primaryGoal: 'Hybrid Athlete',
       trialActivation: cleanTrial,
       trialState: cleanTrial,
       updatedAt: new Date().toISOString(),

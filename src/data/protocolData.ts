@@ -578,20 +578,20 @@ export function parseExerciseString(exerciseStr: string): ParsedExercise {
 }
 
 // ---------------------------------------------------------------------------
-// MILITARY 52-WEEK COMBAT FITNESS & READINESS PROGRAM
-// A Year-Long Guide to Combat Sprint Speed, Close-Combat Strength, Back Health & Operational Resilience
+// MILITARY 52-WEEK FITNESS & READINESS PROGRAM
+// A Year-Long Guide to Building Strength, Endurance, Power & Injury Resilience
 // ---------------------------------------------------------------------------
 export const DIME_WARMUP_TEXT =
-  'Mandatory 10-Minute DIME Warm-Up (Do Before Every Workout): 1) Bodyweight Squats (10 reps), 2) Squat Jumps (8 reps), 3) Forward Lunges (8 reps/leg), 4) Side Plank (20 sec/side), 5) Push-Ups (10 reps), 6) Single-Leg Reach (6 reps/leg), 7) Side Hop to Balance (6 hops/side), 8) Ice Skaters Lateral (8/side), 9) "L" Hops Forward/Side (5 hops/leg). Cool-Down (5–10 Mins): Light walking + 20–30s static stretches for hip flexors, hamstrings, calves, and chest.';
+  'Mandatory 10-Minute DIME Warm-Up (Do Before Every Workout): 1) Bodyweight Squats (10 reps), 2) Squat Jumps (8 reps), 3) Forward Lunges (8 reps/leg), 4) Side Plank (20 sec/side), 5) Push-Ups (10 reps), 6) Single-Leg Reach (6 reps/leg), 7) Side Hop to Balance (6 hops/side), 8) Ice Skaters Lateral (8/side), 9) "L" Hops Forward/Side (5 hops/leg). Cool-Down (5–10 Mins): Light walking + 20–30s static stretches for calves, hamstrings, hips, and chest.';
 
 export const APEX_PROTOCOL_PHASES: Record<string, ProtocolPhase> = {
   apex_phase1: {
     id: 'apex_phase1',
-    title: 'Quarter 1 (Weeks 1–13): Aerobic Base, Posture & Core Stability',
+    title: 'Quarter 1 (Weeks 1–13): Aerobic Base & Movement Foundation',
     weeks: 'Weeks 1–13',
-    desc: 'Build a solid cardiovascular running foundation (4 runs/week), undo tight hips and rounded shoulders from ruck carriage and tactical vehicle transit, and strengthen core stability. Lower weights slowly (3 seconds down).',
+    desc: 'Build a strong cardiovascular running base (3–4 runs/week), master proper lifting form, and strengthen tendons and joints. Lower weights slowly (3 seconds down).',
     coachRule:
-      'Quarter 1 Progression Rules: 1) Reps First (Double Progression) — Start at the low end of every set and rep range (e.g., 3 sets of 10 reps on 3-4x10-12). Add 1–2 reps per set each session until hitting the top of the rep range with 1–2 RIR. 2) Weight Second — Add +2.5–5 lbs (upper body) or +5–10 lbs (lower body) and reset to the bottom of the rep range. 3) Sets Third — Progress from 3 sets to 4 sets once recovery is proven. Every 4th week (Weeks 4, 8, 12) is a Deload Week (-40% sets & run distance). Week 13 is Benchmark Testing.',
+      'Quarter 1 Progression Rules: 1) Reps First (Double Progression) — Start at the low end of every set and rep range (e.g., 3 sets of 10 reps on 3-4x10-12). Add 1–2 reps per set each week until hitting the top of the rep range with 1–2 RIR. 2) Weight Second — Add +2.5–5 lbs (upper body) or +5–10 lbs (lower body) and drop back to the bottom of the rep range. 3) Sets Third — Perform 3 sets in Week 1, 4 sets in Weeks 2–3, and 2 sets on Week 4 (Deload). 4) Cardio & Rucks — Never increase ruck weight, running distance, and running speed in the same week (<=10% distance/wk). Deload (-40% sets & run distance) on Weeks 4, 8, 12. Benchmark Test on Week 13.',
     days: [
       {
         day: 'Day 1',
@@ -599,173 +599,169 @@ export const APEX_PROTOCOL_PHASES: Record<string, ProtocolPhase> = {
         warmup: DIME_WARMUP_TEXT,
         strength: [
           'Goblet Squat or Back Squat (to parallel) (3-4x10-12) [Overload: Start at 3 sets x 10 reps; build to 12 reps then +5-10 lbs - Effort: Moderate (RPE 7) - Rest: 90s - Lower slowly (3s down), thighs parallel, flat braced back]',
-          'Trap-Bar Deadlift or Dumbbell RDL (3-4x10-12) [Overload: Start at 3 sets x 10 reps; build to 12 reps then +5-10 lbs - Effort: Moderate (RPE 7) - Rest: 90s - Lower slowly (3s down)]',
-          'Reverse Lunges (3x10/leg) [Overload: Start at 3 sets x 10/leg; add light DBs once stable - Effort: Bodyweight / Light DBs (RPE 7) - Rest: 60s]',
-          'McGill Curl-Up + Side Plank + Bird Dog (3x10 sec holds each) [Effort: Bodyweight (RPE 7) - Rest: 45s - Spine-safe core bracing; never do straight-leg sit-ups]'
+          'Romanian Deadlift (RDL) (3-4x10-12) [Overload: Start at 3 sets x 10 reps; build to 12 reps then +5-10 lbs - Effort: Moderate (RPE 7) - Rest: 90s - Lower slowly (3s down)]',
+          'Forward or Reverse Lunges (3x10/leg) [Overload: Start at 3 sets x 10/leg; add light DBs once stable - Effort: Bodyweight / Light DBs (RPE 7) - Rest: 60s]',
+          'Front Plank + Glute Bridges (3x30 sec / 15 reps) [Effort: Bodyweight (RPE 7) - Rest: 45s - Spine-safe core bracing; skip sit-ups and twisting crunches]'
         ],
-        run: 'Post-Lift Aerobic Run: 2 miles (1 set)',
+        run: 'Post-Lift Aerobic Run: 3,200m (2 miles) (1 set)',
         pace: 'Easy Conversational Pace (Rest: 0s)',
-        progressionRule: 'Start at 3 sets x 10 reps (RPE 7, 3s eccentric). Build to 12 reps across all sets before adding +5–10 lbs. Post-Lift Run: 2 miles easy conversational pace.'
+        progressionRule: 'Start at 3 sets x 10 reps (RPE 7, 3s eccentric). Build to 12 reps across all sets before adding +5–10 lbs. Post-Lift Run: 3,200m (2 miles) easy conversational pace.'
       },
       {
         day: 'Day 2',
-        focus: 'Cardio Endurance & Tempo Running',
+        focus: 'Cardio Base & Aerobic Endurance',
         warmup: DIME_WARMUP_TEXT,
         strength: [],
-        run: 'Steady Aerobic Run (build distance weekly): 2.5–3 miles (start at 2.5 miles)',
+        run: 'Steady Aerobic Run (build distance weekly): 4,800–6,400m (3–4 miles)',
         pace: 'Conversational Pace (Rest: 0s)',
-        progressionRule: 'Start at 2.5 miles and build distance by no more than 10% per week up to 3 miles.'
+        progressionRule: 'Start at 4,800m (3 miles) and build distance by no more than 10% per week up to 6,400m (4 miles).'
       },
       {
         day: 'Day 3',
-        focus: 'Upper-Body Strength & Grappling Grip',
+        focus: 'Upper-Body Strength & Core',
         warmup: DIME_WARMUP_TEXT,
         strength: [
-          'Dumbbell Bench Press or Push-Ups (3-4x10-12) [Overload: Start at 3 sets x 10 reps; build to 12 reps then +2.5-5 lbs - Effort: Moderate (RPE 7) - Rest: 90s - Lower slowly (3s down)]',
-          'Chin-Ups (or Band-Assisted Pull-Ups) (4x6-8) [Overload: Start at 4 sets x 6 reps; build to 8 reps across all sets - Effort: Bodyweight / Band (RPE 7) - Rest: 90s]',
-          'Seated or Standing Dumbbell Shoulder Press (3x10-12) [Overload: Start at 3 sets x 10 reps; build to 12 reps then +2.5-5 lbs - Effort: Moderate (RPE 7) - Rest: 90s - Lower slowly (3s down)]',
-          'Single-Arm Dumbbell Row + Band Pull-Aparts (3x10/arm + 15 reps) [Overload: Start at 3 sets x 10/arm + 15 pull-aparts; +2.5-5 lbs DB when crisp - Effort: Moderate / Light (RPE 7) - Rest: 60s]'
+          'Dumbbell or Barbell Bench Press (3-4x10-12) [Overload: Start at 3 sets x 10 reps; build to 12 reps then +2.5-5 lbs - Effort: Moderate (RPE 7) - Rest: 90s - Lower slowly (3s down)]',
+          'Pull-Ups (or Band-Assisted / Flexed Hang) (4x5-8) [Overload: Start at 4 sets x 5 reps (or 20s hang); build to 8 reps across all sets - Effort: Bodyweight (RPE 7) - Rest: 90s]',
+          'Standing Dumbbell Shoulder Press (3x10-12) [Overload: Start at 3 sets x 10 reps; build to 12 reps then +2.5-5 lbs - Effort: Moderate (RPE 7) - Rest: 90s - Lower slowly (3s down)]',
+          'Chest-Supported Row + Band Pull-Aparts (3x12 reps each) [Overload: +2.5-5 lbs on 3x12 row when crisp - Effort: Moderate / Light (RPE 7) - Rest: 60s]'
         ],
         run: 'Rest from running',
         pace: 'N/A',
-        progressionRule: 'DB Bench & Shoulder Press: Start at 3x10 (RPE 7), build to 12 reps then +2.5–5 lbs. Chin-Ups: Start at 4x6, build to 4x8.'
+        progressionRule: 'Bench & Shoulder Press: Start at 3x10 (RPE 7), build to 12 reps then +2.5–5 lbs. Pull-Ups: Start at 4x5 (or 20s hang), build to 4x8.'
       },
       {
         day: 'Day 4',
-        focus: 'Mid-Week Steady Run & Hip Mobility',
+        focus: 'Mid-Week Aerobic Run & Mobility',
         warmup: DIME_WARMUP_TEXT,
         strength: [],
-        run: 'Steady Aerobic Run + 10-Min Hip Mobility: 2.5 miles (1 set)',
+        run: 'Steady Aerobic Run + 10-Min Mobility: 4,800m (3 miles) (1 set)',
         pace: 'Easy Conversational Pace (Rest: 0s)',
-        progressionRule: '2.5-mile easy conversational run followed by 10 minutes of hip mobility to undo vehicle transit and ruck stiffness.'
+        progressionRule: '4,800m (3 miles) easy conversational Zone 2 run followed by 10 minutes of foam rolling and mobility.'
       },
       {
         day: 'Day 5',
-        focus: 'Sprint Speed, Agility & Combat Conditioning Circuit (Full Body + Run)',
+        focus: 'Full-Body Power & Conditioning',
         warmup: DIME_WARMUP_TEXT,
         strength: [
           'Two-Arm Kettlebell Swings (4x15) [Overload: +5 lbs KB when 4x15 is explosive - Effort: Moderate KB (RPE 7) - Rest: 60s]',
-          'Lateral Lunges (side-to-side hip strength) (3x8/side) [Overload: Start bodyweight/light DBs; +2.5-5 lbs - Effort: Bodyweight / Light DBs (RPE 7) - Rest: 60s]',
-          'Half-Kneeling Pallof Press (Anti-Rotation) (3x12/side) [Effort: Moderate Band/Cable (RPE 7) - Rest: 60s]',
-          'One-Arm Suitcase Carry (3x25m/arm) [Overload: +5 lbs DB/KB when posture stays vertical - Effort: Moderate Dumbbell/KB (RPE 7) - Rest: 60s]'
+          'Box Step-Ups (knee at 90 degrees) (3x10/leg) [Overload: Start bodyweight/light DBs; +2.5-5 lbs - Effort: Bodyweight / Light DBs (RPE 7) - Rest: 60s]',
+          'Strict Push-Ups (3x12-15) [Overload: Start at 3 sets x 12 reps; build to 15 reps across all sets - Effort: Bodyweight (RPE 7) - Rest: 60s]',
+          "Farmer's Carry + Bird Dogs (3x30m / 8 per side) [Overload: +5 lbs DBs when posture stays vertical - Effort: Moderate Dumbbells (RPE 7) - Rest: 60s]"
         ],
-        run: 'Easy Finisher Run: 1.5 miles (1 set)',
-        pace: 'Easy Pace (Rest: 0s)',
-        progressionRule: 'Complete all 4 full-body & anti-rotation core drills at RPE 7, then finish with a 1.5-mile Easy Finisher Run.'
+        run: 'Rest from running',
+        pace: 'N/A',
+        progressionRule: 'Complete all 4 full-body power, step-up, push-up, and loaded carry + bird-dog core blocks at RPE 7.'
       },
       {
         day: 'Day 6',
-        focus: 'Rest & Shift Recovery',
-        warmup: 'None — Focus on 7–9 hours of dark, cool sleep and meal prep for upcoming shifts.',
-        strength: [
-          'Rest & Shift Recovery: Focus on 7–9 hours of dark, cool sleep and meal prep (0.75–1.0g lean protein per lb of bodyweight).'
-        ],
-        run: 'Rest & Shift Recovery',
-        pace: 'N/A',
-        progressionRule: 'Prioritize 7–9 hours of sleep, hydration, and high-protein shift meal prep.'
+        focus: 'Entry Ruck March (Flat to Rolling Hills)',
+        warmup: DIME_WARMUP_TEXT,
+        strength: [],
+        run: 'Entry Ruck March (Flat to Rolling Hills): 3,200–4,800m (2–3 miles) (1 set)',
+        pace: '35 lb pack (5–6 km/h brisk pace — add distance first; only add +5–10 lbs pack weight on a week distance stays the same)',
+        progressionRule: 'Start at 3,200m (2 miles) with a 35 lb pack at 5–6 km/h. Build toward 4,800m (3 miles); never increase pack weight and distance in the same week.'
       },
       {
         day: 'Day 7',
-        focus: 'Rest & Shift Recovery',
-        warmup: 'None — Focus on 7–9 hours of dark, cool sleep and meal prep for upcoming shifts.',
+        focus: 'Complete Rest & Recovery',
+        warmup: 'None — Full physical and mental recovery; prioritize 7–9 hours of dark, cool sleep.',
         strength: [
-          'Rest & Shift Recovery: Focus on 7–9 hours of dark, cool sleep, hydration, and meal prep for upcoming shifts.'
+          'Complete Rest: Full physical and mental recovery; prioritize 7–9 hours of sleep, hydration, and meal prep (0.75–1.0g lean protein per lb of bodyweight).'
         ],
-        run: 'Rest & Shift Recovery',
+        run: 'Complete Rest',
         pace: 'N/A',
-        progressionRule: 'Complete physiological & nervous system recovery before next training week.'
+        progressionRule: 'Complete physiological & nervous system recovery before Day 1 Lower-Body Strength + Run.'
       }
     ]
   },
   apex_phase2: {
     id: 'apex_phase2',
-    title: 'Quarter 2 (Weeks 14–26): Running Stamina & Grappling Strength',
+    title: 'Quarter 2 (Weeks 14–26): Running Stamina & Base Strength',
     weeks: 'Weeks 14–26',
-    desc: 'Increase running stamina with 100m–400m tempo/interval sessions and 3–4 mile runs while building lean muscle and grip strength for ground control.',
+    desc: 'Expand aerobic and threshold running capacity with 400m–800m track intervals and 6,400–8,000m (4–5 mile) runs while building base barbell strength.',
     coachRule:
-      'Quarter 2 Progression Rules: Start at 6 reps on 4x6-8 compound lifts at Challenging Effort (RPE 8). Build to 8 reps across all 4 sets before adding +2.5–5 lbs (upper) or +5–10 lbs (lower). Never increase vest weight, running distance, and running speed in the same week. Deload (-40% volume) on Weeks 16, 20, 24. Benchmark Test on Week 26.',
+      'Quarter 2 Progression Rules: Start at the low end of set and rep ranges (e.g., 4 sets x 6 reps on 4-5x6-8 Back Squat & Bench Press) at Challenging Effort (RPE 8). Build to 8 reps across all sets before adding +2.5–5 lbs (upper) or +5–10 lbs (lower). Never increase ruck weight, running distance, and running speed in the same week. Deload (-40% volume) on Weeks 16, 20, 24. Benchmark Test on Week 26.',
     days: [
       {
         day: 'Day 1',
         focus: 'Lower-Body Strength + Post-Lift Aerobic Run',
         warmup: DIME_WARMUP_TEXT,
         strength: [
-          'Barbell Back Squat (parallel depth) (4x6-8) [Overload: Start at 4 sets x 6 reps; build to 8 reps then +5-10 lbs - Effort: Challenging (RPE 8) - Rest: 120s (2-3 min)]',
-          'Conventional or Sumo Barbell Deadlift (4x6) [Overload: +5-10 lbs on 4x6 with clean bar speed - Effort: Challenging (RPE 8) - Rest: 120s (2-3 min)]',
+          'Barbell Back Squat (parallel depth) (4-5x6-8) [Overload: Start at 4 sets x 6 reps; build to 8 reps then +5-10 lbs, then 5th set - Effort: Challenging (RPE 8) - Rest: 120s (2-3 min)]',
+          'Conventional or Trap-Bar Deadlift (4x6) [Overload: +5-10 lbs on 4x6 with clean bar speed - Effort: Challenging (RPE 8) - Rest: 120s (2-3 min)]',
           'Bulgarian Split Squat (rear foot elevated) (3x8/leg) [Overload: +5 lbs DBs when 3x8/leg is solid - Effort: Moderate Dumbbells (RPE 8) - Rest: 90s]',
-          'Tall-Kneeling Pallof Press + Glute Bridge (3x10/side + 15 reps) [Effort: Moderate Band/Cable (RPE 8) - Rest: 60s]'
+          'Pallof Press (Anti-Rotation) + Hanging Knee Raise (3x10/side + 12 reps) [Effort: Moderate Band/Cable (RPE 8) - Rest: 60s]'
         ],
-        run: 'Post-Lift Aerobic Run: 2 miles (1 set)',
+        run: 'Post-Lift Aerobic Run: 3,200m (2 miles) (1 set)',
         pace: 'Easy Recovery Pace (Rest: 0s)',
-        progressionRule: 'Back Squat: Start at 4x6 (RPE 8), build to 4x8 then +5–10 lbs. Deadlift: 4x6 at RPE 8. Finish with 2-mile easy recovery run.'
+        progressionRule: 'Back Squat: Start at 4x6 (RPE 8), build to 8 reps then +5–10 lbs. Deadlift: 4x6 at RPE 8. Finish with 3,200m (2 miles) easy recovery run.'
       },
       {
         day: 'Day 2',
-        focus: 'Cardio Endurance: 100m Tempo Runs & Vest Conditioning',
+        focus: 'Cardio Intervals & Speed Endurance (400m Repeats)',
         warmup: DIME_WARMUP_TEXT,
         strength: [
-          '100m Tempo Runs (smooth, consistent speed) (10x100m (~16-18s)) [Effort: Moderate (65-75% speed, RPE 8) - Rest: 45s walk]'
+          '400m Run Repeats (or 10 x 100m Tempo Runs) (6-8x400m (~75-90s)) [Overload: Start at 6 sets x 400m; build to 8 repeats - Effort: Hard (75-80% effort, RPE 8) - Rest: 120s (2 min walk)]'
         ],
-        run: 'Brisk Walk or Light Jog Wearing 20–30 lb Vest: 1.5 miles (1 set)',
-        pace: 'Brisk Pace Wearing 20–30 lb Vest (Rest: 0s)',
-        progressionRule: 'Hit smooth 16–18s pacing across all 10x100m tempo repeats (45s walk rest), followed by 1.5 miles in a 20–30 lb plate carrier or weight vest.'
+        run: '6–8 × 400m Run Repeats (~75–90s) or 10 × 100m Tempo Runs',
+        pace: 'Hard (75–80% effort) • 2 min walk recovery between repeats',
+        progressionRule: 'Start at 6x400m (~75–90s per repeat, 2 min walk rest) and progress to 8x400m with consistent split pacing.'
       },
       {
         day: 'Day 3',
-        focus: 'Upper-Body Strength & Grappling Grip',
+        focus: 'Upper-Body Strength & Core',
         warmup: DIME_WARMUP_TEXT,
         strength: [
-          'Barbell Bench Press or Incline Press (4x6-8) [Overload: Start at 4 sets x 6 reps; build to 8 reps then +2.5-5 lbs - Effort: Challenging (RPE 8) - Rest: 120s (2-3 min)]',
+          'Barbell Bench Press (1-second pause on chest) (4-5x6-8) [Overload: Start at 4 sets x 6 reps; build to 8 reps then +2.5-5 lbs, then 5th set - Effort: Challenging (RPE 8) - Rest: 120s (2-3 min)]',
           'Weighted or Strict Pull-Ups (4x6-8) [Overload: Start at 4 sets x 6 reps; build to 8 reps (BW or +10-25 lbs) - Effort: Challenging (RPE 8) - Rest: 120s (2 min)]',
-          'Single-Arm Landmine Press (staggered stance) (3x8/arm) [Overload: +2.5-5 lbs on 3x8/arm - Effort: Moderate (RPE 8) - Rest: 90s]',
-          'Inverted Row + Barbell Deadlift Grip Hold (3x10 reps + 30 sec) [Effort: Bodyweight / 60% Max Deadlift (RPE 8) - Rest: 90s]'
+          'Standing Barbell Overhead Press (4x6-8) [Overload: Start at 4 sets x 6 reps; build to 8 reps then +2.5-5 lbs - Effort: Challenging (RPE 8) - Rest: 120s (2 min)]',
+          'Bent-Over Barbell Row + Face Pulls (3x8-10 + 15 reps) [Overload: Start at 3x8 row; build to 10 reps then +5 lbs - Effort: Moderate (RPE 8) - Rest: 90s]'
         ],
         run: 'Rest from running',
         pace: 'N/A',
-        progressionRule: 'Bench Press & Pull-Ups: Start at 4x6 (RPE 8), build to 4x8 then add +2.5–5 lbs. Lock in 30s double-overhand grip holds at 60% max DL.'
+        progressionRule: 'Bench Press (1s pause), Pull-Ups & Barbell OHP: Start at 4x6 (RPE 8), build to 8 reps then add +2.5–5 lbs.'
       },
       {
         day: 'Day 4',
         focus: 'Mid-Week Long Steady Aerobic Run',
         warmup: DIME_WARMUP_TEXT,
         strength: [],
-        run: 'Long Steady Aerobic Run: 3–4 miles (start at 3 miles)',
+        run: 'Long Steady Aerobic Run: 6,400–8,000m (4–5 miles) (start at 4 miles)',
         pace: 'Steady Zone 2 Pace (Rest: 0s)',
-        progressionRule: 'Start at 3 miles and build weekly by no more than 10% toward 4 miles at steady Zone 2 pace.'
+        progressionRule: 'Start at 6,400m (4 miles) and build weekly by no more than 10% toward 8,000m (5 miles) at steady Zone 2 pace.'
       },
       {
         day: 'Day 5',
-        focus: 'Sprint Speed, Agility & Close-Combat Circuit (Sandbag/Sled)',
+        focus: 'Anaerobic Conditioning (Sled, Sandbag & Grip)',
         warmup: DIME_WARMUP_TEXT,
         strength: [
-          'Sandbag Shouldering (lift to shoulder) (4x6/side) [Overload: Progress from 70 lb toward 100 lb sandbag - Effort: 70-100 lb Sandbag (RPE 8) - Rest: 90s]',
-          'Sandbag Bear-Hug Walk + Squats (3x30m + 8 squats) [Effort: 70-100 lb Sandbag (RPE 8) - Rest: 90s]',
-          'Rotational Medicine Ball Wall Throw (3x8/side) [Effort: 10-14 lb Med Ball (RPE 8) - Rest: 60s]',
-          'Heavy Sled Push & Backward Drag (4x15m out / 15m back) [Overload: +10 lbs sled load when all 4 rounds stay crisp - Effort: Heavy (75-80% effort, RPE 8) - Rest: 120s (2 min)]'
+          'Heavy Sled Push & Backward Drag (5x15m out / 15m back) [Overload: +10 lbs sled load when all 5 rounds stay crisp - Effort: Heavy (75-85% effort, RPE 8.5) - Rest: 120s (2 min)]',
+          'Sandbag Bear-Hug Carry (4x30m) [Overload: Progress from 80 lb toward 120 lb sandbag - Effort: 80-120 lb Sandbag (RPE 8) - Rest: 90s]',
+          'Barbell Deadlift Grip Holds (3x30-45 sec) [Overload: Build from 30s to 45s at 60-70% Max Deadlift - Effort: 60-70% Max Deadlift (RPE 8) - Rest: 90s]',
+          'Ab Wheel Rollouts (or Plank Saw) (3x10-12) [Overload: Start at 3 sets x 10 reps; build to 12 reps - Effort: Bodyweight (RPE 8) - Rest: 60s]'
         ],
         run: 'Rest from running',
         pace: 'N/A',
-        progressionRule: 'Build combatives & heavy-load extraction power with 70–100 lb sandbag work and 4x15m out/15m back heavy sled pushes/drags.'
+        progressionRule: '5x15m out/15m back Heavy Sled Push & Backward Drag + 4x30m Sandbag Bear-Hug Carry (80–120 lbs) + 3x30–45s Barbell Deadlift Grip Holds.'
       },
       {
         day: 'Day 6',
-        focus: 'Rest & Shift Recovery',
-        warmup: 'None — Focus on 7–9 hours of dark, cool sleep and meal prep for upcoming shifts.',
-        strength: [
-          'Rest & Shift Recovery: Focus on 7–9 hours of dark, cool sleep and meal prep (0.75–1.0g lean protein per lb of bodyweight).'
-        ],
-        run: 'Rest & Shift Recovery',
-        pace: 'N/A',
-        progressionRule: 'Prioritize 7–9 hours of sleep, hydration, and high-protein shift meal prep.'
+        focus: 'Progressive Ruck March (Rolling Hills)',
+        warmup: DIME_WARMUP_TEXT,
+        strength: [],
+        run: 'Progressive Ruck March (Rolling Hills): 4,800–6,400m (3–4 miles) (1 set)',
+        pace: '40–50 lb pack (5–6 km/h brisk pace on rolling hills)',
+        progressionRule: 'Progress from 4,800m (3 miles) to 6,400m (4 miles) with a 40–50 lb pack at 5–6 km/h. Never increase weight and distance in the same week.'
       },
       {
         day: 'Day 7',
-        focus: 'Rest & Shift Recovery',
-        warmup: 'None — Focus on 7–9 hours of dark, cool sleep and meal prep for upcoming shifts.',
+        focus: 'Complete Rest & Recovery',
+        warmup: 'None — Full physical and mental recovery; prioritize 7–9 hours of dark, cool sleep.',
         strength: [
-          'Rest & Shift Recovery: Focus on 7–9 hours of dark, cool sleep, hydration, and meal prep for upcoming shifts.'
+          'Complete Rest: Full physical and mental recovery; prioritize 7–9 hours of sleep, hydration, and meal prep (0.75–1.0g lean protein per lb of bodyweight).'
         ],
-        run: 'Rest & Shift Recovery',
+        run: 'Complete Rest',
         pace: 'N/A',
         progressionRule: 'Complete physiological & nervous system recovery before next training week.'
       }
@@ -773,11 +769,11 @@ export const APEX_PROTOCOL_PHASES: Record<string, ProtocolPhase> = {
   },
   apex_phase3: {
     id: 'apex_phase3',
-    title: 'Quarter 3 (Weeks 27–39): Limit Strength, Combat Sprint Speed & Threshold Runs',
+    title: 'Quarter 3 (Weeks 27–39): Peak Strength, Sprint Speed & Tempo Runs',
     weeks: 'Weeks 27–39',
-    desc: 'Build maximum strength while moving every rep upward as fast as possible, paired with short sprints, agility drills, and sustained 3–4 mile tempo runs.',
+    desc: 'Lift heavy weights with maximum upward speed (Compensatory Acceleration) while building high-speed sprint stamina and fast 5,000m–8,000m running endurance.',
     coachRule:
-      'Quarter 3 Progression Rules: Start at the low end of every set and rep range (e.g., 4 sets x 3 reps on 4-5x3-5 Back Squat & Bench Press; 3 sets x 3 reps on 3-4x3-4 Deadlift; 8 repeats on 8-10x40m Sprint Repeats). Explode upward fast on every concentric rep at 85–92% Max (RPE 8.5–9). Deload (-40% volume) on Weeks 28, 32, 36. Benchmark Test on Week 39.',
+      'Quarter 3 Progression Rules: Start at the low end of every set and rep range (e.g., 4 sets x 3 reps on 4-5x3-5 Back Squat & Bench Press; 8 sprints on 8-10x20-40m Hill/Sled Sprints). Explode upward fast on every concentric rep at 85–92% Max (RPE 8.5–9). Deload (-40% volume, -20 lbs ruck weight) on Weeks 28, 32, 36. Benchmark Test on Week 39.',
     days: [
       {
         day: 'Day 1',
@@ -786,81 +782,78 @@ export const APEX_PROTOCOL_PHASES: Record<string, ProtocolPhase> = {
         strength: [
           'Box Jumps (step down; land softly) (4x4) [Effort: Max Jump Height (RPE 8.5) - Rest: 120s (2 min)]',
           'Barbell Back Squat (explode up fast) (4-5x3-5) [Overload: Start at 4 sets x 3 reps; build to 5 reps then +5-10 lbs, then 5th set - Effort: Heavy (85-92% Max, RPE 8.5-9) - Rest: 180s (3-5 min)]',
-          'Conventional Barbell Deadlift (3-4x3-4) [Overload: Start at 3 sets x 3 reps; build to 4 reps then +5-10 lbs, then 4th set - Effort: Heavy (85-90% Max, RPE 8.5-9) - Rest: 180s (3-5 min)]',
-          "Standing Pallof Hold + Heavy Farmer's Walk (3x20s/side + 25m) [Overload: +5 lbs/hand on 25m walk - Effort: Heavy (RPE 8.5) - Rest: 90s]"
+          'Deficit Deadlift (stand on 5 cm plate) (3x4) [Overload: +5-10 lbs on 3x4 with crisp bar speed - Effort: Heavy (80-85% Max, RPE 8.5-9) - Rest: 180s (3 min)]',
+          'Heavy Suitcase Carry (one hand at a time) (3x25m/arm) [Overload: +5 lbs DB/KB on 25m/arm - Effort: Heavy Dumbbell/KB (RPE 8.5) - Rest: 60s]'
         ],
         run: 'Rest from running',
         pace: 'N/A',
-        progressionRule: 'Back Squat: Start at 4x3 (85–92% Max), build to 5 reps before adding +5–10 lbs. Deadlift: Start at 3x3 (85–90% Max), build to 4 reps.'
+        progressionRule: 'Back Squat: Start at 4x3 (85–92% Max), build to 5 reps before adding +5–10 lbs. Deficit Deadlift (5 cm plate): 3x4 at 80–85% Max.'
       },
       {
         day: 'Day 2',
-        focus: 'Combat Sprint Speed, Cone Agility & Recovery Run',
+        focus: 'Hill / Sled Sprint Speed + Easy Recovery Run',
         warmup: DIME_WARMUP_TEXT,
         strength: [
-          '10m & 20m Sprint Starts (from ready stance) (6x10-20m) [Effort: All-Out (95-100%, RPE 9.5) - Rest: 90s]',
-          'Pro Agility (5m-10m-5m) & 10m T-Test Cone Drills (3x1 rep each drill) [Effort: All-Out (sharp cuts, RPE 9) - Rest: 120s (2 min)]'
+          'Hill Sprints or Weighted Sled Sprints (8-10x20-40m (<= 6 sec)) [Overload: Start at 8 sets x 20-40m; build to 10 sprints - Effort: All-Out (95-100%, RPE 9.5) - Rest: 90s (90-120 sec)]'
         ],
-        run: 'Easy Recovery Run: 2 miles (1 set)',
-        pace: 'Easy Pace (after Sprint Starts & Cone Drills)',
-        progressionRule: 'Execute 6x10–20m Sprint Starts from tactical ready stance and 3x1 Pro Agility & T-Test drills at 95–100% effort, then 2-mile easy recovery run.'
+        run: 'Easy Recovery Run: 3,200m (2 miles) (1 set)',
+        pace: 'Easy Pace (after 8–10 × 20–40m Hill or Weighted Sled Sprints)',
+        progressionRule: 'Execute 8–10x20–40m Hill Sprints or Weighted Sled Sprints (<= 6 sec work, 90–120s full rest) at 95–100% effort, then 3,200m (2 miles) easy recovery run.'
       },
       {
         day: 'Day 3',
         focus: 'Upper Max Strength & Explosive Pressing',
         warmup: DIME_WARMUP_TEXT,
         strength: [
-          'Explosive Push-Ups or Med Ball Chest Pass (4x5) [Effort: Bodyweight / 10 lb Ball (RPE 8.5) - Rest: 90s]',
+          'Explosive Medicine Ball Chest Pass (4x5) [Effort: 10-14 lb Med Ball (RPE 8.5) - Rest: 90s]',
           'Barbell Bench Press (explode up fast) (4-5x3-5) [Overload: Start at 4 sets x 3 reps; build to 5 reps then +2.5-5 lbs, then 5th set - Effort: Heavy (85-92% Max, RPE 8.5-9) - Rest: 180s (3-5 min)]',
           'Weighted Pull-Ups (4x4-6) [Overload: Start at 4 sets x 4 reps; build to 6 reps then +2.5-5 lbs - Effort: Heavy (RPE 8.5) - Rest: 180s (3 min)]',
-          'Standing Barbell Push Press + Face Pulls (4x4 + 15 reps) [Overload: +2.5-5 lbs on 4x4 Push Press - Effort: Heavy (80-85% Max, RPE 8.5) - Rest: 120s (2 min)]'
+          'Barbell Push Press (use leg drive) (4x4) [Overload: +2.5-5 lbs on 4x4 Push Press - Effort: Heavy (80-85% Max, RPE 8.5) - Rest: 120s (2 min)]'
         ],
         run: 'Rest from running',
         pace: 'N/A',
-        progressionRule: 'Bench Press: Start at 4x3 (85–92% Max), build to 5 reps then +2.5–5 lbs. Weighted Pull-Ups: Start at 4x4, build to 4x6.'
+        progressionRule: 'Bench Press: Start at 4x3 (85–92% Max), build to 5 reps then +2.5–5 lbs. Weighted Pull-Ups: Start at 4x4, build to 4x6. Push Press: 4x4 at 80–85% Max.'
       },
       {
         day: 'Day 4',
-        focus: 'Mid-Week Sustained Threshold Tempo Run',
+        focus: 'Mid-Week Sustained Tempo Run',
         warmup: DIME_WARMUP_TEXT,
         strength: [],
-        run: 'Sustained Tempo Run (fast, controlled pace): 3–4 miles (start at 3 miles)',
+        run: 'Sustained Tempo Run (fast, controlled pace): 5,000–8,000m (3–5 miles) (start at 3 miles)',
         pace: 'Threshold (75–80% HRR, Rest: 0s)',
-        progressionRule: 'Start at 3 miles at Threshold pace (75–80% HRR) and build progressively toward 4 miles.'
+        progressionRule: 'Start at 5,000m (3.1 miles) at Threshold pace (75–80% HRR) and build progressively toward 8,000m (5 miles).'
       },
       {
         day: 'Day 5',
-        focus: 'Power & Repeat Sprint Ability (RSA)',
+        focus: 'Speed-Power & Ballistic Conditioning',
         warmup: DIME_WARMUP_TEXT,
         strength: [
-          'Trap-Bar Jumps (jump explosively) (4x3) [Effort: Light (20% Squat Max, RPE 8) - Rest: 120s (2 min)]',
+          'Trap-Bar Jumps (jump explosively) (5x3) [Effort: Light (20% Squat Max, RPE 8) - Rest: 120s (2 min)]',
           'Speed Bench Press (max bar speed) (6x3) [Effort: Moderate (55-65% Max, RPE 8) - Rest: 60s]',
-          'Medicine Ball Overhead Slam + Rotational Lunge (3x8 reps each) [Effort: 10-14 lb Med Ball (RPE 8) - Rest: 60s]',
-          '40m Sprint Repeats (Repeat Sprint Ability) (8-10x40m) [Overload: Start at 8 sets x 40m; build to 10 repeats - Effort: Hard (90-95% effort, RPE 9) - Rest: 35s]'
+          'Single-Arm Kettlebell Snatch (4x5/arm) [Overload: Progress from 35 lb toward 53 lb KB - Effort: Explosive (35-53 lb, RPE 8.5) - Rest: 90s]',
+          'Rotational Medicine Ball Throws (3x6/side) [Effort: 10-12 lb Med Ball (RPE 8) - Rest: 60s]'
         ],
         run: 'Rest from running',
         pace: 'N/A',
-        progressionRule: 'Explosive Trap-Bar Jumps (20% Squat Max) + Speed Bench (55–65% Max) + 40m Sprint Repeats (start at 8x40m with strict 35s rest).'
+        progressionRule: 'Explosive Trap-Bar Jumps (5x3 @ 20% Squat Max) + Speed Bench (6x3 @ 55–65% Max) + Single-Arm KB Snatch (4x5/arm) + Rotational Med Ball Throws (3x6/side).'
       },
       {
         day: 'Day 6',
-        focus: 'Rest & Shift Recovery',
-        warmup: 'None — Focus on 7–9 hours of dark, cool sleep and meal prep for upcoming shifts.',
-        strength: [
-          'Rest & Shift Recovery: Focus on 7–9 hours of dark, cool sleep and meal prep (0.75–1.0g lean protein per lb of bodyweight).'
-        ],
-        run: 'Rest & Shift Recovery',
-        pace: 'N/A',
-        progressionRule: 'Prioritize 7–9 hours of sleep, hydration, and high-protein shift meal prep.'
+        focus: 'Heavy Hill Ruck March',
+        warmup: DIME_WARMUP_TEXT,
+        strength: [],
+        run: 'Heavy Hill Ruck March (Deload 20 lbs every 4th wk): 4,000–6,000m (2.5–3.7 miles) (1 set)',
+        pace: '60–80 lb pack (4–5.5 km/h — Deload pack weight by 20 lbs every 4th week)',
+        progressionRule: '4,000–6,000m Heavy Hill Ruck March with a 60–80 lb pack at 4–5.5 km/h. Drop pack weight by 20 lbs on every 4th Deload week.'
       },
       {
         day: 'Day 7',
-        focus: 'Rest & Shift Recovery',
-        warmup: 'None — Focus on 7–9 hours of dark, cool sleep and meal prep for upcoming shifts.',
+        focus: 'Complete Rest & Recovery',
+        warmup: 'None — Full physical and mental recovery; prioritize 7–9 hours of dark, cool sleep.',
         strength: [
-          'Rest & Shift Recovery: Focus on 7–9 hours of dark, cool sleep, hydration, and meal prep for upcoming shifts.'
+          'Complete Rest: Full physical and mental recovery; prioritize 7–9 hours of sleep, hydration, and meal prep (0.75–1.0g lean protein per lb of bodyweight).'
         ],
-        run: 'Rest & Shift Recovery',
+        run: 'Complete Rest',
         pace: 'N/A',
         progressionRule: 'Complete physiological & nervous system recovery before next training week.'
       }
@@ -868,90 +861,86 @@ export const APEX_PROTOCOL_PHASES: Record<string, ProtocolPhase> = {
   },
   apex_phase4: {
     id: 'apex_phase4',
-    title: 'Quarter 4 (Weeks 40–52): Combat Simulation Readiness & Annual Peak',
+    title: 'Quarter 4 (Weeks 40–52): Combat Readiness & Annual Peak',
     weeks: 'Weeks 40–52',
-    desc: 'Put your strong aerobic endurance, strength, and speed together into realistic tactical obstacle and casualty-extraction circuits. Week 51: Cut volume by 50% (Taper). Week 52: Final Fitness Test.',
+    desc: 'Combine peak running endurance, strength, and speed into realistic combat conditioning circuits. Week 51: Cut volume by 50% (Taper). Week 52: Final Fitness Test.',
     coachRule:
-      'Quarter 4 Progression Rules: Maintain limit strength with low-volume heavy triples/quads (start at 3 sets x 3 reps on 3x3-4 Back Squat & Bench Press; 3x3 Deadlift at 80–85% Max, RPE 8–8.5) so legs stay fresh for Hill Sprints and the 4-Round Combat Readiness & Casualty Extraction Circuit in a 20-lb plate carrier. Deload (-40% volume) on Weeks 40, 44, 48. Week 51: Cut volume by 50% (Taper). Week 52: Final Fitness Test.',
+      'Quarter 4 Progression Rules: Maintain peak strength with low-volume heavy triples/quads (start at 3 sets x 3 reps on 3x3-4 Back Squat, Bench Press & Conventional Deadlift; 3x4-5 Barbell OHP at 80–85% Max, RPE 8–8.5) so legs stay fresh for Day 2 Agility/Fartlek, Day 5 4-Round Combat Medley, and Day 6 5,000m Battle Simulation March. Deload (-40% volume) on Weeks 40, 44, 48. Week 51: Cut volume by 50% (Taper). Week 52: Final Fitness Test.',
     days: [
       {
         day: 'Day 1',
-        focus: 'Lower Strength Maintenance & Broad Jump Power',
+        focus: 'Squat, Bench & Pull-Up Strength Maintenance',
         warmup: DIME_WARMUP_TEXT,
         strength: [
-          'Standing Long Jump (Broad Jump) (3x3) [Effort: Max Distance (RPE 8.5) - Rest: 120s (2 min)]',
           'Barbell Back Squat (3x3-4) [Overload: Start at 3 sets x 3 reps; build to 4 reps then +5-10 lbs - Effort: Heavy (80-85% Max, RPE 8-8.5) - Rest: 180s (3 min)]',
-          'Conventional or Trap-Bar Deadlift (3x3) [Overload: +5-10 lbs on 3x3 when bar speed is crisp - Effort: Heavy (80-85% Max, RPE 8-8.5) - Rest: 180s (3 min)]',
-          'Staggered-Stance Pallof Press (3x10/side) [Effort: Moderate-Heavy (RPE 8) - Rest: 60s]'
+          'Barbell Bench Press (3x3-4) [Overload: Start at 3 sets x 3 reps; build to 4 reps then +2.5-5 lbs - Effort: Heavy (80-85% Max, RPE 8-8.5) - Rest: 180s (3 min)]',
+          'Weighted Pull-Ups + Standing Pallof Press (3x5 + 10/side) [Overload: +2.5-5 lbs on 3x5 Weighted Pull-Ups - Effort: Challenging (RPE 8.5) - Rest: 90s]'
         ],
         run: 'Rest from running',
         pace: 'N/A',
-        progressionRule: 'Back Squat: Start at 3x3 (80–85% Max, RPE 8–8.5), build to 4 reps then +5–10 lbs. Deadlift: 3x3 at 80–85% Max.'
+        progressionRule: 'Back Squat & Bench Press: Start at 3x3 (80–85% Max, RPE 8–8.5), build to 4 reps then add load. Weighted Pull-Ups + Standing Pallof Press: 3x5 + 10/side.'
       },
       {
         day: 'Day 2',
-        focus: 'Hill Sprints & Steady Aerobic Run',
+        focus: 'Pro Agility, T-Test Drills & Fartlek Run',
         warmup: DIME_WARMUP_TEXT,
         strength: [
-          'Hill Sprints (easier on hamstrings than flat sprints) (6x30m) [Effort: All-Out (95%, RPE 9) - Rest: 90s walk]'
+          'Pro Agility (5m-10m-5m) & 10m T-Test Drills (4x1 rep each drill) [Effort: All-Out (95%, RPE 9) - Rest: 90s]'
         ],
-        run: 'Steady Aerobic Run: 2.5–3 miles (start at 2.5 miles)',
-        pace: 'Conversational Pace (after 6 × 30m Hill Sprints)',
-        progressionRule: 'Complete 6x30m Hill Sprints at 95% effort (90s walk rest), then transition into a 2.5–3 mile conversational aerobic run.'
+        run: 'Fartlek Run (jog mixed with 45s sprints & 200m hills): 6,400–8,000m (4–5 miles)',
+        pace: 'Moderate to Hard (Jog mixed with 45s sprints & 200m hills)',
+        progressionRule: 'Complete 4x1 rep each of Pro Agility (5m-10m-5m) & 10m T-Test Drills at 95% effort (90s rest), then 6,400–8,000m (4–5 miles) Fartlek Run.'
       },
       {
         day: 'Day 3',
-        focus: 'Upper Strength Maintenance & Grappling Grip',
+        focus: 'Deadlift, Overhead Press & Sandbag Maintenance',
         warmup: DIME_WARMUP_TEXT,
         strength: [
-          'Barbell Bench Press (3x3-4) [Overload: Start at 3 sets x 3 reps; build to 4 reps then +2.5-5 lbs - Effort: Heavy (80-85% Max, RPE 8-8.5) - Rest: 180s (3 min)]',
-          'Strict Pronated Pull-Ups (3xMax (stop 1 shy)) [Overload: +1 rep per session or add vest - Effort: Bodyweight or +Vest (RPE 9) - Rest: 120s (2 min)]',
-          'Single-Arm Dumbbell Bench Press (3x8/arm) [Overload: +2.5-5 lbs DB on 8/arm - Effort: Moderate-Heavy (RPE 8) - Rest: 90s]',
-          "Heavy Farmer's Walk (3x30m) [Overload: +5 lbs/hand on completed 30m - Effort: Heavy Dumbbells/Handles (RPE 8.5) - Rest: 90s]"
+          'Conventional Deadlift (3x3-4) [Overload: Start at 3 sets x 3 reps; build to 4 reps then +5-10 lbs - Effort: Heavy (80-85% Max, RPE 8-8.5) - Rest: 180s (3 min)]',
+          'Standing Barbell Overhead Press (3x4-5) [Overload: Start at 3 sets x 4 reps; build to 5 reps then +2.5-5 lbs - Effort: Heavy (80-85% Max, RPE 8-8.5) - Rest: 150s (2-3 min)]',
+          'Sandbag Clean & Press + Hanging Leg Raises (3x6 + 12 reps) [Effort: 80-120 lb Sandbag (RPE 8.5) - Rest: 90s]'
         ],
         run: 'Rest from running',
         pace: 'N/A',
-        progressionRule: 'Bench Press: Start at 3x3 (80–85% Max, RPE 8–8.5), build to 4 reps then +2.5–5 lbs. Pull-Ups: 3 sets stopping 1 rep shy of failure.'
+        progressionRule: 'Conventional Deadlift: Start at 3x3 (80–85% Max), build to 4 reps. Barbell OHP: Start at 3x4, build to 5 reps. Sandbag Clean & Press + Hanging Leg Raises: 3x6 + 12.'
       },
       {
         day: 'Day 4',
         focus: 'Mid-Week Steady Zone 2 Recovery Run',
         warmup: DIME_WARMUP_TEXT,
         strength: [],
-        run: 'Steady Zone 2 Recovery Run: 3 miles (1 set)',
+        run: 'Steady Zone 2 Recovery Run: 4,800m (3 miles) (1 set)',
         pace: 'Easy Conversational Pace (Rest: 0s)',
-        progressionRule: 'Maintain an easy conversational Zone 2 pace across 3 miles to flush fatigue before Day 5 Combat Circuit.'
+        progressionRule: 'Maintain an easy conversational Zone 2 pace across 4,800m (3 miles) to flush fatigue before Day 5 Combat Medley & Day 6 Battle Simulation.'
       },
       {
         day: 'Day 5',
-        focus: 'Combat Bounding & Casualty Extraction Circuit (Wearing 20-lb Plate Carrier)',
+        focus: '4-Round Combat Readiness Medley',
         warmup: DIME_WARMUP_TEXT,
         strength: [
-          '4 Rounds Wearing 20-lb Plate Carrier (60-90s/round) (4x1 full circuit) [Effort: Hard (85-95% effort, RPE 9) - Rest: 120s (2-3 min between rounds) - Circuit Stations: 1) 45m Bounding Sprint + 1.2m Barrier Vault / Box Step-Over, 2) 15m Low Crawl + 10 Sledgehammer Tire Strikes, 3) 180-lb Casualty / Heavy Sled Drag (10m out, turn, 10m back), 4) 30s Heavy Sandbag Bear-Hug Hold / Ground Control Drill]'
+          '4 Rounds Back-to-Back Combat Medley (60-90 sec work/round) (4x1 full circuit) [Effort: Hard (85-90% effort, RPE 9) - Rest: 150s (2-3 min between rounds) - Circuit Stations: 1) 70m Casualty Drag / Heavy Sled Drag (~165 lbs), 2) 70m Sprint carrying two 30-50 lb Ammo Cans / Dumbbells, 3) 15m Low Crawl + 15m High Crawl + 5 Push-Ups, 4) 10 Sledgehammer Strikes per side on a tire]'
         ],
         run: 'Rest from running',
         pace: 'N/A',
-        progressionRule: 'Complete 4 full rounds in a 20-lb plate carrier (60–90s/round, 2–3 min rest): 1) 45m Sprint + 1.2m Vault, 2) 15m Low Crawl + 10 Sledgehammer Strikes, 3) 180-lb Casualty Drag (10m out/10m back), 4) 30s Sandbag Bear-Hug Hold.'
+        progressionRule: 'Complete 4 rounds back-to-back (60–90s work/round, 2–3 min rest): 70m Casualty Drag (~165 lbs) + 70m Ammo Can Sprint (30–50 lbs/hand) + 15m Low/High Crawl + 5 Push-Ups + 10/side Tire Sledgehammer Strikes.'
       },
       {
         day: 'Day 6',
-        focus: 'Rest & Operational Recovery',
-        warmup: 'None — Focus on 7–9 hours of dark, cool sleep and meal prep for upcoming operations.',
-        strength: [
-          'Rest & Operational Recovery: Focus on 7–9 hours of dark, cool sleep and meal prep (0.75–1.0g lean protein per lb of bodyweight).'
-        ],
-        run: 'Rest & Operational Recovery',
-        pace: 'N/A',
-        progressionRule: 'Prioritize 7–9 hours of sleep, hydration, and high-protein operational meal prep.'
+        focus: 'Battle Simulation March & Obstacle Course',
+        warmup: DIME_WARMUP_TEXT,
+        strength: [],
+        run: 'Battle Simulation March & Obstacle Course: 5,000m (3.1 miles) (1 set)',
+        pace: '60 lb pack / full kit',
+        progressionRule: 'Complete a 5,000m (3.1 miles) Battle Simulation March & Obstacle Course under a 60 lb pack / full kit.'
       },
       {
         day: 'Day 7',
-        focus: 'Rest & Operational Recovery',
-        warmup: 'None — Focus on 7–9 hours of dark, cool sleep and meal prep for upcoming operations.',
+        focus: 'Complete Rest & Recovery',
+        warmup: 'None — Full physical and mental recovery; prioritize 7–9 hours of dark, cool sleep.',
         strength: [
-          'Rest & Operational Recovery: Focus on 7–9 hours of dark, cool sleep, hydration, and meal prep for upcoming operations.'
+          'Complete Rest: Full physical and mental recovery; prioritize 7–9 hours of sleep, hydration, and meal prep (0.75–1.0g lean protein per lb of bodyweight).'
         ],
-        run: 'Rest & Operational Recovery',
+        run: 'Complete Rest',
         pace: 'N/A',
         progressionRule: 'Complete physiological & nervous system recovery before next training week.'
       }
@@ -960,7 +949,7 @@ export const APEX_PROTOCOL_PHASES: Record<string, ProtocolPhase> = {
 };
 
 /**
- * Returns customized week data for any week 1 through 52 of the 52-Week Military Combat Fitness & Readiness Program.
+ * Returns customized week data for any week 1 through 52 of the Military 52-Week Fitness & Readiness Program.
  * Incorporates Quarter 1–4 templates, 3-week progressive blocks, every-4th-week 40% Deloads (Weeks 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48),
  * Week 51 Taper (-50% volume), and Quarterly/Annual Benchmark Tests (Weeks 13, 26, 39, 52).
  */
@@ -996,12 +985,12 @@ export function getApexWeekData(weekNumber: number): ProtocolPhase {
   if (isDeloadWeek) {
     weekBadge = ' (DELOAD WEEK — -40% VOLUME)';
     weekRulePrefix +=
-      'RECOVERY / DELOAD WEEK (Every 4th Week Rule): Cut your strength sets and running distance by 40% this week so your joints and central nervous system recover. ';
+      'RECOVERY / DELOAD WEEK (Every 4th Week Rule): Cut your strength sets and running mileage by 40% this week so your joints and nervous system recover. ';
     clonedDays.forEach((d) => {
       if (d.run && !d.run.toLowerCase().includes('rest')) {
         d.run = `${d.run} [Deload Week ${week}: Cut running distance/rounds by 40%]`;
       }
-      d.progressionRule = `Deload Week ${week}: Cut strength sets and running distance by 40% for joint & CNS recovery. ${d.progressionRule || ''}`;
+      d.progressionRule = `Deload Week ${week}: Cut strength sets and running mileage by 40% for joint & CNS recovery. ${d.progressionRule || ''}`;
     });
   } else if (isTaperWeek) {
     weekBadge = ' (WEEK 51 TAPER — -50% VOLUME)';
@@ -1016,7 +1005,7 @@ export function getApexWeekData(weekNumber: number): ProtocolPhase {
   } else if (isTestWeek) {
     weekBadge = week === 52 ? ' (FINAL ANNUAL FITNESS TEST)' : ` (QUARTER ${quarterNum} BENCHMARK TEST)`;
     weekRulePrefix +=
-      'FITNESS BENCHMARK WEEK (Test Well-Rested): Test 1) 1.5-Mile Run [Combat Ready ≤11:30 | Strong Standard ≤10:15 | Elite Standard ≤9:30] & 3-Mile (5K) Run [≤25:00 | ≤22:00 | ≤20:00], 2) Back Squat & Deadlift [2.0x | 2.2x | 2.5x BW], 3) Bench Press [1.25x | 1.5x | 1.75x BW] & Push-Ups [35 | 45 | 55+], 4) Strict Pull-Ups [8 | 12 | 15+] & 40m Sprint [≤5.70s | ≤5.30s | ≤5.00s], 5) Vertical Jump [50 cm | 60 cm | 70+ cm]. ';
+      'TARGET FITNESS BENCHMARK WEEK (Test Well-Rested): Test 1) 3,200m (2-Mile) Run [Solid ≤15:00 | Strong ≤13:30 | Elite ≤12:30] & 5,000m Run [≤24:30 | ≤21:30 | ≤19:30], 2) Back Squat & Deadlift 1RM [2.0x | 2.2x | 2.5x BW], 3) Bench Press 1RM [1.25x | 1.5x | 1.75x BW] & Overhead Press 1RM [0.8x | 1.0x | 1.25x BW], 4) Strict Pull-Ups [8 | 12 | 15+ reps] & 40m Sprint [≤5.70s | ≤5.30s | ≤5.00s], 5) Vertical Jump [50 cm | 60 cm | 70+ cm]. ';
   } else {
     const blockWeek = ((week - 1) % 4) + 1; // 1, 2, or 3 within the 4-week cycle
     weekRulePrefix += `3-Week Progressive Block (Week ${blockWeek} of 3): Start at the low end of set & rep ranges; add 1–2 reps per set until hitting the top of the rep range with 1–2 RIR, then add +2.5–5 lbs (upper) or +5–10 lbs (lower). `;
@@ -1032,17 +1021,18 @@ export function getApexWeekData(weekNumber: number): ProtocolPhase {
   };
 }
 
-// Merge 52-Week Military Combat Readiness Program into PROTOCOL_DATA
+// Merge Military 52-Week Fitness & Readiness Program into PROTOCOL_DATA
 Object.assign(PROTOCOL_DATA, APEX_PROTOCOL_PHASES);
 
 // ---------------------------------------------------------------------------
-// 12-WEEK TACTICAL BODYBUILDING PROGRAM (Starts Sunday • 4 Lift + 2 Speed/Cond + 1 Rest)
+// 12-WEEK MILITARY TACTICAL BODYBUILDING PROGRAM
+// Warfighter Strength, Hypertrophy & Field Readiness (7-Day Garrison Cycle)
 // ---------------------------------------------------------------------------
 export const TACTICAL_BB_DIME_WARMUP_TEXT =
-  'Mandatory 8-Minute DIME Warm-Up Protocol (Required Every Session): Dynamic Mobility — 10 World\'s Greatest Stretches (5/side), 10 Leg Swings (front/back & side-to-side/leg); Isolation & Activation — 15 Glute Bridges, 15 Band Pull-Aparts; Movement Prep — 20m High Knees, 20m Butt Kicks, 20m A-Skips; Explosive Primer — 3 Broad Jumps (step back and fully reset between reps).';
+  'Mandatory 8-Minute DIME Warm-Up Protocol (Before Every Session): Dynamic Mobility — 10 World\'s Greatest Stretches with thoracic reach (5/side), 10 Leg Swings (front/back and side-to-side/leg); Isolation & Activation — 15 Glute Bridges (2-sec hold), 15 Band Pull-Aparts (palms up); Movement Prep — 20m High Knees, 20m Butt Kicks, 20m A-Skips; Explosive Primer — 3 Broad Jumps (step back and fully reset between reps).';
 
 export const TACTICAL_BB_DAILY_RECOVERY_DIME_TEXT =
-  'Mandatory Daily DIME Restorative Flow (8 Minutes) + Full Recovery: Complete light DIME Dynamic Mobility & Activation (10 World\'s Greatest Stretches, 10 Leg Swings/leg, 15 Glute Bridges, 15 Band Pull-Aparts) to relieve ruck and plate-carrier stiffness, then prioritize 8+ hours of sleep and hydration.';
+  'Complete Rest & Garrison Prep: Full CNS recovery, foot care, meal prep, and 8+ hours of sleep prioritization (Optional: light 8-minute DIME dynamic mobility & activation flow to relieve ruck and plate-carrier stiffness).';
 
 export interface TacticalConditioningWeek {
   week: number;
@@ -1053,18 +1043,18 @@ export interface TacticalConditioningWeek {
 }
 
 export const TACTICAL_CONDITIONING_MATRIX: TacticalConditioningWeek[] = [
-  { week: 1, phase: 1, phaseName: 'Phase 1: Armor & Base', conditioningSummary: '6×20m Falling Starts + 4×40m Build-Ups + 4×50m Sled Push | Fri Zone 2 (25–30m)', is_deload: false },
-  { week: 2, phase: 1, phaseName: 'Phase 1: Armor & Base', conditioningSummary: '6×20m Falling Starts + 4×40m Build-Ups + 4×50m Sled Push | Fri Zone 2 (25–30m)', is_deload: false },
-  { week: 3, phase: 1, phaseName: 'Phase 1: Armor & Base', conditioningSummary: '6×20m Falling Starts + 4×40m Build-Ups + 4×50m Sled Push | Fri Zone 2 (25–30m)', is_deload: false },
-  { week: 4, phase: 1, phaseName: 'Phase 1 Deload', conditioningSummary: 'Deload (-40% volume, ~80% weight, crisp speed)', is_deload: true },
-  { week: 5, phase: 2, phaseName: 'Phase 2: Power-Building', conditioningSummary: '6× Pro Agility (5-10-5m) + 5×30m Flying Sprints + 6×15s/45s Assault Bike | Fri Zone 2', is_deload: false },
-  { week: 6, phase: 2, phaseName: 'Phase 2: Power-Building', conditioningSummary: '6× Pro Agility (5-10-5m) + 5×30m Flying Sprints + 6×15s/45s Assault Bike | Fri Zone 2', is_deload: false },
-  { week: 7, phase: 2, phaseName: 'Phase 2: Power-Building', conditioningSummary: '6× Pro Agility (5-10-5m) + 5×30m Flying Sprints + 6×15s/45s Assault Bike | Fri Zone 2', is_deload: false },
-  { week: 8, phase: 2, phaseName: 'Phase 2 Deload', conditioningSummary: 'Deload (-40% volume, ~80% weight, crisp speed)', is_deload: true },
-  { week: 9, phase: 3, phaseName: 'Phase 3: Peak & Velocity', conditioningSummary: '4×60m Broken Sprints (20m/drop/40m) + 4× T-Drill (10m×10m) | Fri Zone 2', is_deload: false },
-  { week: 10, phase: 3, phaseName: 'Phase 3: Peak & Velocity', conditioningSummary: '4×60m Broken Sprints (20m/drop/40m) + 4× T-Drill (10m×10m) | Fri Zone 2', is_deload: false },
-  { week: 11, phase: 3, phaseName: 'Phase 3: Peak & Velocity', conditioningSummary: '4×60m Broken Sprints (20m/drop/40m) + 4× T-Drill (10m×10m) | Fri Zone 2', is_deload: false },
-  { week: 12, phase: 3, phaseName: 'Phase 3 Deload / Peak', conditioningSummary: 'Deload (-40% volume, ~80% weight, crisp bar speed)', is_deload: true },
+  { week: 1, phase: 1, phaseName: 'Phase 1: Armor & Base', conditioningSummary: 'Day 3: 6×20m Prone Starts + 4×40m Build-Ups + 4×40m Backward Sled | Day 6: 3–4 mi Ruck @ 35 lbs + Arm Pump', is_deload: false },
+  { week: 2, phase: 1, phaseName: 'Phase 1: Armor & Base', conditioningSummary: 'Day 3: 6×20m Prone Starts + 4×40m Build-Ups + 4×40m Backward Sled | Day 6: 3–4 mi Ruck @ 35 lbs + Arm Pump', is_deload: false },
+  { week: 3, phase: 1, phaseName: 'Phase 1: Armor & Base', conditioningSummary: 'Day 3: 6×20m Prone Starts + 4×40m Build-Ups + 4×40m Backward Sled | Day 6: 3–4 mi Ruck @ 35 lbs + Arm Pump', is_deload: false },
+  { week: 4, phase: 1, phaseName: 'Phase 1 Deload', conditioningSummary: 'Deload (-40% sets, ~80% load, cap Day 6 ruck at 2 miles unweighted)', is_deload: true },
+  { week: 5, phase: 2, phaseName: 'Phase 2: Power-Building', conditioningSummary: 'Day 3: 6× Pro Agility (5-10-5m) + 5×30m Flying Sprints + 6×15s/45s Bike | Day 6: 4–5 mi Ruck @ 45 lbs + Arm Pump', is_deload: false },
+  { week: 6, phase: 2, phaseName: 'Phase 2: Power-Building', conditioningSummary: 'Day 3: 6× Pro Agility (5-10-5m) + 5×30m Flying Sprints + 6×15s/45s Bike | Day 6: 4–5 mi Ruck @ 45 lbs + Arm Pump', is_deload: false },
+  { week: 7, phase: 2, phaseName: 'Phase 2: Power-Building', conditioningSummary: 'Day 3: 6× Pro Agility (5-10-5m) + 5×30m Flying Sprints + 6×15s/45s Bike | Day 6: 4–5 mi Ruck @ 45 lbs + Arm Pump', is_deload: false },
+  { week: 8, phase: 2, phaseName: 'Phase 2 Deload', conditioningSummary: 'Deload (-40% sets, ~80% load, cap Day 6 ruck at 2 miles unweighted)', is_deload: true },
+  { week: 9, phase: 3, phaseName: 'Phase 3: Peak & Combat Velocity', conditioningSummary: 'Day 3: 4× IMT Bound Series + 4×50m Farmer Walk/50m Sprint Shuttle | Day 6: 5–6 mi Ruck @ 45–55 lbs + Arm Pump', is_deload: false },
+  { week: 10, phase: 3, phaseName: 'Phase 3: Peak & Combat Velocity', conditioningSummary: 'Day 3: 4× IMT Bound Series + 4×50m Farmer Walk/50m Sprint Shuttle | Day 6: 5–6 mi Ruck @ 45–55 lbs + Arm Pump', is_deload: false },
+  { week: 11, phase: 3, phaseName: 'Phase 3: Peak & Combat Velocity', conditioningSummary: 'Day 3: 4× IMT Bound Series + 4×50m Farmer Walk/50m Sprint Shuttle | Day 6: 5–6 mi Ruck @ 45–55 lbs + Arm Pump', is_deload: false },
+  { week: 12, phase: 3, phaseName: 'Phase 3 Deload / Peak', conditioningSummary: 'Deload (-40% sets, ~80% load, 2-mile unweighted Zone 2 walk)', is_deload: true },
 ];
 
 function buildTacticalBodybuildingPhase(phaseNum: 1 | 2 | 3): ProtocolPhase {
@@ -1073,66 +1063,78 @@ function buildTacticalBodybuildingPhase(phaseNum: 1 | 2 | 3): ProtocolPhase {
   const mainReps = isP1 ? '8-10' : isP2 ? '5-6' : '3-5';
   const upperAccReps = isP1 ? '10-12' : isP2 ? '8-10' : '6-8';
   const lowerAccSingleReps = isP1 ? '10/leg' : isP2 ? '8/leg' : '6/leg';
-  const legPressReps = isP1 ? '12' : isP2 ? '10' : '8';
+  const legCurlReps = isP1 ? '12' : isP2 ? '10' : '8';
   const compoundRest = isP1 ? 120 : isP2 ? 150 : 180;
   const accessoryRest = isP1 ? 75 : isP2 ? 90 : 75;
 
   const phaseTitle = isP1
-    ? 'Phase 1 (Weeks 1–4): Armor & Base — 12-Week Tactical Bodybuilding Program'
+    ? 'Phase 1 (Weeks 1–4): Armor & Base — 12-Week Military Tactical Bodybuilding Program'
     : isP2
-    ? 'Phase 2 (Weeks 5–8): Power-Building — 12-Week Tactical Bodybuilding Program'
-    : 'Phase 3 (Weeks 9–12): Peak & Velocity — 12-Week Tactical Bodybuilding Program';
+    ? 'Phase 2 (Weeks 5–8): Power-Building — 12-Week Military Tactical Bodybuilding Program'
+    : 'Phase 3 (Weeks 9–12): Peak & Combat Velocity — 12-Week Military Tactical Bodybuilding Program';
 
   const phaseWeeks = isP1 ? 'Weeks 1–4' : isP2 ? 'Weeks 5–8' : 'Weeks 9–12';
   const phaseDesc = isP1
-    ? 'Phase 1 (Armor & Base): Structural hypertrophy (8–10 main, 10–15 accessory), tendon preparation, and acceleration mechanics. Starts Sunday. Guardrails: Zero Olympic lifts, burpees, sandbags, or jump ropes. Mandatory 8-Min DIME Warm-Up daily.'
+    ? 'Phase 1 (Armor & Base): Structural hypertrophy (8–10 main, 10–15 accessory), tendon resilience, acceleration mechanics, and aerobic ruck base (3–4 mi @ 35 lbs). 7-Day Garrison Cycle. Guardrails: Zero Olympic lifts, burpees, or high-impact jump ropes. Mandatory 8-Min DIME Warm-Up daily.'
     : isP2
-    ? 'Phase 2 (Power-Building): Maximal force production (5–6 main, 8–10 accessory), upper-back & shoulder density, and top-end agility/deceleration speed. Guardrails: Zero Olympic lifts, burpees, sandbags, or jump ropes. Mandatory 8-Min DIME Warm-Up daily.'
-    : 'Phase 3 (Peak & Velocity): Heavy strength maintenance (3–5 main, 6–8 explosive/hypertrophy), ballistic power, and broken-sprint tactical bounding conditioning. Guardrails: Zero Olympic lifts, burpees, sandbags, or jump ropes. Mandatory 8-Min DIME Warm-Up daily.';
+    ? 'Phase 2 (Power-Building): Maximal force production (5–6 main, 8–10 accessory), yoke/upper-back density, top-end sprint velocity, and 4–5 mi ruck @ 45 lbs. Guardrails: Zero Olympic lifts, burpees, or high-impact jump ropes. Mandatory 8-Min DIME Warm-Up daily.'
+    : 'Phase 3 (Peak & Combat Velocity): Heavy strength maintenance (3–5 main, 6–8 explosive/hypertrophy), IMT bounding power under fatigue, casualty-drag stamina, and 5–6 mi ruck @ 45–55 lbs. Guardrails: Zero Olympic lifts, burpees, or high-impact jump ropes. Mandatory 8-Min DIME Warm-Up daily.';
 
   const coachRule =
-    'Tactical Bodybuilding Execution & Field Rules: 1) Double Progression — Pick a weight within the rep range; once you hit the top reps across all sets with 1–2 RIR, add +5 lbs (upper) or +10 lbs (lower) next week. 2) Mandated Daily DIME — Complete the 8-Minute DIME Warm-Up before EVERY session. 3) Guardrails — Zero Olympic lifts, burpees, sandbags, or jump ropes. 4) Deload Weeks (4, 8, 12) — Cut working sets by 40% (~80% weight, crisp speed). 5) Field Fatigue Protocol — Off 24-hr duty / 4 hrs sleep: cut secondary accessory sets by half, keep main lift @ 3 RIR, swap sprints for 20-min Zone 2 flush.';
+    'Military Tactical Bodybuilding & Garrison Rules: 1) Double Progression — Pick a weight within the target rep range; once you hit the top of the rep range for all sets with 1–2 RIR, add +5 lbs (upper body) or +10 lbs (lower body) next week. 2) Unit PT Adjustment Rule — If morning unit PT includes heavy running (>3 miles) or high-rep leg calisthenics, drop 1 working set from lower-body accessory lifts that afternoon and prioritize carbs + electrolytes before lifting. 3) Guardrails — Zero Olympic lifts, burpees, or high-impact jump ropes. 4) Deload Weeks (4, 8, 12) — Cut working sets by 40% (~80% load) and cap Day 6 rucking at 2 miles unweighted. 5) Field Exercise (FTX) / Range Protocol — During multi-day field ops, pause heavy lower-body barbell loading, perform 15–20 mins bodyweight push-ups, pull-ups, and mobility, and resume at previous week\'s weights upon return to garrison.';
 
-  const tuesdayDay: ProtocolDay = isP1
+  const day3SpeedDay: ProtocolDay = isP1
     ? {
-        day: 'Sunday +2 • Tuesday',
-        focus: 'Tuesday: Speed & Combat Agility Conditioning (Track / Turf — Phase 1 Acceleration)',
+        day: 'Day 3',
+        focus: 'Tactical Speed & Bounding Conditioning (Track / Field — Phase 1 Acceleration & Mechanics)',
         warmup: TACTICAL_BB_DIME_WARMUP_TEXT,
         strength: [
-          '20m Falling-Start Sprints (6x20m) [Overload: Explosive first 3 steps - Effort: Max Acceleration (RPE 9) - Rest: 90s - Walk-back recovery between reps]',
-          '40m Build-Up Sprints (4x40m) [Overload: Smooth top-speed posture - Effort: Hard (85-90% effort, RPE 8.5) - Rest: 120s - 2 min recovery]',
-          '50m Sled Push Finisher (4x50m) [Overload: Add +10 lbs sled when crisp - Effort: Moderate Load (RPE 8) - Rest: 60s - Drive low through balls of feet]'
+          '20m Prone-to-Sprint Starts (6x20m) [Overload: Explosive prone push-off & first 3 steps - Effort: Max Acceleration (RPE 9) - Rest: 90s - 90s walk-back rest between starts]',
+          '40m Build-Up Sprints (4x40m) [Overload: Smooth acceleration to 85-90% effort - Effort: Hard (85-90% effort, RPE 8.5) - Rest: 120s - 2 min rest]',
+          '40m Backwards Sled Drag Finisher (Casualty-Drag Simulation) (4x40m) [Overload: Add +10 lbs sled when crisp - Effort: Casualty-Drag Simulation (RPE 8.5) - Rest: 60s - 4 rounds of 40m backwards sled drag]'
         ],
         run: 'Rest from distance running',
         pace: 'N/A',
-        progressionRule: 'Phase 1 Acceleration: Combat sprint acceleration and anaerobic repeatability. Field Fatigue Rule: Swap sprints for 20-min Zone 2 flush if sleep-deprived.'
+        progressionRule: 'Phase 1 Acceleration & Mechanics: 6×20m prone-to-sprint starts (90s rest) + 4×40m build-up sprints at 85–90% (2 min rest) + 4×40m backwards sled drag finisher (60s rest).'
       }
     : isP2
     ? {
-        day: 'Sunday +2 • Tuesday',
-        focus: 'Tuesday: Speed & Combat Agility Conditioning (Track / Turf — Phase 2 Agility & Deceleration)',
+        day: 'Day 3',
+        focus: 'Tactical Speed & Bounding Conditioning (Track / Field — Phase 2 Agility & Top-End Velocity)',
         warmup: TACTICAL_BB_DIME_WARMUP_TEXT,
         strength: [
-          'Pro Agility Shuttle (5-10-5 meters) (6x5-10-5m) [Overload: Sharp plant & drop hips - Effort: All-Out Change of Direction (RPE 9) - Rest: 90s]',
-          '30m Flying Sprints (15m build-up, 30m max velocity) (5x30m) [Overload: Upright relaxed top speed - Effort: Max Velocity (RPE 9.5) - Rest: 120s - 2 min full recovery]',
+          'Pro Agility Shuttle (5-10-5m) (6x5-10-5m) [Overload: Sharp plant & low hip turns - Effort: All-Out Change of Direction (RPE 9) - Rest: 90s]',
+          '30m Flying Sprints (15m build-up, 30m max velocity) (5x30m) [Overload: Upright relaxed top-end velocity - Effort: Max Velocity (RPE 9.5) - Rest: 120s - 2 min full rest]',
           'Assault Bike Max Sprint / Easy Spin Finisher (6x15s sprint / 45s spin) [Effort: All-Out 15s / Easy 45s (RPE 9) - Rest: 45s]'
         ],
         run: 'Rest from distance running',
         pace: 'N/A',
-        progressionRule: 'Phase 2 Agility & Deceleration: Sharp lateral deceleration and top-end sprint mechanics. Field Fatigue Rule: Swap sprints for 20-min Zone 2 flush.'
+        progressionRule: 'Phase 2 Agility & Top-End Velocity: 6× Pro Agility Shuttle (90s rest) + 5×30m flying sprints (2 min rest) + 6 rounds of 15s assault bike max sprint / 45s easy spin.'
       }
     : {
-        day: 'Sunday +2 • Tuesday',
-        focus: 'Tuesday: Speed & Combat Agility Conditioning (Track / Turf — Phase 3 Tactical Bounding)',
+        day: 'Day 3',
+        focus: 'Tactical Speed & Bounding Conditioning (Track / Field — Phase 3 Combat Bounding Simulation)',
         warmup: TACTICAL_BB_DIME_WARMUP_TEXT,
         strength: [
-          '60m Broken Sprints (sprint 20m, drop to chest, pop up, sprint 40m) (4x60m) [Effort: Tactical Bounding Simulation (RPE 9.5) - Rest: 150s - 2.5 min full recovery]',
-          'T-Drill Agility Runs (10m x 10m) (4x10m x 10m) [Effort: Crisp Lateral & Backpedal Cuts (RPE 9) - Rest: 90s]'
+          'IMT Bound Series (sprint 15m, drop to prone 2s, pop up, sprint 15m, cut 90 deg, sprint 15m) (4x45m IMT Bound) [Effort: Combat Bounding Simulation (RPE 9.5) - Rest: 150s - 2.5 min full recovery]',
+          "50m Heavy Farmer's Walk + 50m Sprint Shuttle (4x50m carry + 50m sprint) [Overload: +5 lbs/hand on farmer walk - Effort: Sprint-Drag-Carry Power (RPE 9) - Rest: 120s - 2 min rest]"
         ],
         run: 'Rest from distance running',
         pace: 'N/A',
-        progressionRule: 'Phase 3 Tactical Bounding: Realistic prone-to-sprint get-ups and multi-directional agility under fatigue. Field Fatigue Rule: Swap for 20-min Zone 2 flush.'
+        progressionRule: 'Phase 3 Combat Bounding Simulation: 4× IMT Bound Series (15m sprint, 2s prone drop, 15m sprint, 90° cut, 15m sprint — 2.5 min rest) + 4× 50m heavy farmer\'s walk + 50m sprint shuttle (2 min rest).'
       };
+
+  const day6RuckRun = isP1
+    ? 'Part A — Aerobic Ruck March (Morning — 45–60 mins): 3–4 miles @ 35 lbs dry weight'
+    : isP2
+    ? 'Part A — Aerobic Ruck March (Morning — 45–60 mins): 4–5 miles @ 45 lbs dry weight'
+    : 'Part A — Aerobic Ruck March (Morning — 45–60 mins): 5–6 miles @ 45–55 lbs dry weight';
+
+  const day6RuckPace = isP1
+    ? '15:00/mile pace (Zone 2 HR 130–145 BPM; brisk power-walk, no running)'
+    : isP2
+    ? '14:30/mile pace on rolling terrain (Zone 2 HR 130–145 BPM; brisk power-walk)'
+    : '14:00–14:30/mile pace (Zone 2 HR 130–145 BPM; Week 12 Deload: 2-mile unweighted Zone 2 walk)';
 
   return {
     id: `tactical_bodybuilding_p${phaseNum}`,
@@ -1142,92 +1144,89 @@ function buildTacticalBodybuildingPhase(phaseNum: 1 | 2 | 3): ProtocolPhase {
     coachRule,
     days: [
       {
-        day: 'Sunday',
-        focus: 'Sunday: Upper Body — Push & Shoulder Armor',
+        day: 'Day 1',
+        focus: 'Upper Body — Push & Plate-Carrier Armor',
         warmup: TACTICAL_BB_DIME_WARMUP_TEXT,
         strength: [
-          `Incline Barbell or Dumbbell Bench Press (4x${mainReps}) [Overload: Double progression (+5 lbs upper at top reps, 1-2 RIR) - Effort: RPE 8 - Rest: ${compoundRest}s - Primary press; 2-sec controlled eccentric]`,
-          `Seated Dumbbell Overhead Press (3x${upperAccReps}) [Overload: +5 lbs DBs on top reps (1-2 RIR) - Effort: RPE 8 - Rest: ${accessoryRest}s - Full range of motion; brace core without arch]`,
-          `Weighted Dips or Close-Grip Bench Press (3x${upperAccReps}) [Overload: +5 lbs on top reps (1-2 RIR) - Effort: RPE 8 - Rest: ${accessoryRest}s - Keep elbows tucked to protect shoulder capsule]`,
-          `Explosive Med-Ball Chest Pass (against wall) (4x5) [Overload: Maximum throwing velocity - Effort: Explosive (RPE 8.5) - Rest: 60s - Maximum velocity, full reset between throws]`,
-          `Superset: Lateral Raises + Cable Tricep Pushdowns (3x12-15 / 12-15) [Overload: Minimal rest between paired movements; +2.5-5 lbs at 15 reps - Effort: RPE 8.5 - Rest: 60s]`
+          `Incline Barbell or Dumbbell Bench Press (4x${mainReps}) [Overload: Double progression (+5 lbs upper at top reps, 1-2 RIR) - Effort: RPE 8 - Rest: ${compoundRest}s - Builds upper-chest shelf for plate carriers; 2-sec eccentric]`,
+          `Standing Barbell or Dumbbell Overhead Press (3x${upperAccReps}) [Overload: +5 lbs on top reps (1-2 RIR) - Effort: RPE 8 - Rest: ${accessoryRest}s - Strict overhead stability and trunk bracing under axial load]`,
+          `Weighted Dips or Close-Grip Bench Press (3x${upperAccReps}) [Overload: +5 lbs on top reps (1-2 RIR) - Effort: RPE 8 - Rest: ${accessoryRest}s - Tricep lockout strength for hand-release push-ups and obstacle climbs]`,
+          `Explosive Med-Ball Chest Pass (from kneeling) (4x5) [Overload: Max velocity per throw - Effort: Explosive (RPE 8.5) - Rest: 60s - Simulates prone-to-sprint push-off; max velocity per throw (All Phases)]`,
+          `Superset: Lateral Raises + Cable Tricep Pushdowns (3x12-15 / 12-15) [Overload: Minimal rest between paired movements; +2.5-5 lbs at 15 reps - Effort: RPE 8.5 - Rest: 60s - Medial delt armor and elbow tendon resilience]`
         ],
         run: 'Rest from running',
         pace: 'N/A',
-        progressionRule: `Primary Press: 4×${mainReps} (+5 lbs upper when hitting top reps w/ 1–2 RIR); Accessories: ${upperAccReps}. Mandatory 8-Min DIME Warm-Up.`
+        progressionRule: `Primary Press: 4×${mainReps} (+5 lbs upper when hitting top reps w/ 1–2 RIR); OHP & Dips/CGBP: 3×${upperAccReps}. Mandatory 8-Min DIME Warm-Up.`
       },
       {
-        day: 'Monday',
-        focus: 'Monday: Lower Body — Quad Drive & Acceleration',
+        day: 'Day 2',
+        focus: 'Lower Body — Quad Drive & Ruck Stability',
         warmup: TACTICAL_BB_DIME_WARMUP_TEXT,
         strength: [
-          `Trap Bar Deadlift or Front Squat (4x${mainReps}) [Overload: Double progression (+10 lbs lower at top reps, 1-2 RIR) - Effort: RPE 8 - Rest: ${compoundRest}s - Primary lower lift; explosive concentric drive]`,
-          `Bulgarian Split Squats (Dumbbells) (3x${lowerAccSingleReps}) [Overload: +5-10 lbs DBs when hitting top reps - Effort: RPE 8 - Rest: ${accessoryRest}s - Maintain upright torso and knee alignment]`,
-          `Leg Press (3x${legPressReps}) [Overload: +10 lbs at crisp eccentric control - Effort: RPE 8 - Rest: ${accessoryRest}s - Controlled 3-second eccentric lowering phase]`,
-          `Box Jumps (4x4) [Overload: Step down and fully reset each rep - Effort: Explosive Power (RPE 8.5) - Rest: 90s - Focus on soft landing mechanics]`,
-          `Superset: Standing Calf Raises + Hanging Leg Raises (3x12-15 / 12-15) [Overload: Full stretch at bottom of calf raise; no swinging - Effort: RPE 8.5 - Rest: 60s]`
+          `Trap Bar Deadlift (4x${mainReps}) [Overload: Double progression (+10 lbs lower at top reps, 1-2 RIR) - Effort: RPE 8 - Rest: ${compoundRest}s - Direct ACFT carryover and high-output lower-body force]`,
+          `Rear-Foot Elevated Split Squats (Dumbbells) (3x${lowerAccSingleReps}) [Overload: +5-10 lbs DBs when hitting top reps - Effort: RPE 8 - Rest: ${accessoryRest}s - Bulletproofs knees and hips for uneven terrain under a ruck]`,
+          `Front Squat or Hack Squat (3x${upperAccReps}) [Overload: +10 lbs at crisp eccentric control - Effort: RPE 8 - Rest: ${accessoryRest}s - Anterior core bracing and quad hypertrophy without spinal shear]`,
+          `Seated-to-Box Jump (from 90-degree bench) (4x4) [Overload: Step down and fully reset each rep - Effort: Explosive Power (RPE 8.5) - Rest: 90s - Eliminates stretch reflex; trains explosive get-up from cover (All Phases)]`,
+          `Superset: Standing Calf Raises + Weighted Plank (3x12-15 / 45 sec) [Overload: +5-10 lbs on calf raises & weighted plank - Effort: RPE 8.5 - Rest: 60s - Ankle stiffness for rucking + anti-extension trunk endurance]`
         ],
         run: 'Rest from running',
         pace: 'N/A',
-        progressionRule: `Primary Lower: 4×${mainReps} (+10 lbs lower at top reps w/ 1–2 RIR); Split Squats ${lowerAccSingleReps}, Leg Press ${legPressReps}. Mandatory 8-Min DIME Warm-Up.`
+        progressionRule: `Trap Bar Deadlift: 4×${mainReps} (+10 lbs lower at top reps w/ 1–2 RIR); Split Squats ${lowerAccSingleReps}, Front/Hack Squat 3×${upperAccReps}. Unit PT Rule: Drop 1 accessory set if morning PT had >3 mi run.`
       },
+      day3SpeedDay,
       {
-        ...tuesdayDay,
-        day: 'Tuesday'
-      },
-      {
-        day: 'Wednesday',
-        focus: 'Wednesday: Upper Body — Pull & Combat Armor Posture',
+        day: 'Day 4',
+        focus: 'Upper Body — Yoke, Pull & Ruck Posture',
         warmup: TACTICAL_BB_DIME_WARMUP_TEXT,
         strength: [
-          `Weighted Pull-Ups or Lat Pulldowns (4x${mainReps}) [Overload: Double progression (+5 lbs upper at top reps, 1-2 RIR) - Effort: RPE 8 - Rest: ${compoundRest}s - Full scapular depression and chest-to-bar pull]`,
-          `Chest-Supported T-Bar or Dumbbell Row (4x${upperAccReps}) [Overload: +5 lbs on top reps - Effort: RPE 8 - Rest: ${accessoryRest}s - Eliminates lower-back fatigue; squeeze shoulder blades]`,
-          `Face Pulls (4x15) [Overload: +5 lbs when external rotation stays crisp - Effort: RPE 8.5 - Rest: 60s - External rotation at peak contraction]`,
-          `Barbell or Heavy Dumbbell Shrugs (3x10-12) [Overload: +5-10 lbs on 12 reps - Effort: RPE 8 - Rest: 60s - 2-second pause at the top of each repetition]`,
-          `Superset: Hammer Curls + Heavy Farmer's Carries (3x10 / 40m) [Overload: +5 lbs at crisp posture - Effort: RPE 8.5 - Rest: 90s - Maintain tall posture and braced core on carries]`
+          `Weighted Pull-Ups (Overhand / Tactical Grip) (4x${mainReps}) [Overload: Double progression (+5 lbs upper at top reps, 1-2 RIR) - Effort: RPE 8 - Rest: ${compoundRest}s - Wall/obstacle climb strength and lats for torso stabilization]`,
+          `Chest-Supported T-Bar or Seal Row (4x${upperAccReps}) [Overload: +5 lbs on top reps - Effort: RPE 8 - Rest: ${accessoryRest}s - Zero lower-back fatigue; builds mid-back thickness against kit pull]`,
+          `Face Pulls with External Rotation (4x15) [Overload: +5 lbs when external rotation stays crisp - Effort: RPE 8.5 - Rest: 60s - Rotator cuff health for weapon manipulation and overhead carries (All Phases)]`,
+          `Heavy Barbell or Trap-Bar Shrugs (3x10-12) [Overload: +5-10 lbs on 12 reps - Effort: RPE 8 - Rest: 60s - Builds upper-trap yoke to protect brachial plexus under heavy rucks (All Phases)]`,
+          `Superset: Hammer Curls + Heavy Farmer's Carries (3x10 / 50m) [Overload: +5 lbs at crisp posture - Effort: RPE 8.5 - Rest: 90s - Litter-carry grip stamina; keep ribs stacked over pelvis]`
         ],
         run: 'Rest from running',
         pace: 'N/A',
-        progressionRule: `Pull-Ups/Pulldowns: 4×${mainReps} (+5 lbs upper at top reps); Rows: 4×${upperAccReps}; Shrugs + Hammer Curl/Farmer Carry superset. Mandatory 8-Min DIME Warm-Up.`
+        progressionRule: `Weighted Pull-Ups: 4×${mainReps} (+5 lbs upper at top reps); T-Bar/Seal Row: 4×${upperAccReps}; Shrugs + Hammer Curl/50m Farmer Carry superset.`
       },
       {
-        day: 'Thursday',
-        focus: 'Thursday: Lower Body — Posterior Chain & Top-End Speed',
+        day: 'Day 5',
+        focus: 'Lower Body — Posterior Chain & Casualty-Drag Power',
         warmup: TACTICAL_BB_DIME_WARMUP_TEXT,
         strength: [
-          `Romanian Deadlift (Barbell or Dumbbell) (4x${mainReps}) [Overload: Double progression (+10 lbs lower at top reps, 1-2 RIR) - Effort: RPE 8 - Rest: ${compoundRest}s - Push hips back until deep hamstring tension; flat spine]`,
-          `Heavy Sled Push or Reverse Sled Drag (4x30m) [Overload: +10 lbs sled when trips stay crisp - Effort: Heavy (RPE 8.5) - Rest: 90s - Drive through balls of feet]`,
-          `Lying or Seated Leg Curls (3x${legPressReps}) [Overload: +5-10 lbs with strict return control - Effort: RPE 8 - Rest: ${accessoryRest}s - Control the return phase; avoid hip lift]`,
-          `Kettlebell Swings (4x12) [Overload: +5 lbs KB when hip snap is explosive - Effort: Explosive Hinge (RPE 8) - Rest: 60s - Explosive power hip snap; hinge, do not squat]`,
-          `Pallof Press (3x10/side) [Overload: +2.5-5 lbs or band tension - Effort: RPE 8 - Rest: 60s - Anti-rotation core stability; 2-second hold at full extension]`
+          `Romanian Deadlift (Barbell or Dumbbell) (4x${mainReps}) [Overload: Double progression (+10 lbs lower at top reps, 1-2 RIR) - Effort: RPE 8 - Rest: ${compoundRest}s - Eccentric hamstring resilience to prevent sprint pulls]`,
+          `Heavy Reverse Sled Drag + Forward Sled Sprint (4x25m rev + 25m fwd) [Overload: +10 lbs sled when trips stay crisp - Effort: Sprint-Drag-Carry Power (RPE 8.5) - Rest: 90s - Direct Sprint-Drag-Carry metabolic conditioning (All Phases)]`,
+          `Lying or Seated Leg Curls (3x${legCurlReps}) [Overload: +5-10 lbs with strict 3-sec eccentric - Effort: RPE 8 - Rest: ${accessoryRest}s - 3-second controlled eccentric; isolate knee flexion]`,
+          `Heavy Kettlebell Swings (4x12) [Overload: +5 lbs KB when hip snap is explosive - Effort: Ballistic Hip Extension (RPE 8) - Rest: 60s - Ballistic hip extension for sprinting and obstacle vaulting (All Phases)]`,
+          `Superset: Pallof Press + Hanging Knee/Leg Raises (3x10/side / 12) [Overload: +2.5-5 lbs or band tension - Effort: RPE 8.5 - Rest: 60s - Anti-rotation core stability under asymmetric weapon/pack loads]`
         ],
         run: 'Rest from running',
         pace: 'N/A',
-        progressionRule: `RDL: 4×${mainReps} (+10 lbs lower at top reps); Sled Push/Drag: 4×30m (90s rest); Leg Curls: 3×${legPressReps}. Mandatory 8-Min DIME Warm-Up.`
+        progressionRule: `RDL: 4×${mainReps} (+10 lbs lower at top reps); Reverse Sled Drag + Sled Sprint: 4×25m+25m (90s rest); Leg Curls: 3×${legCurlReps}. Unit PT Rule: Drop 1 accessory set if morning PT had >3 mi run.`
       },
       {
-        day: 'Friday',
-        focus: 'Friday: Athletic Conditioning & Arms ("Friday Pump + Engine")',
+        day: 'Day 6',
+        focus: 'Ruck Conditioning & Arm Hypertrophy ("Ruck + Arm Pump")',
         warmup: TACTICAL_BB_DIME_WARMUP_TEXT,
         strength: [
-          'EZ-Bar Curls (3x10-12) [Overload: +5 lbs upper at 12 reps - Effort: RPE 8.5 - Rest: 60s - Part A Arm Hypertrophy (25 mins total)]',
-          'Skullcrushers or Overhead Cable Extension (3x10-12) [Overload: +5 lbs upper at 12 reps - Effort: RPE 8.5 - Rest: 60s - Controlled eccentric, full elbow lock]',
-          'Cable Crunches or Ab-Wheel Rollouts (3x12-15) [Overload: +5 lbs cable or deeper rollout - Effort: RPE 8 - Rest: 60s - Spine-safe anterior core hypertrophy]'
+          'EZ-Bar or Dumbbell Bicep Curls (3x10-12) [Overload: +5 lbs upper at 12 reps - Effort: RPE 8.5 - Rest: 60s - Part B Arm & Rear-Delt Pump (25 mins)]',
+          'Overhead Cable Tricep Extension or Skullcrushers (3x10-12) [Overload: +5 lbs upper at 12 reps - Effort: RPE 8.5 - Rest: 60s - Controlled eccentric, full elbow lock]',
+          'Superset: Band Pull-Aparts + Dead Hang (Decompression) (3x20 / 45 sec hang) [Effort: RPE 7.5 - Rest: 60s - Decompress spine and restore shoulder posture post-ruck]'
         ],
-        run: 'Part B — Aerobic Base / Operational Flush: 25–30 mins Zone 2 Run, Row, or Incline Treadmill Walk',
-        pace: 'Heart rate 130–145 BPM — conversational pace to clear metabolic waste and build operational stamina',
-        progressionRule: 'Part A (25 mins Arms & Core) + Part B (25–30 mins Zone 2 Flush @ 130–145 BPM). Mandatory 8-Min DIME Warm-Up.'
+        run: day6RuckRun,
+        pace: day6RuckPace,
+        progressionRule: `${day6RuckRun} (${day6RuckPace}) + Part B (25 mins Arm & Rear-Delt Pump + Spinal Decompression Hang).`
       },
       {
-        day: 'Saturday',
-        focus: 'Saturday: Complete Rest (Optional Daily DIME Mobility Flush)',
+        day: 'Day 7',
+        focus: 'Complete Rest & Garrison Prep',
         warmup: TACTICAL_BB_DAILY_RECOVERY_DIME_TEXT,
         strength: [
-          'Complete Rest: Full recovery, hydration, 8+ hours of dark sleep, and operational meal prep (Optional: light 8-min DIME mobility flow to relieve ruck & vehicle transit hip tightness).'
+          'Complete Rest & Garrison Prep: Full CNS recovery, foot care, meal prep, and 8+ hours of sleep prioritization.'
         ],
         run: 'Complete Rest',
         pace: 'N/A',
-        progressionRule: 'Full recovery, hydration, and sleep prioritization before starting Sunday Upper Push.'
+        progressionRule: 'Full CNS recovery, foot care, hydration, and sleep prioritization before starting Day 1 Upper Push.'
       }
     ]
   };
@@ -1272,9 +1271,9 @@ function applyDeloadToExerciseString(exerciseStr: string): string {
 }
 
 /**
- * Returns customized week data for any week 1 through 12 of the 12-Week Tactical Bodybuilding Program.
+ * Returns customized week data for any week 1 through 12 of the 12-Week Military Tactical Bodybuilding Program.
  * Incorporates Phase 1 (Wks 1–4), Phase 2 (Wks 5–8), Phase 3 (Wks 9–12),
- * Deload Weeks (Weeks 4, 8, 12: -40% working sets, ~80% weight), and Mandated Daily DIME Warm-Up.
+ * Deload Weeks (Weeks 4, 8, 12: -40% working sets, ~80% weight, cap Day 6 ruck at 2 miles unweighted), and Mandated 8-Min DIME Warm-Up.
  */
 export function getTacticalHypertrophyWeekData(weekNumber: number): ProtocolPhase {
   const week = Math.max(1, Math.min(12, weekNumber));
@@ -1288,21 +1287,24 @@ export function getTacticalHypertrophyWeekData(weekNumber: number): ProtocolPhas
       const isRest = d.focus.toLowerCase().includes('complete rest');
       if (!isRest) {
         d.strength = d.strength.map((s) => applyDeloadToExerciseString(s));
-        if (d.run && !d.run.toLowerCase().includes('rest')) {
+        if (d.day === 'Day 6') {
+          d.run = `Part A — Deload Week ${week} Unweighted Walk: 2 miles unweighted Zone 2 walk`;
+          d.pace = 'Unweighted brisk walk (Zone 2 HR 130–145 BPM — cap Day 6 rucking at 2 miles unweighted on Deload Weeks)';
+        } else if (d.run && !d.run.toLowerCase().includes('rest')) {
           d.run = `${d.run} [Week ${week} Deload: -40% rounds/volume]`;
         }
-        d.progressionRule = `DELOAD WEEK ${week}: Cut working sets by 40% (e.g. 4 sets → 2–3 sets) & keep weights at ~80% of prior week's load with crisp bar speed. ${d.progressionRule || ''}`;
+        d.progressionRule = `DELOAD WEEK ${week}: Reduce working sets by 40% (e.g. 4 sets → 2–3 sets), keep weights at ~80% of prior week's load, and cap Day 6 rucking at 2 miles unweighted. ${d.progressionRule || ''}`;
       }
     });
   }
 
   const phaseLabel =
-    phaseNum === 1 ? 'Phase 1: Armor & Base' : phaseNum === 2 ? 'Phase 2: Power-Building' : 'Phase 3: Peak & Velocity';
+    phaseNum === 1 ? 'Phase 1: Armor & Base' : phaseNum === 2 ? 'Phase 2: Power-Building' : 'Phase 3: Peak & Combat Velocity';
 
   return {
     ...basePhase,
     id: `tactical_bb_week_${week}`,
-    title: `12-Week Tactical Bodybuilding — Week ${week} (${phaseLabel}${isDeloadWeek ? ' • DELOAD' : ''})`,
+    title: `12-Week Military Tactical Bodybuilding — Week ${week} (${phaseLabel}${isDeloadWeek ? ' • DELOAD' : ''})`,
     weeks: `Week ${week} of 12 • ${phaseLabel}`,
     days: clonedDays
   };
@@ -1312,18 +1314,18 @@ export function getTacticalHypertrophyWeekData(weekNumber: number): ProtocolPhas
 PROTOCOL_DATA.tactical_hypertrophy = TACTICAL_HYPERTROPHY_BASE_PHASE;
 
 // ---------------------------------------------------------------------------
-// Universal Military PT Test & Selection Readiness (ACFT / PFT / CFT) Protocol
+// General Military PFT & Selection Readiness (PFT / CFT / PRT) Protocol
 // ---------------------------------------------------------------------------
 export const UNIVERSAL_PAT_PROTOCOL: ProtocolPhase = {
   id: 'universal_pat',
-  title: 'Universal Military PT Test & Selection Readiness Protocol',
+  title: 'General Military PFT & Selection Readiness Protocol (PFT / CFT / PRT)',
   weeks: 'Weeks 1-8',
-  desc: 'Comprehensive 8-week Armed Forces PT test and selection preparation (ACFT / PFT / CFT). Peak 1.5–2 mile running speed, 300m anaerobic sprint output, unbroken hand-release push-up & plank density, and 180 lb casualty drag power.',
-  coachRule: 'Military PT Laws: Target +1 rep per week on continuous push-ups and plank/core density. Drop 3-5 seconds off 300m interval repeats. Progressive +10 lbs on Trap Bar Deadlift. 1.5-Mile threshold goal: sub-10:30 competitive standard (or sub-13:30 2-mile ACFT).',
+  desc: 'Comprehensive 8-week general Armed Forces PFT, CFT, PRT, and selection preparation. Peak 1.5–3 mile running speed, 300m anaerobic shuttle sprint output, unbroken push-up & plank/core density, pull-up volume, and 180 lb casualty drag power.',
+  coachRule: 'General PFT Laws: Target +1-2 reps per week on continuous push-ups, pull-ups, and plank/core density. Drop 3-5 seconds off 300m interval repeats. Progressive +10 lbs on Trap Bar Deadlift & Squats. 1.5-Mile threshold goal: sub-10:30 competitive standard.',
   days: [
     {
       day: 'Day 1',
-      focus: 'Upper Combat Density: Bench & Push-Up Volume',
+      focus: 'Upper Combat Density: Bench, Pull-Ups & Push-Up Volume',
       warmup: DIME_WARMUP_TEXT,
       strength: [
         'Flat Barbell Bench Press (4x8) [Overload: +5 lbs on 8 reps - Rest: 90s - Retract scapulae, touch lower sternum]',
@@ -1331,7 +1333,7 @@ export const UNIVERSAL_PAT_PROTOCOL: ProtocolPhase = {
         'Standing Military Overhead Press (3x8) [Overload: +5 lbs on 8 reps - Rest: 90s - Core braced, glutes squeezed]',
         'Incline Dumbbell Bench Press (3x10) [Overload: +5 lbs DBs on 10 reps - Rest: 75s - 30 deg incline, upper chest armor]',
         'Barbell Bent-Over Row (4x8-10) [Overload: +5 lbs on 10 reps - Rest: 75s - Strict 45 deg hinge, pull to navel]',
-        'Military Cadence Hand-Release Push-Up Benchmark (3xMax) [Cadence test: 2 sec down, 1 sec up - Rest: 90s - Track unbroken reps]'
+        'Military Cadence Push-Up Benchmark (3xMax) [Cadence test: 2 sec down, 1 sec up - Rest: 90s - Track unbroken reps]'
       ],
       run: 'Rest from running',
       pace: 'N/A',
@@ -1394,14 +1396,14 @@ export const UNIVERSAL_PAT_PROTOCOL: ProtocolPhase = {
     },
     {
       day: 'Day 6',
-      focus: 'Military PT Test Run Benchmark & Aerobic Threshold',
+      focus: 'General PFT Run Benchmark & Aerobic Threshold',
       warmup: DIME_WARMUP_TEXT,
       strength: [
         'Post-Run Mandatory Core Bracing (3x15) [Deadbugs, bird-dogs, and side planks for lumbar spine integrity]'
       ],
-      run: '1.5-Mile Military PT Benchmark Run (or 2-Mile ACFT Pacing)',
-      pace: 'Target Pace: 6:30-7:20 min/mile (Sub-10:30 to 11:00 1.5-mi / Sub-13:45 2-mi standard). 800m cool-down jog.',
-      progressionRule: 'PT Benchmark Run: Drop 5-10s off total time bi-weekly; Maintain steady continuous split pacing'
+      run: '1.5-Mile / 3-Mile General PFT Benchmark Run',
+      pace: 'Target Pace: 6:30-7:20 min/mile (Sub-10:30 to 11:00 1.5-mi / Sub-21:00 3-mi PFT standard). 800m cool-down jog.',
+      progressionRule: 'PFT Benchmark Run: Drop 5-10s off total time bi-weekly; Maintain steady continuous split pacing'
     },
     {
       day: 'Day 7',
@@ -1417,25 +1419,24 @@ export const UNIVERSAL_PAT_PROTOCOL: ProtocolPhase = {
   ]
 };
 
-// Add Universal Military PT into PROTOCOL_DATA
+// Add General Military PFT into PROTOCOL_DATA
 PROTOCOL_DATA.universal_pat = UNIVERSAL_PAT_PROTOCOL;
 
 /**
- * Returns customized week data for any week 1 through 8 of the Military PT & Selection Protocol.
- * Dynamically injects progressive 300m sprint repeats, casualty drag conditioning, and PT test milestones.
+ * Returns customized week data for any week 1 through 8 of the General Military PFT & Selection Protocol.
+ * Dynamically injects progressive 300m sprint repeats, casualty drag conditioning, and PFT test milestones.
  */
 export function getUniversalPatWeekData(weekNumber: number): ProtocolPhase {
   const week = Math.max(1, Math.min(8, weekNumber));
   const clonedDays = JSON.parse(JSON.stringify(UNIVERSAL_PAT_PROTOCOL.days)) as ProtocolDay[];
 
-  // Dynamic weekly progressions across the 8-week military PT & selection cycle
   if (week === 1) {
     clonedDays[1].run = '4 x 300m Track Intervals (Maximal Combat Speed)';
     clonedDays[1].pace = 'Target: 52-58 sec per 300m repeat. 2.5-3 min full walking recovery between rounds.';
     clonedDays[1].progressionRule = 'Week 1 Benchmark: Establish baseline 300m sprint turnover.';
-    clonedDays[5].run = '1.5-Mile / 2-Mile Military PT Benchmark Run';
-    clonedDays[5].pace = 'Target: 6:45-7:30 min/mile (Sub-11:15 1.5-mi / Sub-14:30 2-mi benchmark). 800m cool-down jog.';
-    clonedDays[5].progressionRule = 'Week 1 Diagnostic: Establish baseline military PT test readiness time.';
+    clonedDays[5].run = '1.5-Mile / 3-Mile General PFT Benchmark Run';
+    clonedDays[5].pace = 'Target: 6:45-7:30 min/mile (Sub-11:15 1.5-mi / Sub-22:00 3-mi benchmark). 800m cool-down jog.';
+    clonedDays[5].progressionRule = 'Week 1 Diagnostic: Establish baseline general PFT readiness time.';
   } else if (week === 2) {
     clonedDays[1].run = '4 x 300m Track Intervals (Lactate Tolerance)';
     clonedDays[1].pace = 'Target: 51-56 sec per 300m repeat. 2.5 min recovery.';
@@ -1447,11 +1448,10 @@ export function getUniversalPatWeekData(weekNumber: number): ProtocolPhase {
     clonedDays[1].run = '5 x 300m Track Intervals (Volume Overload)';
     clonedDays[1].pace = 'Target: 50-54 sec per 300m repeat. 2.5 min walking recovery.';
     clonedDays[1].progressionRule = '+1 Repeat added. Maintain sub-54s speed across all 5 intervals.';
-    clonedDays[5].run = '2.0-Mile Over-Distance Capacity Run';
-    clonedDays[5].pace = 'Target: 6:50-7:15 min/mile. Build aerobic stamina across full 2-mile ACFT distance.';
+    clonedDays[5].run = '2.5-Mile Over-Distance Capacity Run';
+    clonedDays[5].pace = 'Target: 6:50-7:15 min/mile. Build aerobic stamina across PFT distance.';
     clonedDays[5].progressionRule = 'Over-distance: Build aerobic stamina across test distance.';
   } else if (week === 4) {
-    // Deload & CNS Reset
     clonedDays[1].run = '3 x 300m Technical Strides (Deload Flush)';
     clonedDays[1].pace = 'Smooth 75-80% mechanics. 3 min full recovery. Restore CNS.';
     clonedDays[1].progressionRule = 'Deload: Focus on sprint mechanics, posture, and arm drive.';
@@ -1469,24 +1469,23 @@ export function getUniversalPatWeekData(weekNumber: number): ProtocolPhase {
     clonedDays[1].run = '6 x 300m Track Intervals (Peak Anaerobic Output)';
     clonedDays[1].pace = 'Target: 47-50 sec per 300m repeat. 2 min recovery.';
     clonedDays[1].progressionRule = 'Max Repeat Volume: 6 high-intensity reps under 50s.';
-    clonedDays[5].run = '1.5-Mile / 2-Mile PT Passing Threshold Push';
-    clonedDays[5].pace = 'Target: 6:30-7:00 min/mile (Sub-10:45 1.5-mi / Sub-13:45 2-mi standard).';
+    clonedDays[5].run = '1.5-Mile / 3-Mile PFT Passing Threshold Push';
+    clonedDays[5].pace = 'Target: 6:30-7:00 min/mile (Sub-10:45 1.5-mi / Sub-21:00 3-mi standard).';
     clonedDays[5].progressionRule = 'Passing Standard: Target top-tier service branch distinction mark.';
   } else if (week === 7) {
     clonedDays[1].run = '4 x 300m Test-Simulation Intervals';
-    clonedDays[1].pace = 'Target: 46-49 sec per 300m. Exact PT test pacing.';
+    clonedDays[1].pace = 'Target: 46-49 sec per 300m. Exact PFT test pacing.';
     clonedDays[1].progressionRule = 'Test Simulation: Rehearse exact start-line cadence and turn mechanics.';
-    clonedDays[5].run = 'Full Military PT Mock Assessment Run';
-    clonedDays[5].pace = 'Maximal continuous effort. Goal: Official ACFT / PFT / CFT distinction time.';
+    clonedDays[5].run = 'Full General PFT Mock Assessment Run';
+    clonedDays[5].pace = 'Maximal continuous effort. Goal: Official PFT / CFT / PRT distinction time.';
     clonedDays[5].progressionRule = 'Mock Test: Official simulation of physical readiness standards.';
   } else {
-    // Week 8: Peak & Official Assessment
     clonedDays[1].run = '3 x 300m High-Speed Openers (Taper)';
     clonedDays[1].pace = 'Target: 45-48s. Explosive turnover with 4 min full recovery.';
     clonedDays[1].progressionRule = 'Taper Openers: Prime nervous system without accumulating fatigue.';
-    clonedDays[5].run = 'OFFICIAL MILITARY PT BENCHMARK ASSESSMENT';
-    clonedDays[5].pace = 'Maximum competitive effort. Sub-10:30 1.5-mi / Sub-13:30 2-mi distinction standard.';
-    clonedDays[5].progressionRule = 'Official PT Assessment: Record best passing score for record / selection.';
+    clonedDays[5].run = 'OFFICIAL GENERAL PFT BENCHMARK ASSESSMENT';
+    clonedDays[5].pace = 'Maximum competitive effort. Sub-10:30 1.5-mi / Sub-20:30 3-mi distinction standard.';
+    clonedDays[5].progressionRule = 'Official PFT Assessment: Record best passing score for record / selection.';
   }
 
   const isDeload = week === 4;
@@ -1495,11 +1494,543 @@ export function getUniversalPatWeekData(weekNumber: number): ProtocolPhase {
   return {
     ...UNIVERSAL_PAT_PROTOCOL,
     id: `universal_pat_week_${week}`,
-    title: `Military PT & Selection Protocol — Week ${week}${isDeload ? ' (DELOAD)' : isPeak ? ' (PEAK ASSESSMENT)' : ''}`,
+    title: `General PFT & Selection Protocol — Week ${week}${isDeload ? ' (DELOAD)' : isPeak ? ' (PEAK ASSESSMENT)' : ''}`,
     weeks: `Week ${week} of 8`,
     days: clonedDays
   };
 }
+
+// ---------------------------------------------------------------------------
+// Army Fitness Test (AFT) 8-Week Specific Training Program
+// A Focused 8-Week Peaking Plan for All Five AFT Events & 2-Mile Run Endurance
+// ---------------------------------------------------------------------------
+export const AFT_DIME_WARMUP_TEXT =
+  'MANDATORY 10-MINUTE DIME WARM-UP (Do Before Every Workout — Never do long static stretches before lifting, sprinting, or testing): ' +
+  '1. Bodyweight Squats (10 reps) • 2. Squat Jumps (8 reps) • 3. Forward Lunges (8 reps/leg) • ' +
+  '4. Side Plank (20 sec/side) • 5. Push-Ups (10 reps) • 6. Single-Leg Reach (6 reps/leg) • ' +
+  '7. Side Hop to Balance (6 hops/side) • 8. Ice Skaters Lateral (8/side) • 9. "L" Hops Forward/Side (5 hops/leg). ' +
+  'Cool-Down (5–10 Mins): Finish every session with easy walking and 20–30 second static stretches for calves, hamstrings, hip flexors, and chest.';
+
+export const AFT_COACH_RULE =
+  'AFT 4-Step Progression & Safety Rules: ' +
+  '1. Reps First (Double Progression): Keep the same weight until you hit the top rep number on every set with strict form (add 1–2 reps/set from Week 1 to Week 2 of each block). ' +
+  '2. Weight Second (Load Progression): Once hitting top reps on all sets with 1–2 RIR, add 2.5–5 lbs upper-body and 5–10 lbs deadlifts/squats in the next block (never jump >5% at once). ' +
+  '3. Sets Third (Volume & Taper): Start each 2-week block at the lower set number in the first week and add 1 set in the second week if recovery is strong. In Week 8 (Test Week), cut all strength sets and running miles in half. ' +
+  '4. Running & SDC Pacing: Run track intervals 5–10s faster per 400m than goal 2-mile pace; increase easy run distance by 0.5 miles every 2 weeks; shave 3–5s off each 250m SDC simulation across Weeks 5–7. ' +
+  'Spine & Joint Safety: Hinge at the hips with a flat, 360-degree braced back on every deadlift and squat. Avoid straight-leg sit-ups and standing trunk twists—build core stiffness with planks, curl-ups, and heavy carries.';
+
+export const AFT_PROTOCOL_BLOCKS: Record<'aft_block1' | 'aft_block2' | 'aft_block3' | 'aft_week7' | 'aft_week8', ProtocolPhase> = {
+  aft_block1: {
+    id: 'aft_block1',
+    title: 'AFT 8-Week Program — Block 1: Event Technique, Base Strength & Aerobic Foundation',
+    weeks: 'Weeks 1–2',
+    desc: 'Goal: Dial in crisp trap-bar deadlift hip-hinge form, strict Hand-Release Push-Up rhythm, efficient SDC footwork, and 4 weekly aerobic runs.',
+    coachRule: AFT_COACH_RULE,
+    days: [
+      {
+        day: 'Day 1',
+        focus: 'Deadlift Strength + Easy Base Run (Lower + Run)',
+        warmup: AFT_DIME_WARMUP_TEXT,
+        strength: [
+          'Trap-Bar Deadlift (reset every rep on the floor) (3-4x6-8) [Moderate (70–75% Max) - Rest: 120s - Reset every rep on the floor; flat 360-degree braced back]',
+          'Barbell Back Squat or Goblet Squat (to parallel) (3x8-10) [Moderate (RPE 7–8) - Rest: 90s - Controlled descent to parallel]',
+          'Reverse Lunges (3x8/leg) [Light Dumbbells - Rest: 60s - Controlled knee tracking and hip stability]',
+          'Superset: Forearm Plank (60–75 sec) + Glute Bridges (15 reps) (3x60-75s / 15 reps) [Bodyweight - Rest: 60s - Core trunk stiffness + glute lockout]'
+        ],
+        run: 'Post-Lift Aerobic Run: 2 miles',
+        pace: 'Easy Conversational Pace (Builds 3-Rep Max Deadlift pulling force, leg drive, and a 2-mile aerobic recovery run)',
+        progressionRule: 'Wk 1→2: Start at 3 sets & 6 reps; add 1–2 reps per set and +1 set in Week 2 if recovery is strong'
+      },
+      {
+        day: 'Day 2',
+        focus: 'Track Speed-Endurance Intervals (Track Repeats)',
+        warmup: AFT_DIME_WARMUP_TEXT,
+        strength: [
+          '400m Track Intervals (at goal 2-mile race pace) (6x400m) [Hard (80% effort) - Rest: 90s walk - Run 5–10 seconds faster per 400m than your goal 2-mile pace]'
+        ],
+        run: '6 x 400m Track Intervals (at goal 2-mile race pace)',
+        pace: 'Hard (80% effort) • 90 sec walk rest between repeats (Lowers 2-Mile Run time and improves lactate clearance)',
+        progressionRule: 'Run track intervals 5–10 seconds faster per 400m than your goal 2-mile pace'
+      },
+      {
+        day: 'Day 3',
+        focus: 'Hand-Release Push-Ups & Core Plank (HRP & Core)',
+        warmup: AFT_DIME_WARMUP_TEXT,
+        strength: [
+          'Hand-Release Push-Ups (30-sec timed sets) (4xMax in 30s) [Bodyweight (strict form) - Rest: 90s - Max clean reps in 30s; builds 2-minute HRP stamina]',
+          'Dumbbell or Barbell Bench Press (3-4x8-10) [Moderate (RPE 7–8) - Rest: 90s - Upper-body pressing power]',
+          'Pull-Ups (or Band-Assisted Pull-Ups) (3-4x6-8) [Bodyweight - Rest: 90s - Full dead hang to chin over bar]',
+          'Superset: Chest-Supported Row (10–12 reps) + Face Pulls (10–12 reps) (3x10-12) [Moderate / Light - Rest: 60s - Scapular stability & upper back balance]',
+          'Superset: McGill Curl-Up (10 reps) + Side Plank (30s/side) (3x10 + 30s/side) [Bodyweight - Rest: 45s - Spine-safe core endurance]'
+        ],
+        run: 'Rest from running',
+        pace: 'N/A',
+        progressionRule: 'HRP: Strict hand-release rhythm in 30s windows; Bench/Pull-Ups: +1–2 reps in Week 2'
+      },
+      {
+        day: 'Day 4',
+        focus: 'Steady Aerobic Base Run & Mobility (Aerobic Run)',
+        warmup: AFT_DIME_WARMUP_TEXT,
+        strength: [
+          '10-Min Hip Mobility & Post-Run Stretching (1x10 mins) [Hip flexors, calves, hamstrings, and thoracic spine mobility]'
+        ],
+        run: 'Steady Zone 2 Run + 10-Min Hip Mobility: 3 miles',
+        pace: 'Easy Conversational Pace (3–4 mile conversational Zone 2 run to build cardiovascular foundation)',
+        progressionRule: 'Maintain comfortable conversational Zone 2 breathing throughout all 3 miles'
+      },
+      {
+        day: 'Day 5',
+        focus: 'Sprint-Drag-Carry (SDC) & Explosive Power (SDC Drills)',
+        warmup: AFT_DIME_WARMUP_TEXT,
+        strength: [
+          'Two-Arm Kettlebell Swings (explosive hip snap) (4x15) [Moderate KB - Rest: 60s - Explosive hip hinge snap]',
+          'Backward Sled Drag (low hips, quick steps) (4x25m out / 25m back) [90 lb Sled (AFT weight) - Rest: 90s - Stay low in hips with quick, choppy backward steps]',
+          'Lateral Shuffle (stay low, touch line, reverse) (4x25m out / 25m back) [Bodyweight (fast feet) - Rest: 60s - Stay low, touch line cleanly, reverse direction fast]',
+          "40-lb Kettlebell Farmer's Carry (4x50m) [Two 40-lb KBs/DBs - Rest: 60s - Braced trunk, fast controlled footwork]"
+        ],
+        run: 'SDC Event Footwork & Sled/Carry Drills (Included in session)',
+        pace: 'Crisp AFT event technique on 90-lb backward sled drags, lateral shuffles, and 40-lb KB carries',
+        progressionRule: 'Master efficient turnaround mechanics and low hip position on 90-lb sled drags'
+      },
+      {
+        day: 'Day 6',
+        focus: 'Long Aerobic Run (or Light Ruck) (Long Run)',
+        warmup: AFT_DIME_WARMUP_TEXT,
+        strength: [
+          'Post-Run Cool-Down Walk & Static Stretches (1x10 mins) [20–30 second static stretches for calves, hamstrings, hip flexors, and chest]'
+        ],
+        run: 'Long Steady Aerobic Run: 3.5 miles',
+        pace: 'Easy Conversational Pace (3.5–4.5 mile steady aerobic run so a 2-mile test effort feels controlled)',
+        progressionRule: 'Increase easy run distance by 0.5 miles every 2 weeks (3.5 miles in Weeks 1–2 → 4.0 miles in Weeks 3–6)'
+      },
+      {
+        day: 'Day 7',
+        focus: 'Complete Rest',
+        warmup: 'None. Full physical and nervous system recovery.',
+        strength: [
+          'Complete physical and nervous system recovery. Eat 0.75–1.0g protein/lb, hydrate steadily, and aim for 7–9 hours of sleep.'
+        ],
+        run: 'Complete Rest',
+        pace: 'N/A',
+        progressionRule: 'Full physical and nervous system recovery'
+      }
+    ]
+  },
+
+  aft_block2: {
+    id: 'aft_block2',
+    title: 'AFT 8-Week Program — Block 2: Heavy Strength & Threshold Running',
+    weeks: 'Weeks 3–4',
+    desc: 'Goal: Increase trap-bar deadlift intensity to 80–85% max, extend plank holds past 2 minutes, and sharpen 2-mile race stamina with 800m intervals and 3.5–4 mile runs.',
+    coachRule: AFT_COACH_RULE,
+    days: [
+      {
+        day: 'Day 1',
+        focus: 'Heavy Deadlift Strength + Easy Base Run (Lower + Run)',
+        warmup: AFT_DIME_WARMUP_TEXT,
+        strength: [
+          'Trap-Bar Deadlift (explode upward, control down) (4-5x4-5) [Heavy (80–85% Max) - Rest: 180s - Explode upward, control down with 360-deg braced back]',
+          'Barbell Back Squat (parallel depth) (3-4x6) [Challenging (75–80%) - Rest: 150s - 2–3 min rest; full parallel depth]',
+          'Bulgarian Split Squat (rear foot elevated) (3x8/leg) [Moderate Dumbbells - Rest: 90s - Unilateral quad & glute drive]',
+          'Forearm Plank (target 2:00–2:30 holds) (3x120-150s) [Bodyweight - Rest: 90s - Extend plank holds past 2 minutes]'
+        ],
+        run: 'Post-Lift Aerobic Run: 2 miles',
+        pace: 'Easy Recovery Pace (2-mile aerobic flush after heavy 80–85% deadlifts & squats)',
+        progressionRule: 'Add +5–10 lbs to Trap-Bar Deadlift & Squat from Block 1; extend Forearm Plank holds to 2:00–2:30'
+      },
+      {
+        day: 'Day 2',
+        focus: '800m Track Speed-Endurance Repeats (800m Repeats)',
+        warmup: AFT_DIME_WARMUP_TEXT,
+        strength: [
+          '800m Track Repeats (at target 2-mile test pace) (4-5x800m) [Hard (85% effort) - Rest: 120s walk - Run at target 2-mile test pace]'
+        ],
+        run: '4–5 x 800m Track Repeats (at target 2-mile test pace)',
+        pace: 'Hard (85% effort) • 2 min walk rest between repeats (Sharpens 2-mile race stamina)',
+        progressionRule: 'Week 3: 4x800m • Week 4: 5x800m at exact target 2-mile test pace'
+      },
+      {
+        day: 'Day 3',
+        focus: 'Hand-Release Push-Ups & Heavy Upper Strength (HRP & Upper)',
+        warmup: AFT_DIME_WARMUP_TEXT,
+        strength: [
+          'Hand-Release Push-Ups (45-sec timed sets) (4xMax in 45s) [Bodyweight (steady pace) - Rest: 90s - Max clean reps in 45s]',
+          'Barbell Bench Press (1-second pause on chest) (4x5-6) [Heavy (80% Max) - Rest: 150s - 1-second pause on chest; 2–3 min rest]',
+          'Weighted or Strict Pull-Ups (4x6-8) [BW or +10–20 lbs - Rest: 120s - Full range pulling strength]',
+          'Superset: Standing Barbell Overhead Press (6–8 reps) + Band Pull-Aparts (15 reps) (3x6-8 + 15) [Moderate-Heavy - Rest: 90s - Overhead lockout + rear delt stability]',
+          'Pallof Press (Anti-Rotation) (3x12/side) [Moderate Band/Cable - Rest: 60s - Core anti-rotation stiffness]'
+        ],
+        run: 'Rest from running',
+        pace: 'N/A',
+        progressionRule: 'Extend HRP work window to 45s sets; add +2.5–5 lbs to Bench Press & Overhead Press'
+      },
+      {
+        day: 'Day 4',
+        focus: 'Sustained Tempo Run (Tempo Run)',
+        warmup: AFT_DIME_WARMUP_TEXT,
+        strength: [
+          'Post-Run Cool-Down & Static Stretches (1x10 mins) [Easy walking + 20–30s static stretches for calves, hamstrings, hip flexors, and chest]'
+        ],
+        run: 'Sustained Tempo Run (fast, controlled aerobic effort): 3 miles',
+        pace: 'Threshold (75–80% HRR) — Fast, controlled aerobic effort',
+        progressionRule: 'Hold steady lactate threshold pace across all 3 miles without slowing in Mile 3'
+      },
+      {
+        day: 'Day 5',
+        focus: 'Sprint-Drag-Carry (SDC) Combos & Grip Stamina (SDC Combos)',
+        warmup: AFT_DIME_WARMUP_TEXT,
+        strength: [
+          '50m Sprint + 50m Backward 90-lb Sled Drag (4x100m continuous) [Hard (85–90% effort) - Rest: 120s - 100m continuous combo; 2 min rest]',
+          '50m Lateral Shuffle + 50m 40-lb KB Carry (4x100m continuous) [Hard (85–90% effort) - Rest: 120s - 100m continuous combo; 2 min rest]',
+          'Barbell Deadlift Grip Holds (overhand grip) (3x30-40s) [65% Deadlift Max - Rest: 90s - Double-overhand grip endurance for MDL & KB carry]'
+        ],
+        run: 'SDC 100m Continuous Combination Drills (Included in session)',
+        pace: 'Hard (85–90% effort) with 2 min rest between 100m combination bouts',
+        progressionRule: 'Eliminate transition hesitation between sprint/drag and shuffle/carry'
+      },
+      {
+        day: 'Day 6',
+        focus: 'Long Steady Aerobic Run (Long Run)',
+        warmup: AFT_DIME_WARMUP_TEXT,
+        strength: [
+          'Post-Run Cool-Down Walk & Static Stretches (1x10 mins) [20–30 second static stretches for calves, hamstrings, hip flexors, and chest]'
+        ],
+        run: 'Long Steady Aerobic Run: 4 miles',
+        pace: 'Easy Zone 2 Pace (+0.5 miles progression from Weeks 1–2)',
+        progressionRule: 'Complete 4.0 continuous miles at relaxed conversational Zone 2 effort'
+      },
+      {
+        day: 'Day 7',
+        focus: 'Complete Rest',
+        warmup: 'None. Full physical and nervous system recovery.',
+        strength: [
+          'Complete physical and nervous system recovery. Prioritize 0.75–1.0g protein/lb, complex carbs, hydration, and 7–9 hours sleep.'
+        ],
+        run: 'Complete Rest',
+        pace: 'N/A',
+        progressionRule: 'Full physical and nervous system recovery'
+      }
+    ]
+  },
+
+  aft_block3: {
+    id: 'aft_block3',
+    title: 'AFT 8-Week Program — Block 3: Peak 3RM Deadlift & Full 250m SDC Conditioning',
+    weeks: 'Weeks 5–6',
+    desc: 'Goal: Peak your 3-rep trap-bar deadlift (88–93% max), build 1-minute HRP output, and run full 250m Sprint-Drag-Carry simulations.',
+    coachRule: AFT_COACH_RULE,
+    days: [
+      {
+        day: 'Day 1',
+        focus: 'Peak 3RM Trap-Bar Deadlift & Explosive Lower (3RM Peak)',
+        warmup: AFT_DIME_WARMUP_TEXT,
+        strength: [
+          'Box Jumps (step down; land softly) (4x4) [Max Jump Height - Rest: 120s - Step down every rep; land softly to prime CNS]',
+          'Trap-Bar Deadlift (practice AFT 3RM sets) (5x3) [Heavy (88–93% Max) - Rest: 240s - 3–5 min rest; practice official AFT 3RM sets]',
+          'Barbell Back Squat (explode up fast) (3x4) [Heavy (80–85% Max) - Rest: 180s - Explode up fast out of parallel]',
+          'Weighted Forearm Plank (10–25 lb plate on back) (3x75-90s) [Weighted (10–25 lb plate) - Rest: 90s - High-tension core armor]'
+        ],
+        run: 'Rest from running (Focus on maximal 3RM neural output)',
+        pace: 'N/A',
+        progressionRule: 'Peak 3RM Trap-Bar Deadlift at 88–93% max across 5 sets of 3 reps with full 3–5 min rest'
+      },
+      {
+        day: 'Day 2',
+        focus: '1,000m Race-Pace Track Repeats (Race Pace)',
+        warmup: AFT_DIME_WARMUP_TEXT,
+        strength: [
+          '1,000m Track Repeats (at target 2-mile race pace) (3-4x1000m) [Hard (85–90% effort) - Rest: 120s walk - Run at target 2-mile race pace + 1-mile easy cooldown jog]'
+        ],
+        run: '3–4 x 1,000m Track Repeats (at target 2-mile race pace) + 1-Mile Easy Cooldown Jog',
+        pace: 'Hard (85–90% effort) • 2 min walk rest between repeats + 1 mile Easy Pace cooldown',
+        progressionRule: 'Lock in exact 2-mile goal pace across 1,000m repeats (3 repeats Wk 5 → 4 repeats Wk 6)'
+      },
+      {
+        day: 'Day 3',
+        focus: '60-Sec HRP Output & Heavy Upper Superset (HRP & Core)',
+        warmup: AFT_DIME_WARMUP_TEXT,
+        strength: [
+          'Weighted or Band-Resisted Push-Ups (3x8-10) [20 lb Vest or Band - Rest: 90s - Potentiate pressing force before timed HRP sets]',
+          'Hand-Release Push-Ups (60-sec timed sets) (3xMax in 60s) [Bodyweight (fast rhythm) - Rest: 150s - Max reps in 60 sec; 2–3 min rest]',
+          'Superset: Barbell Bench Press (5 reps) + Weighted Pull-Ups (5 reps) (3x5) [Heavy (80–85% Max) - Rest: 150s - 5 reps each; 2–3 min rest]',
+          'Forearm Plank (aim for 3:00–3:40+ hold) (2xMax clean hold) [Bodyweight - Rest: 180s - Aim for 3:00–3:40+ max clean hold (100-pt AFT standard)]'
+        ],
+        run: 'Rest from running',
+        pace: 'N/A',
+        progressionRule: 'Build 60-second unbroken HRP output and push Forearm Plank hold to 3:00–3:40+'
+      },
+      {
+        day: 'Day 4',
+        focus: 'Steady Zone 2 Aerobic Run (Aerobic Run)',
+        warmup: AFT_DIME_WARMUP_TEXT,
+        strength: [
+          'Post-Run Cool-Down & Static Stretches (1x10 mins) [Easy walking and 20–30s static stretches for calves, hamstrings, hip flexors, and chest]'
+        ],
+        run: 'Steady Zone 2 Aerobic Run: 3.5 miles',
+        pace: 'Easy Conversational Pace (+0.5 miles progression from Weeks 1–4)',
+        progressionRule: 'Flush lower-body soreness and build aerobic recovery capacity'
+      },
+      {
+        day: 'Day 5',
+        focus: 'Full 250m Sprint-Drag-Carry Simulation & Trap-Bar Jumps (Full SDC)',
+        warmup: AFT_DIME_WARMUP_TEXT,
+        strength: [
+          'Full 250m Sprint-Drag-Carry Simulation: 50m Sprint → 50m 90-lb Sled Drag → 50m Lateral Shuffle → 50m 40-lb KB Carry → 50m Sprint (3x250m full event) [All-Out Race Effort - Rest: 270s - 4–5 min full rest between simulations]',
+          'Trap-Bar Jumps (jump explosively) (3x3) [Light (20% Squat Max) - Rest: 120s - Explosive triple extension]'
+        ],
+        run: '3 x Full 250m Sprint-Drag-Carry (SDC) Event Simulations (All-Out Race Effort)',
+        pace: 'Target: Passing ≤2:10 • Strong (80–90+ Pts) ≤1:45 • Max/Elite (100 Pts) ≤1:29 (4–5 min full rest)',
+        progressionRule: 'Shave 3–5 seconds off each 250m SDC simulation across Weeks 5–7'
+      },
+      {
+        day: 'Day 6',
+        focus: 'Long Steady Aerobic Run (Long Run)',
+        warmup: AFT_DIME_WARMUP_TEXT,
+        strength: [
+          'Post-Run Cool-Down Walk & Static Stretches (1x10 mins) [20–30 second static stretches for calves, hamstrings, hip flexors, and chest]'
+        ],
+        run: 'Long Steady Aerobic Run: 4 miles',
+        pace: 'Steady Zone 2 Pace',
+        progressionRule: 'Maintain effortless aerobic rhythm across 4 miles so the 2-mile AFT run feels controlled'
+      },
+      {
+        day: 'Day 7',
+        focus: 'Complete Rest',
+        warmup: 'None. Full physical and nervous system recovery.',
+        strength: [
+          'Complete physical and nervous system recovery.'
+        ],
+        run: 'Complete Rest',
+        pace: 'N/A',
+        progressionRule: 'Full physical and nervous system recovery'
+      }
+    ]
+  },
+
+  aft_week7: {
+    id: 'aft_week7',
+    title: 'AFT 8-Week Program — Week 7: AFT Event Simulation & Dress Rehearsal',
+    weeks: 'Week 7 of 8 (Dress Rehearsal)',
+    desc: 'Week 7 (Dress Rehearsal): Practice back-to-back AFT event pacing early in the week, rehearse the AFT Finisher Combo on tired legs, then begin taper.',
+    coachRule: AFT_COACH_RULE,
+    days: [
+      {
+        day: 'Day 1',
+        focus: 'Dress Rehearsal: Deadlift (3×3 @ 85%) + Back Squat (2×4 @ 75%) + 1.5-Mile Easy Run',
+        warmup: AFT_DIME_WARMUP_TEXT,
+        strength: [
+          'Trap-Bar Deadlift (3x3) [85% Max - Rest: 180s - Crisp speed; leave 2 reps in reserve]',
+          'Barbell Back Squat (2x4) [75% Max - Rest: 150s - Crisp speed; leave 2 reps in reserve]'
+        ],
+        run: '1.5-Mile Easy Run (Post-Lift Dress Rehearsal)',
+        pace: 'Easy conversational pace (Crisp bar speed on lifts; leave 2 reps in reserve)',
+        progressionRule: 'Leave 2 reps in reserve on every set; focus on crisp bar speed'
+      },
+      {
+        day: 'Day 2',
+        focus: '400m Pace Repeats (at Exact 2-Mile Goal Pace) + 1-Mile Cooldown',
+        warmup: AFT_DIME_WARMUP_TEXT,
+        strength: [
+          '400m Pace Repeats (at exact 2-mile goal pace) (4x400m) [Exact 2-mile goal pace - Rest: 90s - Smooth, controlled rhythm + 1-Mile Easy Cooldown]'
+        ],
+        run: '4 x 400m Pace Repeats (at exact 2-mile goal pace) + 1-Mile Easy Cooldown',
+        pace: 'Smooth, controlled rhythm at exact 2-mile goal pace (90s rest)',
+        progressionRule: 'Dial in exact 400m lap split pacing for next week’s record 2-Mile Run'
+      },
+      {
+        day: 'Day 3',
+        focus: '2-Min HRP Test (1×Max) + Pull-Ups (3×6) + Forearm Plank (1×3:00)',
+        warmup: AFT_DIME_WARMUP_TEXT,
+        strength: [
+          '2-Min Hand-Release Push-Up (HRP) Dress Rehearsal (1xMax in 2:00) [Bodyweight - Rest: 180s - Practice steady HRP breathing across full 2-minute test window]',
+          'Pull-Ups (3x6) [Bodyweight - Rest: 120s - Crisp, controlled reps]',
+          'Forearm Plank Dress Rehearsal (1x180s) [Bodyweight - Rest: 120s - 1×3:00 hold]'
+        ],
+        run: 'Rest from running',
+        pace: 'N/A',
+        progressionRule: 'Practice steady HRP breathing and pacing across the full 2-minute clock'
+      },
+      {
+        day: 'Day 4',
+        focus: 'Steady Zone 2 Aerobic Run + 10-Min Mobility',
+        warmup: AFT_DIME_WARMUP_TEXT,
+        strength: [
+          '10-Min Hip & Thoracic Mobility (1x10 mins) [Easy decompression and static stretching]'
+        ],
+        run: 'Steady Zone 2 Aerobic Run + 10-Min Mobility: 2.5 miles',
+        pace: 'Easy conversational pace',
+        progressionRule: 'Keep effort light and restorative ahead of Day 5 AFT Finisher Combo'
+      },
+      {
+        day: 'Day 5',
+        focus: 'AFT Finisher Combo: 250m SDC → 2:30 Plank → 2-Mile Run at Goal Pace',
+        warmup: AFT_DIME_WARMUP_TEXT,
+        strength: [
+          'AFT Finisher Combo — Part 1: 1×250m Sprint-Drag-Carry (SDC) (1x250m) [95% effort - Rest: 300s - Rest 5 min before Plank]',
+          'AFT Finisher Combo — Part 2: 1×2:30 Forearm Plank (1x150s) [Bodyweight - Rest: 300s - Rest 5 min before 2-Mile Run]'
+        ],
+        run: 'AFT Finisher Combo — Part 3: 2-Mile Run at Goal Pace (after 250m SDC & 2:30 Plank)',
+        pace: 'Official 2-Mile Goal Pace — Rehearse pacing on tired legs',
+        progressionRule: 'Full back-to-back AFT event rehearsal: 250m SDC (95%) → 5m rest → 2:30 Plank → 5m rest → 2-Mile Run at goal pace'
+      },
+      {
+        day: 'Day 6',
+        focus: 'Begin Taper: Active Recovery & Mobility Flush',
+        warmup: 'Easy walking and 10-minute gentle hip/ankle/shoulder mobility.',
+        strength: [
+          'Complete Rest & Taper Initiation: Light walking and 20–30s static stretches for calves, hamstrings, hip flexors, and chest.'
+        ],
+        run: 'Complete Rest (Taper begins for Week 8 Record Test)',
+        pace: 'N/A',
+        progressionRule: 'Begin shedding cumulative fatigue for Week 8 Record Test'
+      },
+      {
+        day: 'Day 7',
+        focus: 'Complete Rest',
+        warmup: 'None. Full physical and nervous system recovery.',
+        strength: [
+          'Complete physical and nervous system recovery.'
+        ],
+        run: 'Complete Rest',
+        pace: 'N/A',
+        progressionRule: 'Full physical and nervous system recovery'
+      }
+    ]
+  },
+
+  aft_week8: {
+    id: 'aft_week8',
+    title: 'AFT 8-Week Program — Week 8: Taper & Official AFT Record Test',
+    weeks: 'Week 8 of 8 (Taper & Test Week)',
+    desc: 'Week 8 (Taper & Test): Cut lifting volume and running miles by 50% early in the week, take 2 full days off to rest and hydrate, and execute your official AFT on Day 6.',
+    coachRule: AFT_COACH_RULE,
+    days: [
+      {
+        day: 'Day 1',
+        focus: 'Taper Strength: Trap-Bar Deadlift (3×2 @ 80%) + HRP (2×15) + Plank (2×60s)',
+        warmup: AFT_DIME_WARMUP_TEXT,
+        strength: [
+          'Trap-Bar Deadlift (Taper) (3x2) [80% Max - Rest: 180s - Low volume; fast, snappy reps; zero soreness]',
+          'Hand-Release Push-Ups (Taper) (2x15) [Bodyweight - Rest: 90s - Fast, snappy reps; zero soreness]',
+          'Forearm Plank (Taper) (2x60s) [Bodyweight - Rest: 60s - Crisp trunk activation; zero fatigue]'
+        ],
+        run: 'Rest from running (Volume cut 50% for Test Week)',
+        pace: 'N/A',
+        progressionRule: 'Low volume: Fast, snappy reps with zero soreness'
+      },
+      {
+        day: 'Day 2',
+        focus: 'Taper Recovery & Hydration',
+        warmup: 'None. Light walking and mobility only.',
+        strength: [
+          'Complete Rest & CNS Recovery: Hydrate steadily all day and sleep 8+ hours.'
+        ],
+        run: 'Complete Rest',
+        pace: 'N/A',
+        progressionRule: 'Rest and glycogen restoration'
+      },
+      {
+        day: 'Day 3',
+        focus: 'Taper Primer: DIME Warm-Up + 4×100m Strides (80% Speed) + 1.5-Mile Easy Jog',
+        warmup: AFT_DIME_WARMUP_TEXT,
+        strength: [
+          '4×100m Strides (80% speed) (4x100m) [80% speed - Rest: 90s - Keep legs fresh and elastic (20 mins total session)]'
+        ],
+        run: '1.5-Mile Easy Jog + 4×100m Strides (80% speed)',
+        pace: 'Easy elastic pace (20 mins total — keep legs fresh and elastic)',
+        progressionRule: '20 mins total session; keep legs fresh and elastic for Test Day'
+      },
+      {
+        day: 'Day 4',
+        focus: 'Complete Rest & Hydration (Pre-Test Rest Day 1)',
+        warmup: 'None. No heavy lifting or hard running.',
+        strength: [
+          'Complete Rest & Hydration: No heavy lifting or hard running. Hydrate with electrolytes and sleep 8+ hours.'
+        ],
+        run: 'Complete Rest',
+        pace: 'N/A',
+        progressionRule: 'No heavy lifting or hard running; sleep 8+ hours'
+      },
+      {
+        day: 'Day 5',
+        focus: 'Complete Rest, Electrolytes & Light Carb-Load (Pre-Test Rest Day 2)',
+        warmup: 'None. No heavy lifting or hard running.',
+        strength: [
+          'Complete Rest & Hydration: Carb-load lightly, hydrate with electrolytes, and sleep 8+ hours.'
+        ],
+        run: 'Complete Rest',
+        pace: 'N/A',
+        progressionRule: 'Carb-load lightly, hydrate with electrolytes, and sleep 8+ hours'
+      },
+      {
+        day: 'Day 6',
+        focus: 'OFFICIAL AFT RECORD TEST: All 5 Events in Sequence',
+        warmup: AFT_DIME_WARMUP_TEXT,
+        strength: [
+          'AFT Event 1: 3-Repetition Maximum Deadlift (MDL) (1x3RM) [Official Record Test - Passing: 180–200 lbs • Strong (80–90+ Pts): 260–300 lbs • Max (100 Pts): 340 lbs (2.0–2.5× BW)]',
+          'AFT Event 2: Hand-Release Push-Ups (HRP — 2 Min) (1xMax in 2:00) [Official Record Test - Passing: 25–30 reps • Strong (80–90+ Pts): 42–50 reps • Max (100 Pts): 57–60+ reps]',
+          'AFT Event 3: 250m Sprint-Drag-Carry (SDC) (1x250m) [Official Record Test - 50m Sprint → 50m 90-lb Sled Drag → 50m Lateral Shuffle → 50m 40-lb KB Carry → 50m Sprint • Passing: ≤2:10 • Strong: ≤1:45 • Max: ≤1:29]',
+          'AFT Event 4: Forearm Plank (PLK) (1xMax Hold) [Official Record Test - Passing: 2:00 • Strong (80–90+ Pts): 2:50–3:15 • Max (100 Pts): 3:40+]'
+        ],
+        run: 'AFT Event 5: Official 2-Mile Run (2MR)',
+        pace: 'Execute with confidence • Passing Baseline: ≤18:00 • Strong Target (80–90+ Pts): ≤15:00 • Max/Elite Target (100 Pts): ≤13:22',
+        progressionRule: 'OFFICIAL AFT RECORD TEST: DIME Warm-Up → 3RM Deadlift → 2-Min HRP → 250m SDC → Plank → 2-Mile Run'
+      },
+      {
+        day: 'Day 7',
+        focus: 'Post-Test Complete Rest & Recovery',
+        warmup: 'None. Full physical and nervous system recovery.',
+        strength: [
+          'Complete physical and nervous system recovery. Celebrate your AFT execution, refuel, and rehydrate.'
+        ],
+        run: 'Complete Rest',
+        pace: 'N/A',
+        progressionRule: 'Full post-test recovery'
+      }
+    ]
+  }
+};
+
+export const AFT_BASE_PROTOCOL: ProtocolPhase = AFT_PROTOCOL_BLOCKS.aft_block1;
+PROTOCOL_DATA.aft_protocol = AFT_BASE_PROTOCOL;
+
+/**
+ * Returns customized week data for any week 1 through 8 of the Army Fitness Test (AFT) 8-Week Training Program.
+ */
+export function getAftWeekData(weekNumber: number): ProtocolPhase {
+  const week = Math.max(1, Math.min(8, weekNumber));
+  const baseBlock =
+    week <= 2
+      ? AFT_PROTOCOL_BLOCKS.aft_block1
+      : week <= 4
+      ? AFT_PROTOCOL_BLOCKS.aft_block2
+      : week <= 6
+      ? AFT_PROTOCOL_BLOCKS.aft_block3
+      : week === 7
+      ? AFT_PROTOCOL_BLOCKS.aft_week7
+      : AFT_PROTOCOL_BLOCKS.aft_week8;
+
+  const clonedDays = JSON.parse(JSON.stringify(baseBlock.days)) as ProtocolDay[];
+  const blockLabel =
+    week <= 2
+      ? 'Block 1 (Wks 1–2): Event Technique, Base Strength & Aerobic Foundation'
+      : week <= 4
+      ? 'Block 2 (Wks 3–4): Heavy Strength & Threshold Running'
+      : week <= 6
+      ? 'Block 3 (Wks 5–6): Peak 3RM Deadlift & Full 250m SDC'
+      : week === 7
+      ? 'Block 4 (Wk 7): AFT Event Simulation & Dress Rehearsal'
+      : 'Block 4 (Wk 8): Taper & Official AFT Record Test';
+
+  return {
+    ...baseBlock,
+    id: `aft_protocol_week_${week}`,
+    title: `Army Fitness Test (AFT) 8-Week Program — Week ${week} (${blockLabel})`,
+    weeks: `Week ${week} of 8 • ${blockLabel}`,
+    days: clonedDays,
+  };
+}
+
 
 
 

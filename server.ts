@@ -2458,17 +2458,43 @@ RULES:
   });
 
   const distPath = path.resolve(__dirname, 'dist');
-  const isProduction = process.env.NODE_ENV === 'production' || fs.existsSync(distPath);
+  const isProduction = process.env.NODE_ENV === 'production';
 
-  if (isProduction) {
+  // Prevent browser or Service Worker from caching stale HTML or Service Worker scripts
+  app.use((req, res, next) => {
+    if (
+      req.path === '/' ||
+      req.path === '/index.html' ||
+      req.path === '/sw.js' ||
+      req.path.includes('dev-sw') ||
+      req.path.includes('workbox')
+    ) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+    next();
+  });
+
+  if (isProduction && fs.existsSync(distPath)) {
     app.use(express.static(distPath));
     app.use((req, res, next) => {
+      // Never return index.html (text/html) for missing JS/CSS/TS/map asset requests
+      if (/\.(js|mjs|cjs|ts|tsx|css|map|json|wasm)$/i.test(req.path)) {
+        return res.status(404).end();
+      }
       if (req.method === 'GET' && !req.path.startsWith('/api')) {
         return res.sendFile(path.resolve(distPath, 'index.html'));
       }
       next();
     });
   } else {
+    // If a browser tab has a cached production index.html requesting /assets/*, serve dist/assets if present
+    const distAssetsPath = path.resolve(distPath, 'assets');
+    if (fs.existsSync(distAssetsPath)) {
+      app.use('/assets', express.static(distAssetsPath));
+    }
+
     const vite = await createViteServer({
       server: {
         middlewareMode: true,

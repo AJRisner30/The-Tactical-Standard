@@ -228,7 +228,7 @@ export interface WorkoutSessionLog {
   }[];
 }
 
-export type ProgramKey = 'apex_protocol' | 'tactical_hypertrophy' | 'hybrid_protocol' | 'hybrid_db' | 'universal_pat' | 'custom_ai';
+export type ProgramKey = 'apex_protocol' | 'tactical_hypertrophy' | 'hybrid_protocol' | 'hybrid_db' | 'universal_pat' | 'aft_protocol' | 'custom_ai';
 
 export interface QuestionnaireAnswers {
   completedAt: string;
@@ -245,6 +245,7 @@ export interface QuestionnaireAnswers {
     | 'station_db_minimal' 
     | 'complete_apex_peak'
     | 'universal_pat_testing'
+    | 'aft_specific_testing'
     | 'custom_ai_individualized';
   preparingForPat?: 'yes_upcoming_pat' | 'no_general_tactical';
   injuryConstraints?: string;

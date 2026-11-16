@@ -150,15 +150,15 @@ export const GOAL_OPTIONS = [
   {
     id: 'muscle_armor_hypertrophy' as const,
     label: '12-Week Military Tactical Bodybuilding Program',
-    badge: '3-Phase Hypertrophy, Speed & Conditioning',
-    description: '12-week Sunday–Saturday periodization (Armor & Base → Power-Building → Peak & Velocity) with daily 8-min DIME warm-ups, Deload Weeks 4/8/12, and Zero Olympic/Burpee/Sandbag guardrails.',
+    badge: 'Warfighter Strength, Hypertrophy & Field Readiness',
+    description: '12-week 7-Day Garrison Cycle periodization (Armor & Base → Power-Building → Peak & Combat Velocity) with daily 8-min DIME warm-ups, Unit PT Adjustment Rule, FTX Protocol, Deload Weeks 4/8/12, and Zero Olympic/Burpee/Jump-Rope guardrails.',
     preferredProgram: 'tactical_hypertrophy' as ProgramKey,
   },
   {
     id: 'complete_apex_peak' as const,
-    label: 'The 52-Week Military Combat Fitness & Readiness Program',
+    label: 'Military 52-Week Fitness & Readiness Program',
     badge: 'Comprehensive 4-Quarter Annual Engine',
-    description: 'Year-round military periodization taking you from Aerobic Base & Core Stability through Combatives Strength, Limit Strength & Sprint Speed, and Combat Simulation Readiness.',
+    description: 'Year-round military periodization taking you from Aerobic Base & Movement Foundation through Running Stamina & Base Strength, Peak Strength & Sprint Speed, and Combat Readiness & Annual Peak.',
     preferredProgram: 'apex_protocol' as ProgramKey,
   },
   {
@@ -169,10 +169,17 @@ export const GOAL_OPTIONS = [
     preferredProgram: 'hybrid_protocol' as ProgramKey,
   },
   {
+    id: 'aft_specific_testing' as const,
+    label: 'Army Fitness Test (AFT) 8-Week Specific Program',
+    badge: '5-Event AFT Peak (MDL • HRP • SDC • PLK • 2MR)',
+    description: 'Dedicated 8-week progression for the 5-event Army Fitness Test: 3RM Deadlift (MDL), 2-Min Hand-Release Push-Ups (HRP), 250m Sprint-Drag-Carry (SDC), Forearm Plank (PLK), and 2-Mile Run (2MR).',
+    preferredProgram: 'aft_protocol' as ProgramKey,
+  },
+  {
     id: 'universal_pat_testing' as const,
-    label: 'Military PT Test & Selection Readiness (ACFT / PFT / CFT)',
-    badge: 'Armed Forces PT & Selection Standard',
-    description: 'Direct preparation for military physical fitness tests & selection courses: 1.5/2-mile benchmark runs, 300m–400m shuttles, hand-release push-ups, and 180 lb casualty drags.',
+    label: 'General Military PFT & Selection Readiness (PFT / CFT / PRT)',
+    badge: 'General Armed Forces PFT & Selection Standard',
+    description: 'General military physical fitness test & selection course preparation: 1.5–3 mile benchmark runs, 300m–400m anaerobic shuttles, cadence push-ups, pull-ups, and 180 lb casualty drags.',
     preferredProgram: 'universal_pat' as ProgramKey,
   },
   {
@@ -249,20 +256,41 @@ export function calculateProgramRecommendation(
     };
   }
 
+  if (answers.primaryGoalCategory === 'aft_specific_testing') {
+    return {
+      programKey: 'aft_protocol',
+      programTitle: 'Army Fitness Test (AFT) 8-Week Specific Training Program',
+      badge: 'Official 5-Event AFT Peak',
+      durationText: '8-Week Periodized AFT Progression (4 Two-Week Blocks)',
+      weeklySplit: '6 Days Event-Specific Strength, SDC & Run Intervals + Day 7 Rest',
+      fitnessTier,
+      startingWeek: 1,
+      startingPhaseTitle: 'Weeks 1–2: Event Technique, Base Strength & Aerobic Foundation',
+      primaryRationale:
+        'Selected directly by your goal: maximizing your official 5-event Army Fitness Test (AFT) score. Progresses across 4 two-week blocks to peak your 3RM Deadlift, 2-Min Hand-Release Push-Ups, 250m Sprint-Drag-Carry, Forearm Plank, and 2-Mile Run simultaneously without CNS burnout.',
+      keyActionPoints: [
+        'Day 1 & Day 5 build 3RM Deadlift (MDL) and HRP stamina while protecting lower-back fatigue before runs.',
+        'Day 3 replicates the exact 250m Sprint-Drag-Carry (SDC) legs so your legs adapt to heavy lactic clearance.',
+        'Week 7 Dress Rehearsal and Week 8 50% Taper guarantee peak freshness for your official Day 6 AFT Record Test.',
+      ],
+      equipmentNotice: 'Hex/Trap Bar, 90-lb Sled, Pair of 40-lb Kettlebells, and 400m Running Track recommended (Injury-Only Adaptation active).',
+    };
+  }
+
   if (answers.preparingForPat === 'yes_upcoming_pat' || answers.primaryGoalCategory === 'universal_pat_testing') {
     return {
       programKey: 'universal_pat',
-      programTitle: 'Universal Military PT Test & Selection Readiness (ACFT / PFT / CFT)',
-      badge: 'Armed Forces PT & Selection Standard',
-      durationText: '8-Week High-Stakes Military PT & Speed Prep',
-      weeklySplit: '5 Days Strength & Combat Conditioning + 1-2 Days 2-Mi / 1.5-Mi & 300m Shuttles',
+      programTitle: 'General Military PFT & Selection Readiness (PFT / CFT / PRT)',
+      badge: 'General Armed Forces PFT & Selection Standard',
+      durationText: '8-Week High-Stakes Military PFT & Speed Prep',
+      weeklySplit: '5 Days Strength & Combat Conditioning + 1-2 Days 1.5–3 Mi & 300m Shuttles',
       fitnessTier,
       startingWeek: 1,
-      startingPhaseTitle: 'Weeks 1-8: Foundational Conditioning & PT Benchmark Capacity',
+      startingPhaseTitle: 'Weeks 1-8: Foundational Conditioning & PFT Benchmark Capacity',
       primaryRationale:
-        'Selected directly by your answer: actively preparing for an upcoming Military PT test or selection course. Engineered specifically to excel in Armed Forces physical evaluations: 2-mile / 1.5-mile run, 300m–400m anaerobic shuttle sprints, continuous push-ups/HRP, plank/core endurance, and 180 lb casualty drag power.',
+        'Selected directly by your answer: actively preparing for an upcoming general Military PFT (PFT / CFT / PRT) or selection course. Engineered specifically to excel in general Armed Forces physical evaluations: 1.5–3 mile run, 300m–400m anaerobic shuttle sprints, cadence push-ups, pull-ups, plank/core endurance, and 180 lb casualty drag power.',
       keyActionPoints: [
-        'Cadence push-ups & hand-release progressions build unbreakable upper-body stamina under fatigue.',
+        'Cadence push-ups & strict pull-up progressions build unbreakable upper-body stamina under fatigue.',
         'Weekly 300m anaerobic sprint intervals build high-intensity lactate threshold.',
         'Heavy casualty drags, sled pulls, and farmer carries guarantee maximum grip and posterior drive.',
       ],
@@ -296,18 +324,18 @@ export function calculateProgramRecommendation(
     return {
       programKey: 'tactical_hypertrophy',
       programTitle: '12-Week Military Tactical Bodybuilding Program',
-      badge: '3-Phase Armor, Power & Conditioning System',
+      badge: '3-Phase Armor, Power & Combat Velocity System',
       durationText: '12-Week 3-Phase Tactical Mesocycle',
-      weeklySplit: 'Starts Sunday: 4 Lift + Tuesday Speed/Agility + Friday Pump & Zone 2 + Sat Rest',
+      weeklySplit: '7-Day Garrison Cycle: 4 Lift + Day 3 Speed/Bounding + Day 6 Ruck & Arm Pump + Day 7 Rest',
       fitnessTier,
       startingWeek: startWeek,
-      startingPhaseTitle: 'Phase 1 (Weeks 1–4): Armor & Base (8–10 Main • 10–12 Acc)',
+      startingPhaseTitle: 'Phase 1 (Weeks 1–4): Armor & Base (8–10 Main • 10–12 Acc • 3–4 Mi Ruck)',
       primaryRationale:
-        'Selected for building dense tactical muscle armor alongside sprint velocity without Olympic lifts, burpees, sandbags, or jump ropes. Progresses linearly from Armor & Base (Weeks 1–4) into Power-Building (Weeks 5–8) and Peak & Velocity (Weeks 9–12) with built-in Field Fatigue rules.',
+        'Selected for building dense tactical muscle armor, ruck stability, and IMT bounding velocity without Olympic lifts, burpees, or high-impact jump ropes. Progresses linearly from Armor & Base (Weeks 1–4) into Power-Building (Weeks 5–8) and Peak & Combat Velocity (Weeks 9–12) with built-in Unit PT and FTX/Range protocols.',
       keyActionPoints: [
-        'Mandated Daily 8-Minute DIME Warm-Up before every single session (plus daily restorative DIME option).',
-        'Double Progression: +5 lbs upper / +10 lbs lower once hitting top reps with 1–2 RIR; Deloads at Weeks 4, 8, and 12 (-40% sets).',
-        'Field Fatigue Protocol: After 24-hr CQ/staff duty or 4-hr sleep, halve secondary accessories and swap sprints for 20-min Zone 2 flush.',
+        'Mandatory 8-Minute DIME Warm-Up before every single session.',
+        'Double Progression: +5 lbs upper / +10 lbs lower once hitting top reps with 1–2 RIR; Deloads at Weeks 4, 8, and 12 (-40% sets, 2-mi unweighted walk).',
+        'Unit PT & FTX Rules: Drop 1 lower accessory set after heavy (>3 mi) morning unit PT runs; pause barbell loading during multi-day field exercises.',
       ],
     };
   }
@@ -333,19 +361,19 @@ export function calculateProgramRecommendation(
   }
 
   const startingWeek = 1;
-  const startingPhase = 'Quarter 1: Aerobic Base, Posture & Core Stability (Weeks 1–13)';
+  const startingPhase = 'Quarter 1: Aerobic Base & Movement Foundation (Weeks 1–13)';
 
   return {
     programKey: 'apex_protocol',
-    programTitle: '52-Week Military Combat Fitness & Readiness Program',
+    programTitle: 'Military 52-Week Fitness & Readiness Program',
     badge: '52-Week Armed Forces Performance System',
     durationText: '52-Week 4-Quarter Periodized Protocol',
-    weeklySplit: '5-6 Days Tactical Strength, Running Stamina & Combat Readiness',
+    weeklySplit: '7-Day Cycle: 3 Strength Days + 3–4 Runs/Progressive Rucks + Day 7 Rest',
     fitnessTier,
     startingWeek,
     startingPhaseTitle: startingPhase,
     primaryRationale:
-      'The complete 52-week military combat fitness and readiness blueprint. Engineered across 4 progressive 13-week quarters to build your aerobic base, combatives strength, sprint speed, and mission endurance with every-4th-week 40% deloads.',
+      'The complete 52-week military fitness and readiness blueprint. Engineered across 4 progressive 13-week quarters to build your aerobic base, barbell strength, sprint speed, ruck stamina, and combat readiness with every-4th-week 40% deloads.',
     keyActionPoints: [
       'Mandatory 10-Minute DIME Warm-Up before every session to protect hips, knees, shoulders, and lower back.',
       'Starts at the low end of prescribed set and rep ranges (1. Reps First -> 2. Weight Second -> 3. Sets Third).',
