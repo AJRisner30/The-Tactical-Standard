@@ -8,7 +8,7 @@ import {
   onSnapshot, 
   Unsubscribe 
 } from 'firebase/firestore';
-import { db, auth, handleFirestoreError, OperationType } from '../firebase';
+import { db, auth, handleFirestoreError, OperationType, getEffectiveCurrentUser } from '../firebase';
 import { AthleteProfile, WorkoutSessionLog, OfficerAssignedProgram, WorkoutProgram } from '../types';
 import { COACH_AJ_DEFAULT_LOGS } from '../data/coachLogsData';
 
@@ -45,6 +45,9 @@ export function subscribeToUserWorkoutLogs(
   userId: string,
   onLogs: (logs: WorkoutSessionLog[]) => void
 ): Unsubscribe {
+  if (!auth.currentUser) {
+    return () => {};
+  }
   const path = 'workoutLogs';
   try {
     const q = query(
@@ -86,6 +89,7 @@ export function subscribeToUserWorkoutLogs(
     );
   } catch (error) {
     handleFirestoreError(error, OperationType.GET, path);
+    return () => {};
   }
 }
 
@@ -97,6 +101,9 @@ export async function saveWorkoutLogToFirestore(
   userId: string,
   userEmail?: string
 ): Promise<void> {
+  if (!auth.currentUser) {
+    return;
+  }
   const cleanId = (log.id && typeof log.id === 'string' && log.id.trim().length > 0)
     ? log.id.trim()
     : `log-${Date.now()}`;
@@ -231,6 +238,7 @@ export function subscribeToCoachWorkoutLogs(
  * Removes legacy fictitious mock coach logs from Firestore
  */
 export async function cleanUpLegacyMockCoachLogs(): Promise<void> {
+  if (!auth.currentUser) return;
   const legacyIds = [
     'coach-log-combat-chassis-lower',
     'coach-log-vest-conditioning',
@@ -249,6 +257,7 @@ export async function cleanUpLegacyMockCoachLogs(): Promise<void> {
  * Deletes a workout session log from Firestore
  */
 export async function deleteWorkoutLogFromFirestore(logId: string): Promise<void> {
+  if (!auth.currentUser) return;
   const path = `workoutLogs/${logId}`;
   try {
     await deleteDoc(doc(db, 'workoutLogs', logId));
@@ -264,6 +273,10 @@ export function subscribeToUserAthlete(
   userId: string,
   onAthlete: (athlete: AthleteProfile | null) => void
 ): Unsubscribe {
+  if (!auth.currentUser) {
+    onAthlete(null);
+    return () => {};
+  }
   const path = `athletes/${userId}`;
   try {
     const docRef = doc(db, 'athletes', userId);
@@ -302,6 +315,7 @@ export function subscribeToUserAthlete(
     );
   } catch (error) {
     handleFirestoreError(error, OperationType.GET, path);
+    return () => {};
   }
 }
 
@@ -312,6 +326,7 @@ export async function saveAthleteToFirestore(
   athlete: AthleteProfile,
   userId: string
 ): Promise<void> {
+  if (!auth.currentUser) return;
   const path = `athletes/${userId}`;
   try {
     const cleanAthlete: any = {
@@ -367,6 +382,7 @@ export async function saveTrialActivationToFirestore(
   userId: string,
   trialActivation: any
 ): Promise<void> {
+  if (!auth.currentUser) return;
   const path = `athletes/${userId}`;
   try {
     const cleanTrial = sanitizeForFirestore(trialActivation);
@@ -388,6 +404,10 @@ export function subscribeToOfficerProgram(
   officerUserId: string,
   onProgram: (program: OfficerAssignedProgram | null) => void
 ): Unsubscribe {
+  if (!auth.currentUser) {
+    onProgram(null);
+    return () => {};
+  }
   const path = 'officerPrograms';
   try {
     const q = query(
@@ -446,6 +466,10 @@ export function subscribeToOfficerProgram(
 export function subscribeToAllOfficerPrograms(
   onPrograms: (programs: OfficerAssignedProgram[]) => void
 ): Unsubscribe {
+  if (!auth.currentUser) {
+    onPrograms([]);
+    return () => {};
+  }
   const path = 'officerPrograms';
   try {
     return onSnapshot(
@@ -485,6 +509,7 @@ export function subscribeToAllOfficerPrograms(
     );
   } catch (error) {
     handleFirestoreError(error, OperationType.GET, path);
+    return () => {};
   }
 }
 
@@ -494,6 +519,10 @@ export function subscribeToAllOfficerPrograms(
 export function subscribeToAllAthletes(
   onAthletes: (athletes: AthleteProfile[]) => void
 ): Unsubscribe {
+  if (!auth.currentUser) {
+    onAthletes([]);
+    return () => {};
+  }
   const path = 'athletes';
   try {
     return onSnapshot(
@@ -528,6 +557,7 @@ export function subscribeToAllAthletes(
     );
   } catch (error) {
     handleFirestoreError(error, OperationType.GET, path);
+    return () => {};
   }
 }
 
@@ -537,6 +567,7 @@ export function subscribeToAllAthletes(
 export async function saveOfficerProgramToFirestore(
   program: OfficerAssignedProgram
 ): Promise<void> {
+  if (!auth.currentUser) return;
   const path = `officerPrograms/${program.id}`;
   try {
     const cleanProgram: any = {
@@ -571,6 +602,7 @@ export async function saveOfficerProgramToFirestore(
  * Deletes an officer's assigned program from Firestore
  */
 export async function deleteOfficerProgramFromFirestore(programId: string): Promise<void> {
+  if (!auth.currentUser) return;
   const path = `officerPrograms/${programId}`;
   try {
     await deleteDoc(doc(db, 'officerPrograms', programId));
@@ -586,6 +618,7 @@ export async function saveCustomProgramToFirestore(
   program: WorkoutProgram,
   userId: string
 ): Promise<void> {
+  if (!auth.currentUser) return;
   const path = `customPrograms/${program.id}`;
   try {
     const cleanProgram = {
@@ -617,6 +650,10 @@ export function subscribeToUserCustomPrograms(
   userId: string,
   onPrograms: (programs: WorkoutProgram[]) => void
 ): Unsubscribe {
+  if (!auth.currentUser) {
+    onPrograms([]);
+    return () => {};
+  }
   const path = 'customPrograms';
   try {
     const q = query(
@@ -650,6 +687,7 @@ export function subscribeToUserCustomPrograms(
     );
   } catch (error) {
     handleFirestoreError(error, OperationType.GET, path);
+    return () => {};
   }
 }
 
@@ -657,6 +695,7 @@ export function subscribeToUserCustomPrograms(
  * Deletes a custom program from Firestore
  */
 export async function deleteCustomProgramFromFirestore(programId: string): Promise<void> {
+  if (!auth.currentUser) return;
   const path = `customPrograms/${programId}`;
   try {
     await deleteDoc(doc(db, 'customPrograms', programId));
@@ -674,6 +713,10 @@ export function subscribeToCoachPublishedPrograms(
   isAdminUser: boolean,
   onPrograms: (programs: WorkoutProgram[]) => void
 ): Unsubscribe {
+  if (!auth.currentUser) {
+    onPrograms([]);
+    return () => {};
+  }
   const path = 'coachPrograms';
   try {
     const q = isAdminUser
@@ -728,9 +771,13 @@ export function subscribeToCoachPublishedPrograms(
 export async function saveCoachProgramToFirestore(
   program: WorkoutProgram
 ): Promise<void> {
-  const currentEmail = (auth.currentUser?.email || '').trim().toLowerCase();
+  const effectiveUser = getEffectiveCurrentUser();
+  const currentEmail = (effectiveUser?.email || '').trim().toLowerCase();
   if (currentEmail !== 'risneraryan@gmail.com') {
     throw new Error('Unauthorized: Only Coach Aryan Risner may publish shared custom programs.');
+  }
+  if (!auth.currentUser) {
+    return;
   }
 
   const cleanId = (program.id && program.id.trim().length > 0)
@@ -769,9 +816,13 @@ export async function saveCoachProgramToFirestore(
  * Deletes a Coach-authored shared custom program or single workout from Firestore.
  */
 export async function deleteCoachProgramFromFirestore(programId: string): Promise<void> {
-  const currentEmail = (auth.currentUser?.email || '').trim().toLowerCase();
+  const effectiveUser = getEffectiveCurrentUser();
+  const currentEmail = (effectiveUser?.email || '').trim().toLowerCase();
   if (currentEmail !== 'risneraryan@gmail.com') {
     throw new Error('Unauthorized: Only Coach Aryan Risner may delete shared custom programs.');
+  }
+  if (!auth.currentUser) {
+    return;
   }
   const path = `coachPrograms/${programId}`;
   try {

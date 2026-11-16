@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { onIdTokenChanged, User, IdTokenResult } from 'firebase/auth';
-import { auth, db } from '../firebase';
+import { auth, db, getEffectiveCurrentUser } from '../firebase';
 import { doc, getDoc, onSnapshot, collection, query, where, getDocs, setDoc } from 'firebase/firestore';
 import { 
   getCurrentAthlete, 
@@ -53,7 +53,7 @@ export interface UserTierState {
 const STORAGE_SIMULATION_KEY = 'rpa_tier_simulation_override_v2';
 
 export function useUserTier(): UserTierState {
-  const [user, setUser] = useState<User | null>(auth.currentUser);
+  const [user, setUser] = useState<User | null>(() => getEffectiveCurrentUser());
   const [tier, setTier] = useState<UserTier>('standard');
   const [status, setStatus] = useState<UserAccountStatus>('not_selected');
   const [trialEndMs, setTrialEndMs] = useState<number | null>(null);
@@ -110,37 +110,39 @@ export function useUserTier(): UserTierState {
         setLoading(false);
 
         // One-time Admin Cloud Sync: Reset test profile risnerathletics@gmail.com in Firestore
-        (async () => {
-          try {
-            const q = query(collection(db, 'athletes'), where('email', '==', RESETTABLE_TEST_PROFILE_EMAIL));
-            const snap = await getDocs(q);
-            for (const docSnap of snap.docs) {
-              const d = docSnap.data();
-              const t = d.trialActivation || d.trialState;
-              if (!t || t.resetVersion !== 2 || (typeof t.trialEndMs === 'number' && t.trialEndMs <= Date.now())) {
-                const startedAtMs = Date.now();
-                const freshTrialEndMs = startedAtMs + 14 * 24 * 60 * 60 * 1000;
-                const freshTrial = {
-                  startedAtMs,
-                  trialEndMs: freshTrialEndMs,
-                  hasSelectedPlan: true,
-                  tier: 'pro' as const,
-                  status: 'trialing' as const,
-                  resetVersion: 2,
-                  resetAt: new Date().toISOString(),
-                  note: 'Admin reset test account for continuous testing',
-                };
-                await setDoc(doc(db, 'athletes', docSnap.id), {
-                  trialActivation: freshTrial,
-                  trialState: freshTrial,
-                  updatedAt: new Date().toISOString(),
-                }, { merge: true });
+        if (auth.currentUser) {
+          (async () => {
+            try {
+              const q = query(collection(db, 'athletes'), where('email', '==', RESETTABLE_TEST_PROFILE_EMAIL));
+              const snap = await getDocs(q);
+              for (const docSnap of snap.docs) {
+                const d = docSnap.data();
+                const t = d.trialActivation || d.trialState;
+                if (!t || t.resetVersion !== 2 || (typeof t.trialEndMs === 'number' && t.trialEndMs <= Date.now())) {
+                  const startedAtMs = Date.now();
+                  const freshTrialEndMs = startedAtMs + 14 * 24 * 60 * 60 * 1000;
+                  const freshTrial = {
+                    startedAtMs,
+                    trialEndMs: freshTrialEndMs,
+                    hasSelectedPlan: true,
+                    tier: 'pro' as const,
+                    status: 'trialing' as const,
+                    resetVersion: 2,
+                    resetAt: new Date().toISOString(),
+                    note: 'Admin reset test account for continuous testing',
+                  };
+                  await setDoc(doc(db, 'athletes', docSnap.id), {
+                    trialActivation: freshTrial,
+                    trialState: freshTrial,
+                    updatedAt: new Date().toISOString(),
+                  }, { merge: true });
+                }
               }
+            } catch (adminSyncErr) {
+              console.warn('[useUserTier] Admin test account sync note:', adminSyncErr);
             }
-          } catch (adminSyncErr) {
-            console.warn('[useUserTier] Admin test account sync note:', adminSyncErr);
-          }
-        })();
+          })();
+        }
 
         return tokenResult;
       }
@@ -162,17 +164,19 @@ export function useUserTier(): UserTierState {
       if (effectiveStatusRaw === 'active_subscriber') {
         planChosen = true;
       } else {
-        // Query Firestore athlete document for cloud-persisted trial
+        // Query Firestore athlete document for cloud-persisted trial if Firebase Auth is active
         let cloudDocData: any = null;
         let isFetchError = false;
-        try {
-          const athleteDocSnap = await getDoc(doc(db, 'athletes', currentUser.uid));
-          if (athleteDocSnap.exists()) {
-            cloudDocData = athleteDocSnap.data();
+        if (auth.currentUser) {
+          try {
+            const athleteDocSnap = await getDoc(doc(db, 'athletes', currentUser.uid));
+            if (athleteDocSnap.exists()) {
+              cloudDocData = athleteDocSnap.data();
+            }
+          } catch (docErr) {
+            isFetchError = true;
+            console.warn('[useUserTier] Firestore athlete fetch note:', docErr);
           }
-        } catch (docErr) {
-          isFetchError = true;
-          console.warn('[useUserTier] Firestore athlete fetch note:', docErr);
         }
 
         const isTestAccount = Boolean(userEmail && userEmail.trim().toLowerCase() === RESETTABLE_TEST_PROFILE_EMAIL);
@@ -355,12 +359,13 @@ export function useUserTier(): UserTierState {
         unsubscribeDoc = null;
       }
 
-      await evaluateClaims(currentUser, false);
+      const effectiveUser = currentUser || getEffectiveCurrentUser();
+      await evaluateClaims(effectiveUser, false);
 
       if (currentUser?.uid && !isMasterExemptAccount(currentUser.email)) {
         try {
           unsubscribeDoc = onSnapshot(doc(db, 'athletes', currentUser.uid), () => {
-            evaluateClaims(auth.currentUser, false);
+            evaluateClaims(getEffectiveCurrentUser(), false);
           }, (err) => {
             console.warn('[useUserTier] Athlete doc subscription note:', err);
           });
@@ -369,9 +374,10 @@ export function useUserTier(): UserTierState {
     });
 
     const handleTrialChanged = () => {
-      evaluateClaims(auth.currentUser, false);
+      evaluateClaims(getEffectiveCurrentUser(), false);
     };
     window.addEventListener('trial_state_changed', handleTrialChanged);
+    window.addEventListener('local_auth_state_changed', handleTrialChanged);
 
     return () => {
       unsubscribeAuth();
@@ -379,11 +385,12 @@ export function useUserTier(): UserTierState {
         unsubscribeDoc();
       }
       window.removeEventListener('trial_state_changed', handleTrialChanged);
+      window.removeEventListener('local_auth_state_changed', handleTrialChanged);
     };
   }, [evaluateClaims]);
 
   const refreshClaims = useCallback(async () => {
-    return await evaluateClaims(auth.currentUser, true);
+    return await evaluateClaims(getEffectiveCurrentUser(), true);
   }, [evaluateClaims]);
 
   const setSimulatedOverride = useCallback((override: any) => {
@@ -398,8 +405,9 @@ export function useUserTier(): UserTierState {
   }, []);
 
   const activateSubscription = useCallback(async (newTier: UserTier, providerDetails?: Record<string, any>) => {
-    const userEmail = auth.currentUser?.email || '';
-    const uid = auth.currentUser?.uid || getCurrentAthlete()?.id || 'local-officer';
+    const activeUsr = getEffectiveCurrentUser();
+    const userEmail = activeUsr?.email || '';
+    const uid = activeUsr?.uid || getCurrentAthlete()?.id || 'local-officer';
     await activateAthleteSubscription(newTier, uid, providerDetails);
     setSimulatedOverride({ 
       tier: newTier, 
@@ -407,12 +415,13 @@ export function useUserTier(): UserTierState {
       hasSelectedPlan: true,
       targetEmail: userEmail,
     });
-    await evaluateClaims(auth.currentUser, true);
+    await evaluateClaims(getEffectiveCurrentUser(), true);
   }, [evaluateClaims, setSimulatedOverride]);
 
   const activateTrialWithCode = useCallback(async (code: string) => {
-    const userEmail = auth.currentUser?.email || '';
-    const uid = auth.currentUser?.uid || getCurrentAthlete()?.id || 'local-officer';
+    const activeUsr = getEffectiveCurrentUser();
+    const userEmail = activeUsr?.email || '';
+    const uid = activeUsr?.uid || getCurrentAthlete()?.id || 'local-officer';
     const res = await activateTrialCode(code, uid);
     if (res.success && res.daysGranted && res.activationRecord) {
       setSimulatedOverride({
@@ -423,15 +432,16 @@ export function useUserTier(): UserTierState {
         hasSelectedPlan: true,
         targetEmail: userEmail,
       });
-      await evaluateClaims(auth.currentUser, true);
+      await evaluateClaims(getEffectiveCurrentUser(), true);
     }
     return res;
   }, [evaluateClaims, setSimulatedOverride]);
 
   const startFreeTrial = useCallback(async (days = 14) => {
+    const activeUsr = getEffectiveCurrentUser();
     const athlete = getCurrentAthlete();
-    const userEmail = auth.currentUser?.email || athlete?.email || '';
-    const athleteId = auth.currentUser?.uid || athlete?.id || 'default-officer';
+    const userEmail = activeUsr?.email || athlete?.email || '';
+    const athleteId = activeUsr?.uid || athlete?.id || 'default-officer';
 
     // Verify if Firestore already has an authentic trial activation for this user!
     let existingStartedAtMs: number | null = null;
@@ -484,11 +494,12 @@ export function useUserTier(): UserTierState {
       window.dispatchEvent(new CustomEvent('trial_state_changed', { detail: trialRecord }));
     } catch {}
 
-    await evaluateClaims(auth.currentUser, true);
+    await evaluateClaims(getEffectiveCurrentUser(), true);
   }, [evaluateClaims]);
 
   const simulateTrialDaysRemaining = useCallback((days: number) => {
-    const userEmail = auth.currentUser?.email || '';
+    const activeUsr = getEffectiveCurrentUser();
+    const userEmail = activeUsr?.email || '';
     if (!isMasterExemptAccount(userEmail)) {
       return;
     }
@@ -511,7 +522,7 @@ export function useUserTier(): UserTierState {
         targetEmail: userEmail,
       });
     }
-    evaluateClaims(auth.currentUser, true);
+    evaluateClaims(getEffectiveCurrentUser(), true);
   }, [evaluateClaims, setSimulatedOverride]);
 
   const resetTestAccount = useCallback(async (targetEmail = RESETTABLE_TEST_PROFILE_EMAIL) => {
@@ -557,7 +568,7 @@ export function useUserTier(): UserTierState {
       console.warn('[useUserTier] Error resetting test account in Firestore:', err);
     }
 
-    await evaluateClaims(auth.currentUser, true);
+    await evaluateClaims(getEffectiveCurrentUser(), true);
   }, [evaluateClaims]);
 
   // Master exempt account calculation

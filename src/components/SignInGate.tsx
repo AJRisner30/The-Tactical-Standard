@@ -23,6 +23,7 @@ export const SignInGate: React.FC<SignInGateProps> = ({
   onOpenCodeModal,
 }) => {
   const {
+    signInWithGoogle,
     signInWithEmail,
     signUpWithEmail,
     sendPasswordSetupEmail,
@@ -62,6 +63,20 @@ export const SignInGate: React.FC<SignInGateProps> = ({
       }
     } catch (err) {
       console.warn('[SignInGate] Athlete sync note:', err);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    clearAuthError();
+    setLocalError(null);
+    setResetSuccessEmail(null);
+    try {
+      const user = await signInWithGoogle();
+      if (user) {
+        syncAthleteAfterAuth(user.email || '', user.displayName || undefined, user.uid);
+      }
+    } catch {
+      // Handled by FirebaseContext
     }
   };
 
@@ -142,9 +157,18 @@ export const SignInGate: React.FC<SignInGateProps> = ({
       return;
     }
 
+    if (password && password.length > 0 && password.length < 6) {
+      setLocalError('New password must be at least 6 characters long.');
+      return;
+    }
+
     try {
-      await sendPasswordSetupEmail(cleanEmail);
-      setResetSuccessEmail(cleanEmail);
+      await sendPasswordSetupEmail(cleanEmail, password.length >= 6 ? password : undefined);
+      if (password.length >= 6) {
+        syncAthleteAfterAuth(cleanEmail);
+      } else {
+        setResetSuccessEmail(cleanEmail);
+      }
     } catch {
       // Handled by context
     }
@@ -215,9 +239,9 @@ export const SignInGate: React.FC<SignInGateProps> = ({
           </h1>
 
           <p className="mt-2 text-xs sm:text-base text-zinc-300 max-w-xl leading-relaxed">
-            {mode === 'signin' && 'Welcome back, Service Member. Enter your email and password to access your military training protocols, progressive overload logs, and readiness scores.'}
+            {mode === 'signin' && 'Welcome back, Service Member. Sign in with Google or enter your email and password to access your military training protocols, progressive overload logs, and readiness scores.'}
             {mode === 'signup' && 'Sign up to start your 14-day free trial. Instant access to the 52-Week Military Combat Fitness Program, 12-Week Tactical Bodybuilding, 12-Week Hybrid Protocol, Universal Military PT (ACFT/PFT/CFT), and the Adaptive Program Engine.'}
-            {mode === 'set_password' && 'Previously signed in with Google or need to reset your password? Enter your email address to receive a secure link to set your password.'}
+            {mode === 'set_password' && 'Set a new password directly for your account or request a reset link.'}
           </p>
         </div>
 
@@ -283,24 +307,43 @@ export const SignInGate: React.FC<SignInGateProps> = ({
             </button>
           </div>
 
-          {/* Notice for Previous Google Sign-In Users */}
+          {/* One-Click Google Sign-In Button */}
           {mode !== 'set_password' && (
-            <div className="mb-4 px-3 py-2 bg-[#141a21] border border-zinc-800 rounded-xl flex items-center justify-between gap-2 text-[11px] text-zinc-300">
-              <span className="flex items-center gap-1.5">
-                <KeyRound className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                <span>Previously used Google Sign-In?</span>
-              </span>
+            <div className="mb-4">
               <button
                 type="button"
-                onClick={() => {
-                  setMode('set_password');
-                  clearAuthError();
-                  setLocalError(null);
-                }}
-                className="text-amber-400 hover:text-amber-300 font-bold underline cursor-pointer shrink-0"
+                onClick={handleGoogleSignIn}
+                disabled={isAuthenticating}
+                className="w-full py-3 px-4 bg-white hover:bg-zinc-100 text-zinc-950 rounded-2xl font-black text-xs sm:text-sm tracking-wide transition-all shadow-md flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50 active:scale-[0.99]"
               >
-                Set your password here &rarr;
+                <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                  <path
+                    fill="#4285F4"
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                  />
+                </svg>
+                <span>Continue with Google</span>
               </button>
+
+              <div className="relative flex items-center justify-center my-3.5">
+                <div className="border-t border-zinc-800 w-full" />
+                <span className="bg-[#0e1217] px-3 text-[10px] font-mono font-bold uppercase tracking-widest text-zinc-500 whitespace-nowrap">
+                  Or with Email &amp; Password
+                </span>
+                <div className="border-t border-zinc-800 w-full" />
+              </div>
             </div>
           )}
 
@@ -361,11 +404,11 @@ export const SignInGate: React.FC<SignInGateProps> = ({
                         type="button"
                         onClick={() => {
                           setMode('set_password');
-                          handleSendResetEmail();
+                          clearAuthError();
                         }}
                         className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-black font-black rounded-lg text-[11px] cursor-pointer shrink-0 shadow"
                       >
-                        Send Setup Link
+                        Set Password
                       </button>
                     </div>
                   )}
@@ -380,7 +423,7 @@ export const SignInGate: React.FC<SignInGateProps> = ({
                         }}
                         className="text-[11px] text-amber-400 hover:text-amber-300 underline font-semibold cursor-pointer"
                       >
-                        Did you previously sign in with Google? Click here to set your password &rarr;
+                        Need to set or reset your password? Click here &rarr;
                       </button>
                     </div>
                   )}
@@ -394,11 +437,11 @@ export const SignInGate: React.FC<SignInGateProps> = ({
             <div className="mb-5 p-4 bg-emerald-950/50 border border-emerald-500/60 rounded-2xl text-left animate-in fade-in duration-150 space-y-2">
               <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs sm:text-sm">
                 <CheckCircle2 className="w-5 h-5 shrink-0" />
-                <span>Password Setup Email Sent!</span>
+                <span>Password Setup Updated!</span>
               </div>
               <p className="text-xs text-zinc-300 leading-relaxed">
-                We sent a secure password setup link to <strong className="text-white">{resetSuccessEmail}</strong>.
-                Please open your email inbox (and check your spam folder), click the link to set your password, and then come back to sign in.
+                Password configuration processed for <strong className="text-white">{resetSuccessEmail}</strong>.
+                You can now return to Sign In using your email and password.
               </p>
               <div className="pt-1">
                 <button
@@ -588,11 +631,10 @@ export const SignInGate: React.FC<SignInGateProps> = ({
               <div className="p-3.5 bg-[#141a21] border border-amber-500/30 rounded-2xl text-left space-y-2">
                 <div className="flex items-center gap-2 text-amber-300 font-bold text-xs">
                   <KeyRound className="w-4 h-4 text-amber-400" />
-                  <span>Set Password for Previous Google Accounts</span>
+                  <span>Set or Reset Account Password</span>
                 </div>
                 <p className="text-xs text-zinc-300 leading-relaxed">
-                  If you previously signed in using Google, enter your email address below.
-                  We will email you a secure link to choose a password so you can sign in directly using email and password.
+                  Enter your account email and choose a new password below to set your password and sign in immediately.
                 </p>
               </div>
 
@@ -605,11 +647,36 @@ export const SignInGate: React.FC<SignInGateProps> = ({
                   <input
                     type="email"
                     required
-                    placeholder="Enter your previous Google sign-in or registered email"
+                    placeholder="Enter your account email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full bg-[#090b0d] border border-zinc-700 rounded-xl pl-9 pr-3 py-2.5 text-white text-xs sm:text-sm focus:outline-none focus:border-amber-500 transition-colors"
                   />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-zinc-300 text-xs font-bold mb-1 uppercase tracking-wider">
+                  New Password (min 6 chars)
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-zinc-500 absolute left-3 top-3" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    minLength={6}
+                    placeholder="Choose your new password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full bg-[#090b0d] border border-zinc-700 rounded-xl pl-9 pr-10 py-2.5 text-white text-xs sm:text-sm focus:outline-none focus:border-amber-500 transition-colors"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-2.5 text-zinc-400 hover:text-zinc-200 cursor-pointer p-0.5"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
 
@@ -633,12 +700,12 @@ export const SignInGate: React.FC<SignInGateProps> = ({
                   {isAuthenticating ? (
                     <>
                       <RefreshCw className="w-4 h-4 text-black animate-spin" />
-                      <span>Sending Link...</span>
+                      <span>Setting Password...</span>
                     </>
                   ) : (
                     <>
-                      <Mail className="w-4 h-4" />
-                      <span>Send Password Setup Link</span>
+                      <KeyRound className="w-4 h-4" />
+                      <span>Set Password &amp; Sign In</span>
                     </>
                   )}
                 </button>
