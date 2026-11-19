@@ -6,10 +6,11 @@ import {
   ChevronLeft, ChevronRight, CheckCircle2,
   SlidersHorizontal, ArrowRight, Activity, Award, RotateCcw,
   LogOut, RefreshCw, BatteryCharging, Compass,
-  Layers, Edit3, Trash2, EyeOff, Plus, Sparkles, FileText
+  Layers, Edit3, Trash2, EyeOff, Plus, Sparkles
 } from 'lucide-react';
-import { WorkoutProgram, ExerciseTemplate, MuscleGroup, AthleteProfile, ProgramKey, WorkoutSessionLog, WorkoutFormat, isBodyweightExercise, isExerciseTimed } from '../types';
+import { WorkoutProgram, ExerciseTemplate, MuscleGroup, AthleteProfile, ProgramKey, WorkoutSessionLog, WorkoutFormat, OperationalCondition, isBodyweightExercise, isExerciseTimed } from '../types';
 import { PROTOCOL_DATA, COACH_RULES, ProtocolDay, getDefaultRestPeriod, parseExerciseString, getApexWeekData, getTacticalHypertrophyWeekData, getUniversalPatWeekData, getAftWeekData } from '../data/protocolData';
+import { OPERATIONAL_CONDITIONS, applyOperationalConditionToDay, applyOperationalConditionToProgram } from '../utils/operationalAdjuster';
 import { soundManager } from '../utils/audio';
 import { useRestTimer } from '../hooks/useRestTimer';
 import { TacticalStandardCompanyEmblem } from './BrandingLogos';
@@ -156,6 +157,9 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
   // Active block & week inside Army Fitness Test (AFT) 8-Week Training Program
   const [activeAftBlockKey, setActiveAftBlockKey] = useState<'aft_block1' | 'aft_block2' | 'aft_block3' | 'aft_block4'>('aft_block1');
   const [activeAftWeek, setActiveAftWeek] = useState<number>(1);
+
+  // 1-Tap Operational Condition Auto-Adjuster (non-destructive overlay for Garrison / Unit PT / FTX / Austere Field)
+  const [operationalCondition, setOperationalCondition] = useState<OperationalCondition>('garrison');
 
   // Active quarter inside Law Enforcement 52-Week Fitness & Readiness Program (4 Quarters)
   const [activeApexPhaseKey, setActiveApexPhaseKey] = useState<
@@ -788,8 +792,9 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
   };
 
   const handleLaunchDayLifts = (day: ProtocolDay) => {
-    const program = convertDayToProgram(day);
-    onStartWorkout(program);
+    const baseProgram = convertDayToProgram(day);
+    const adjustedProgram = applyOperationalConditionToProgram(baseProgram, operationalCondition);
+    onStartWorkout(adjustedProgram);
   };
 
   // Quarter phase options for the Military 52-Week Fitness & Readiness Program
@@ -1683,29 +1688,6 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
                 <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-300 border border-zinc-700">
                   {selectedProgram === 'custom_ai' && activeCustomProgram ? activeCustomProgram.frequency : currentPhase.weeks}
                 </span>
-                {(selectedProgram === 'apex_protocol' || selectedProgram === 'tactical_hypertrophy' || selectedProgram === 'aft_protocol') && (
-                  <a
-                    href={
-                      selectedProgram === 'apex_protocol'
-                        ? '/assets/aistudio/Military_52-Week_Fitness___Readiness_Program_262b659a.pdf'
-                        : selectedProgram === 'tactical_hypertrophy'
-                        ? '/assets/aistudio/12-Week_Military_Tactical_Bodybuilding_Program_9f273eb2.pdf'
-                        : '/assets/aistudio/Army_Fitness_Test__AFT__8-Week_Specific_Training_Program_0b4b7b88.pdf'
-                    }
-                    download={
-                      selectedProgram === 'apex_protocol'
-                        ? 'Military_52-Week_Fitness_Readiness_Program.pdf'
-                        : selectedProgram === 'tactical_hypertrophy'
-                        ? '12-Week_Military_Tactical_Bodybuilding_Program.pdf'
-                        : 'Army_Fitness_Test_AFT_8-Week_Training_Program.pdf'
-                    }
-                    className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 transition-colors"
-                    title="Download Official Program Manual PDF"
-                  >
-                    <FileText className="w-3 h-3 text-amber-400" />
-                    <span>PDF Manual</span>
-                  </a>
-                )}
               </h1>
             </div>
           </div>
@@ -3056,6 +3038,79 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
         </div>
       )}
 
+      {/* 1-TAP OPERATIONAL CONDITION AUTO-ADJUSTER (UNIT PT / FTX / AUSTERE FIELD) */}
+      <div className="bg-[#0e1217] border border-zinc-800 rounded-2xl p-3 sm:p-4 shadow-md space-y-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <BatteryCharging className="w-4 h-4 text-amber-400" />
+            <span className="text-xs font-black uppercase tracking-wider text-white font-athletic">
+              1-Tap Operational Condition Adjuster
+            </span>
+            <span className="text-[10px] font-mono text-zinc-500 hidden sm:inline">
+              · Non-destructive daily overlay
+            </span>
+          </div>
+          {operationalCondition !== 'garrison' && (
+            <button
+              type="button"
+              onClick={() => setOperationalCondition('garrison')}
+              className="text-[11px] font-mono font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer transition-colors"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>Reset to Garrison</span>
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+          {OPERATIONAL_CONDITIONS.map((cond) => {
+            const isActive = operationalCondition === cond.id;
+            return (
+              <button
+                key={cond.id}
+                type="button"
+                onClick={() => {
+                  setOperationalCondition(cond.id);
+                  soundManager.playSetLogged();
+                }}
+                className={`text-left px-3 py-2 rounded-xl border transition-all cursor-pointer ${
+                  isActive
+                    ? 'bg-amber-500 text-black border-amber-400 shadow-md'
+                    : 'bg-[#090b0d] text-zinc-300 border-zinc-800 hover:border-amber-500/40 hover:text-white'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-1">
+                  <span className={`text-xs font-black uppercase tracking-wider font-athletic ${isActive ? 'text-black' : 'text-white'}`}>
+                    {cond.shortLabel}
+                  </span>
+                  {isActive && (
+                    <span className="text-[9px] font-mono font-black uppercase tracking-wider text-black/80">
+                      Active
+                    </span>
+                  )}
+                </div>
+                <p className={`text-[10px] mt-0.5 line-clamp-1 ${isActive ? 'text-black/80 font-medium' : 'text-zinc-400'}`}>
+                  {cond.summary}
+                </p>
+              </button>
+            );
+          })}
+        </div>
+
+        {operationalCondition !== 'garrison' && (
+          <div className="bg-[#090b0d] border border-amber-500/30 rounded-xl px-3 py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px]">
+            <span className="text-zinc-300">
+              <strong className="text-amber-400 uppercase font-mono mr-1.5">
+                {OPERATIONAL_CONDITIONS.find((c) => c.id === operationalCondition)?.label}:
+              </strong>
+              {selectedProgram === 'aft_protocol'
+                ? 'Applied as a temporary same-day field readiness adjustment without altering your base 8-Week AFT Plan. Tap Garrison to restore full AFT test prescriptions.'
+                : 'Applied live to all displayed sessions and launched workouts. Your base program stays untouched.'}
+            </span>
+          </div>
+        )}
+      </div>
+
       {/* Day Navigator Filter Bar */}
       <div className="bg-[#0e1217] border-2 border-amber-500/40 rounded-2xl p-2.5 sm:p-3 shadow-md">
         <div className="flex items-center justify-between gap-2 mb-2 px-1">
@@ -3173,7 +3228,8 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
 
       {/* Daily Cards */}
       <div className="space-y-5">
-        {daysToShow.map((day, idx) => {
+        {daysToShow.map((rawDay, idx) => {
+          const day = applyOperationalConditionToDay(rawDay, operationalCondition);
           const isRestDay = isProtocolRestDay(day);
           const dayNum = dayViewMode === 'all' ? idx + 1 : (typeof dayViewMode === 'number' ? dayViewMode + 1 : idx + 1);
 
@@ -3215,7 +3271,7 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
                   {!isRestDay && (
                     <button
                       type="button"
-                      onClick={() => handleLaunchDayLifts(day)}
+                      onClick={() => handleLaunchDayLifts(rawDay)}
                       className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-black font-black rounded-xl text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-md cursor-pointer active:scale-95 whitespace-nowrap"
                     >
                       <Play className="w-3.5 h-3.5 fill-black text-black stroke-[2]" />
@@ -3227,6 +3283,13 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
 
               {/* Day Body Content */}
               <div className="p-4 sm:p-6 space-y-4">
+                {day.operationalNote && (
+                  <div className="bg-amber-500/10 border border-amber-500/35 rounded-xl px-3.5 py-2.5 flex items-start gap-2.5 text-xs text-amber-200">
+                    <BatteryCharging className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                    <span className="leading-relaxed">{day.operationalNote}</span>
+                  </div>
+                )}
+
                 {/* WARM UP PRIMER */}
                 <div className="bg-[#090b0d] rounded-xl p-3.5 border border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>

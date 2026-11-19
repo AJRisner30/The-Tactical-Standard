@@ -153,6 +153,31 @@
         "updatedAt": { "type": "string", "description": "Last update timestamp" }
       },
       "required": ["id", "title", "category", "exercises", "isPublished", "createdByEmail"]
+    },
+    "PtTestLog": {
+      "title": "PtTestLog",
+      "description": "Recorded military physical fitness test score log (5-Event AFT or General PFT) with per-event scores, pass status, and promotion point estimates.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique PT test record identifier" },
+        "userId": { "type": "string", "description": "Firebase Auth user ID of the service member" },
+        "athleteId": { "type": "string", "maxLength": 128, "description": "Athlete profile identifier" },
+        "testType": { "type": "string", "enum": ["aft", "general_pft"], "description": "Type of military fitness evaluation" },
+        "standard": { "type": "string", "enum": ["combat", "general"], "description": "Combat MOS (sex-neutral) vs General MOS standard" },
+        "sex": { "type": "string", "enum": ["male", "female"], "description": "Scoring table gender column when General standard is selected" },
+        "ageBracket": { "type": "string", "maxLength": 20, "description": "Official age bracket (e.g., 22-26)" },
+        "date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$", "description": "Test date in YYYY-MM-DD format" },
+        "tag": { "type": "string", "enum": ["baseline", "mock", "rehearsal", "record"], "description": "Evaluation milestone classification" },
+        "events": { "type": "array", "description": "Array of scored event records (up to 10)" },
+        "totalScore": { "type": "number", "description": "Cumulative point score" },
+        "maxScore": { "type": "number", "description": "Maximum possible score (500 for AFT, 300 for General PFT)" },
+        "passed": { "type": "boolean", "description": "Whether all events and total met passing minimums" },
+        "promotionPoints": { "type": "number", "description": "Estimated SGT/SSG promotion points" },
+        "notes": { "type": "string", "maxLength": 1500, "description": "Test conditions and reflection notes" },
+        "createdAt": { "type": "string", "maxLength": 100, "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "maxLength": 100, "description": "Last update timestamp" }
+      },
+      "required": ["id", "userId", "testType", "standard", "sex", "ageBracket", "date", "tag", "events", "totalScore", "maxScore", "passed"]
     }
   },
   "firestore": {
@@ -171,6 +196,10 @@
     "/ruckLogs/{ruckId}": {
       "schema": "RuckSessionLog",
       "description": "Collection of rucking progression logs tracking distance, pack weight, and pace."
+    },
+    "/ptTestLogs/{testId}": {
+      "schema": "PtTestLog",
+      "description": "Collection of AFT and General PFT test score logs scoped strictly to the owning service member."
     },
     "/officerPrograms/{programId}": {
       "schema": "OfficerProgram",

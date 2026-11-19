@@ -9,7 +9,7 @@ import {
   Unsubscribe 
 } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType, getEffectiveCurrentUser } from '../firebase';
-import { AthleteProfile, WorkoutSessionLog, OfficerAssignedProgram, WorkoutProgram } from '../types';
+import { AthleteProfile, WorkoutSessionLog, OfficerAssignedProgram, WorkoutProgram, PtTestRecord, RuckSessionLog } from '../types';
 import { COACH_AJ_DEFAULT_LOGS } from '../data/coachLogsData';
 
 /**
@@ -840,6 +840,202 @@ export async function deleteCoachProgramFromFirestore(programId: string): Promis
     handleFirestoreError(error, OperationType.DELETE, path);
   }
 }
+
+/**
+ * Subscribes in real-time to the authenticated user's PT Test Score records (AFT & General PFT).
+ */
+export function subscribeToUserPtTestLogs(
+  userId: string,
+  onRecords: (records: PtTestRecord[]) => void
+): Unsubscribe {
+  if (!auth.currentUser) {
+    return () => {};
+  }
+  const path = 'ptTestLogs';
+  try {
+    const q = query(collection(db, path), where('userId', '==', userId));
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const list: PtTestRecord[] = [];
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          list.push({
+            id: docSnap.id,
+            userId: data.userId,
+            athleteId: data.athleteId || data.userId,
+            testType: data.testType === 'general_pft' ? 'general_pft' : 'aft',
+            standard: data.standard === 'general' ? 'general' : 'combat',
+            sex: data.sex === 'female' ? 'female' : 'male',
+            ageBracket: data.ageBracket || '22-26',
+            date: data.date || new Date().toISOString().split('T')[0],
+            tag: data.tag || 'mock',
+            events: Array.isArray(data.events) ? data.events : [],
+            totalScore: Number(data.totalScore) || 0,
+            maxScore: Number(data.maxScore) || 500,
+            passed: Boolean(data.passed),
+            promotionPoints: data.promotionPoints !== undefined ? Number(data.promotionPoints) : undefined,
+            notes: data.notes || '',
+            createdAt: data.createdAt || '',
+            updatedAt: data.updatedAt || '',
+          });
+        });
+        list.sort((a, b) => (b.date + (b.createdAt || '')).localeCompare(a.date + (a.createdAt || '')));
+        onRecords(list);
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.GET, path);
+      }
+    );
+  } catch (error) {
+    handleFirestoreError(error, OperationType.GET, path);
+    return () => {};
+  }
+}
+
+export async function savePtTestLogToFirestore(
+  record: PtTestRecord,
+  userId: string
+): Promise<void> {
+  if (!auth.currentUser) return;
+  const cleanId = (record.id && record.id.trim().length > 0)
+    ? record.id.trim().replace(/[^a-zA-Z0-9_-]/g, '_')
+    : `pt_${Date.now()}`;
+  const path = `ptTestLogs/${cleanId}`;
+
+  try {
+    const cleanDoc = {
+      id: cleanId,
+      userId,
+      athleteId: (record.athleteId || userId).slice(0, 128),
+      testType: record.testType === 'general_pft' ? 'general_pft' : 'aft',
+      standard: record.standard === 'general' ? 'general' : 'combat',
+      sex: record.sex === 'female' ? 'female' : 'male',
+      ageBracket: (record.ageBracket || '22-26').slice(0, 20),
+      date: (record.date || new Date().toISOString().split('T')[0]).slice(0, 20),
+      tag: record.tag || 'mock',
+      events: (record.events || []).slice(0, 10),
+      totalScore: Math.max(0, Math.min(600, Math.round(Number(record.totalScore) || 0))),
+      maxScore: Math.max(100, Math.min(600, Math.round(Number(record.maxScore) || 500))),
+      passed: Boolean(record.passed),
+      promotionPoints: record.promotionPoints !== undefined
+        ? Math.max(0, Math.min(200, Math.round(Number(record.promotionPoints) || 0)))
+        : 0,
+      notes: (record.notes || '').slice(0, 1500),
+      createdAt: record.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    await setDoc(doc(db, 'ptTestLogs', cleanId), sanitizeForFirestore(cleanDoc));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+export async function deletePtTestLogFromFirestore(testId: string): Promise<void> {
+  if (!auth.currentUser) return;
+  const path = `ptTestLogs/${testId}`;
+  try {
+    await deleteDoc(doc(db, 'ptTestLogs', testId));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
+/**
+ * Subscribes in real-time to the authenticated user's Ruck March logs in Firestore.
+ */
+export function subscribeToUserRuckLogs(
+  userId: string,
+  onLogs: (logs: RuckSessionLog[]) => void
+): Unsubscribe {
+  if (!auth.currentUser) {
+    return () => {};
+  }
+  const path = 'ruckLogs';
+  try {
+    const q = query(collection(db, path), where('userId', '==', userId));
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const list: RuckSessionLog[] = [];
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          list.push({
+            id: docSnap.id,
+            userId: data.userId,
+            athleteId: data.athleteId || data.userId,
+            title: data.title || 'Tactical Ruck March',
+            date: data.date || new Date().toISOString().split('T')[0],
+            distanceMiles: Number(data.distanceMiles) || 0,
+            weightLbs: Number(data.weightLbs) || 0,
+            durationMinutes: Number(data.durationMinutes) || 0,
+            paceMinPerMile: Number(data.paceMinPerMile) || 0,
+            workloadIndex: Number(data.workloadIndex) || 0,
+            terrain: data.terrain || '',
+            heartRateAvg: data.heartRateAvg !== undefined ? Number(data.heartRateAvg) : undefined,
+            rpe: data.rpe !== undefined ? Number(data.rpe) : undefined,
+            notes: data.notes || '',
+            createdAt: data.createdAt || '',
+            updatedAt: data.updatedAt || '',
+          });
+        });
+        list.sort((a, b) => (b.date + (b.createdAt || '')).localeCompare(a.date + (a.createdAt || '')));
+        onLogs(list);
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.GET, path);
+      }
+    );
+  } catch (error) {
+    handleFirestoreError(error, OperationType.GET, path);
+    return () => {};
+  }
+}
+
+export async function saveRuckLogToFirestore(
+  log: RuckSessionLog,
+  userId: string
+): Promise<void> {
+  if (!auth.currentUser) return;
+  const cleanId = (log.id && log.id.trim().length > 0)
+    ? log.id.trim().replace(/[^a-zA-Z0-9_-]/g, '_')
+    : `ruck_${Date.now()}`;
+  const path = `ruckLogs/${cleanId}`;
+
+  try {
+    const cleanDoc = {
+      id: cleanId,
+      userId,
+      athleteId: (log.athleteId || userId).slice(0, 128),
+      title: (log.title || 'Tactical Ruck March').slice(0, 200),
+      date: (log.date || new Date().toISOString().split('T')[0]).slice(0, 20),
+      distanceMiles: Math.max(0, Math.min(500, Number(log.distanceMiles) || 0)),
+      weightLbs: Math.max(0, Math.min(500, Number(log.weightLbs) || 0)),
+      durationMinutes: Math.max(0, Math.min(5000, Number(log.durationMinutes) || 0)),
+      paceMinPerMile: Math.max(0, Math.min(300, Number(log.paceMinPerMile) || 0)),
+      workloadIndex: Math.max(0, Math.min(100000, Math.round(Number(log.workloadIndex) || 0))),
+      terrain: (log.terrain || 'Road / Garrison').slice(0, 100),
+      rpe: Math.max(1, Math.min(10, Number(log.rpe) || 7)),
+      notes: (log.notes || '').slice(0, 3000),
+      createdAt: log.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    await setDoc(doc(db, 'ruckLogs', cleanId), sanitizeForFirestore(cleanDoc));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+export async function deleteRuckLogFromFirestore(ruckId: string): Promise<void> {
+  if (!auth.currentUser) return;
+  const path = `ruckLogs/${ruckId}`;
+  try {
+    await deleteDoc(doc(db, 'ruckLogs', ruckId));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
 
 
 

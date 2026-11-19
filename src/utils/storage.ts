@@ -1,4 +1,4 @@
-import { WorkoutProgram, WorkoutSessionLog, SupplementProtocol, PersonalRecord } from '../types';
+import { WorkoutProgram, WorkoutSessionLog, SupplementProtocol, PersonalRecord, PtTestRecord, RuckSessionLog } from '../types';
 import { INITIAL_PROGRAMS, INITIAL_PAST_LOGS, INITIAL_SUPPLEMENTS } from '../data/initialData';
 import { getCurrentAthlete } from './athleteAuth';
 
@@ -536,3 +536,49 @@ export function getStoredActiveProgramKey(): string | null {
     return null;
   }
 }
+
+const PT_TEST_LOGS_KEY = 'tts_pt_test_logs_v1';
+const RUCK_LOGS_KEY = 'tts_ruck_logs_v1';
+
+export function getStoredPtTestLogs(): PtTestRecord[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(PT_TEST_LOGS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveStoredPtTestLogs(logs: PtTestRecord[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(PT_TEST_LOGS_KEY, JSON.stringify(logs));
+  } catch (e) {
+    console.error('Failed to save PT test logs', e);
+  }
+}
+
+export function getStoredRuckLogs(): RuckSessionLog[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(RUCK_LOGS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveStoredRuckLogs(logs: RuckSessionLog[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(RUCK_LOGS_KEY, JSON.stringify(logs));
+  } catch (e) {
+    console.error('Failed to save ruck logs', e);
+  }
+}
+

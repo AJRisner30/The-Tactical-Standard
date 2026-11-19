@@ -4,12 +4,14 @@ import {
   ArrowRight, RotateCcw, Info, CheckCircle2, Bookmark, 
   Save, Plus, Trash2, HelpCircle, Layers, ChevronDown, 
   ChevronUp, Target, Award, ShieldCheck, Flame, BarChart3,
-  Timer
+  Timer, Compass
 } from 'lucide-react';
 import { WorkoutSessionLog } from '../types';
 import { calculate1RM, extractPersonalRecords } from '../utils/storage';
 import { soundManager } from '../utils/audio';
 import { RunPaceHrCalculator } from './RunPaceHrCalculator';
+import { AftScoreCalculator } from './AftScoreCalculator';
+import { RuckPacerCalculator } from './RuckPacerCalculator';
 
 export type CalculationFormula = 'epley' | 'brzycki' | 'lombardi' | 'consensus';
 export type WeightUnit = 'lbs' | 'kg';
@@ -40,8 +42,8 @@ interface RepLoadCalculatorTabProps {
 }
 
 export const RepLoadCalculatorTab: React.FC<RepLoadCalculatorTabProps> = ({ logs = [] }) => {
-  // Calculator mode: Strength (1RM & Rep Loads) vs Cardio (Run Pace & Heart Rate)
-  const [activeCalculator, setActiveCalculator] = useState<'strength' | 'cardio'>('strength');
+  // Calculator mode: Strength, Run Pace & HR, AFT & Military PFT Scorer, or 12-Mile Ruck Pacer
+  const [activeCalculator, setActiveCalculator] = useState<'strength' | 'cardio' | 'aft_pt' | 'ruck_pacer'>('strength');
 
   // Unit & Formula toggles
   const [unit, setUnit] = useState<WeightUnit>('lbs');
@@ -376,13 +378,13 @@ export const RepLoadCalculatorTab: React.FC<RepLoadCalculatorTabProps> = ({ logs
 
   return (
     <div id="rep-calculator-tab" className="space-y-6">
-      {/* Top Suite Switcher: 1RM & Rep Loads vs Run Pace & HR */}
+      {/* Top Suite Switcher: 1RM & Rep Loads · Run Pace & HR · AFT & PT Scorer · Ruck Pacer */}
       <div className="flex flex-wrap items-center justify-between gap-3 bg-[#0e1217] border border-zinc-800 p-2 sm:p-2.5 rounded-2xl shadow-lg">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none pb-0.5 sm:pb-0">
           <button
             type="button"
             onClick={() => setActiveCalculator('strength')}
-            className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+            className={`flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap shrink-0 ${
               activeCalculator === 'strength'
                 ? 'bg-amber-500 text-black font-black shadow-md'
                 : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
@@ -395,24 +397,54 @@ export const RepLoadCalculatorTab: React.FC<RepLoadCalculatorTabProps> = ({ logs
           <button
             type="button"
             onClick={() => setActiveCalculator('cardio')}
-            className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+            className={`flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap shrink-0 ${
               activeCalculator === 'cardio'
                 ? 'bg-amber-500 text-black font-black shadow-md'
                 : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
             }`}
           >
             <Timer className="w-4 h-4" />
-            <span>Run Pace &amp; Heart Rate</span>
+            <span>Run Pace &amp; HR</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveCalculator('aft_pt')}
+            className={`flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+              activeCalculator === 'aft_pt'
+                ? 'bg-amber-500 text-black font-black shadow-md'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
+            }`}
+          >
+            <Award className="w-4 h-4" />
+            <span>AFT &amp; PT Scorer</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveCalculator('ruck_pacer')}
+            className={`flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+              activeCalculator === 'ruck_pacer'
+                ? 'bg-amber-500 text-black font-black shadow-md'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
+            }`}
+          >
+            <Compass className="w-4 h-4" />
+            <span>Ruck Pacer</span>
           </button>
         </div>
 
-        <span className="text-[11px] font-mono text-zinc-400 hidden md:inline px-3">
+        <span className="text-[11px] font-mono text-zinc-400 hidden xl:inline px-3">
           The Tactical Standard · Precision Tactical Calculators
         </span>
       </div>
 
       {activeCalculator === 'cardio' ? (
         <RunPaceHrCalculator />
+      ) : activeCalculator === 'aft_pt' ? (
+        <AftScoreCalculator />
+      ) : activeCalculator === 'ruck_pacer' ? (
+        <RuckPacerCalculator />
       ) : (
         <>
           {/* Tab Header Banner */}

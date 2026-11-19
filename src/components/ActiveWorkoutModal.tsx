@@ -3,7 +3,7 @@ import {
   X, Check, Plus, Trash2, Clock, Dumbbell, Flame, Award, 
   ChevronRight, ChevronLeft, MessageSquare, AlertCircle, RefreshCw,
   HelpCircle, Activity, Gauge, Pause, Play, Timer, TrendingUp, Zap, RotateCcw,
-  LogOut, ShieldCheck
+  LogOut, ShieldCheck, ArrowLeftRight, BookOpen, AlertTriangle, CheckCircle2
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import {
@@ -37,6 +37,11 @@ import {
   parseAmrapDetails,
   parseCircuitDetails,
 } from '../utils/workoutFormats';
+import {
+  MILITARY_EVENT_STANDARDS,
+  matchEventStandardForExercise,
+  getLiveExerciseSwapOptions,
+} from '../utils/inWorkoutStandardsAndSwaps';
 
 interface ActiveWorkoutModalProps {
   program: WorkoutProgram;
@@ -435,6 +440,53 @@ export const ActiveWorkoutModal: React.FC<ActiveWorkoutModalProps> = ({
   const [isFinishing, setIsFinishing] = useState<boolean>(false);
   const [showExitModal, setShowExitModal] = useState<boolean>(false);
   const [showRpeGuide, setShowRpeGuide] = useState<boolean>(false);
+
+  // Live 1-Tap Exercise Swap & Official Event Standards Drawer
+  const [isSwapDrawerOpen, setIsSwapDrawerOpen] = useState<boolean>(false);
+  const [customSwapName, setCustomSwapName] = useState<string>('');
+  const [isStandardsDrawerOpen, setIsStandardsDrawerOpen] = useState<boolean>(false);
+  const [selectedStandardId, setSelectedStandardId] = useState<string>(MILITARY_EVENT_STANDARDS[0].id);
+
+  // Close swap panel when moving between exercises
+  useEffect(() => {
+    setIsSwapDrawerOpen(false);
+    setCustomSwapName('');
+  }, [activeExerciseIndex]);
+
+  const openStandardsForCurrentExercise = () => {
+    const activeEx = exercises[activeExerciseIndex];
+    const matched = activeEx ? matchEventStandardForExercise(activeEx.exerciseName) : null;
+    if (matched) {
+      setSelectedStandardId(matched.id);
+    }
+    setIsStandardsDrawerOpen(true);
+  };
+
+  const handleSwapCurrentExercise = (newName: string, reasonNote?: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    setExercises((prev) =>
+      prev.map((ex, idx) => {
+        if (idx !== activeExerciseIndex) return ex;
+        const nextIsBw = isBodyweightExercise(trimmed);
+        return {
+          ...ex,
+          exerciseName: trimmed,
+          isBodyweight: nextIsBw,
+          notes: reasonNote
+            ? `Swapped from ${ex.exerciseName} (${reasonNote})${ex.notes ? ` · ${ex.notes}` : ''}`
+            : `Swapped from ${ex.exerciseName}${ex.notes ? ` · ${ex.notes}` : ''}`,
+          sets: ex.sets.map((s) => ({
+            ...s,
+            weightLbs: nextIsBw && !s.completed ? 0 : s.weightLbs,
+          })),
+        };
+      })
+    );
+    setIsSwapDrawerOpen(false);
+    setCustomSwapName('');
+    soundManager.playSetLogged();
+  };
 
   // Live timer for individual timed sets & superset holds (supports both Countdown Hold and Stopwatch)
   const [activeSetStopwatch, setActiveSetStopwatch] = useState<{
@@ -1256,6 +1308,17 @@ export const ActiveWorkoutModal: React.FC<ActiveWorkoutModalProps> = ({
             <span>{totalVolumeLbs.toLocaleString()} <span className="text-zinc-500 text-[10px]">lbs</span></span>
           </div>
 
+          {/* Event Standards Drawer Trigger */}
+          <button
+            type="button"
+            onClick={openStandardsForCurrentExercise}
+            className="px-2.5 sm:px-3 py-1.5 bg-zinc-900 hover:bg-amber-500/15 text-amber-300 hover:text-amber-200 border border-amber-500/35 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0"
+            title="View official AFT & Military PFT grading standards and no-rep cues"
+          >
+            <BookOpen className="w-3.5 h-3.5 text-amber-400" />
+            <span className="hidden sm:inline">Standards</span>
+          </button>
+
           {/* Exit Workout Button */}
           <button
             type="button"
@@ -1397,10 +1460,42 @@ export const ActiveWorkoutModal: React.FC<ActiveWorkoutModalProps> = ({
                     <h3 className="text-xl sm:text-2xl font-black text-white font-athletic tracking-wide">
                       {currentExercise.exerciseName}
                     </h3>
+
+                    {/* Contextual Official AFT/PFT Standard Cue Link */}
+                    {(() => {
+                      const matchedStd = matchEventStandardForExercise(currentExercise.exerciseName);
+                      if (!matchedStd) return null;
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedStandardId(matchedStd.id);
+                            setIsStandardsDrawerOpen(true);
+                          }}
+                          className="mt-1.5 inline-flex items-center gap-1.5 text-[11px] font-mono font-bold text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
+                        >
+                          <ShieldCheck className="w-3.5 h-3.5" />
+                          <span>Official {matchedStd.shortCode} Standard &amp; No-Rep Cues →</span>
+                        </button>
+                      );
+                    })()}
                   </div>
 
-                  {/* Rest Timer Button */}
-                  <div className="shrink-0 self-start sm:self-auto">
+                  {/* Quick Actions: 1-Tap Swap + Rest Timer */}
+                  <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => setIsSwapDrawerOpen((prev) => !prev)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-black font-athletic uppercase tracking-wider flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap border ${
+                        isSwapDrawerOpen
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/60'
+                          : 'bg-[#090b0d] hover:bg-zinc-800 text-zinc-200 border-zinc-700 hover:border-amber-500/40'
+                      }`}
+                      title="Swap this exercise for an equipment-free, joint-safe, or alternate movement"
+                    >
+                      <ArrowLeftRight className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Swap</span>
+                    </button>
                     {modalRestTimer && modalRestTimer.secondsRemaining > 0 ? (
                       <div className="flex items-center gap-1.5 bg-amber-500/15 border border-amber-500/60 rounded-xl p-1 shadow-md">
                         <button
@@ -1473,6 +1568,74 @@ export const ActiveWorkoutModal: React.FC<ActiveWorkoutModalProps> = ({
                     )}
                   </div>
                 </div>
+
+                {/* Inline 1-Tap Live Exercise Swap Sheet */}
+                {isSwapDrawerOpen && (() => {
+                  const swapOptions = getLiveExerciseSwapOptions(currentExercise.exerciseName);
+                  return (
+                    <div className="bg-[#090b0d] border border-amber-500/40 rounded-xl p-3.5 space-y-3 animate-in fade-in duration-150">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <ArrowLeftRight className="w-4 h-4 text-amber-400" />
+                          <span className="text-xs font-black uppercase tracking-wider text-white font-athletic">
+                            1-Tap Live Swap · Keeps Logged Sets Intact
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setIsSwapDrawerOpen(false)}
+                          className="p-1 text-zinc-400 hover:text-white rounded hover:bg-zinc-800 cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        {swapOptions.map((opt, oIdx) => (
+                          <button
+                            key={oIdx}
+                            type="button"
+                            onClick={() => handleSwapCurrentExercise(opt.name, opt.tier)}
+                            className="text-left p-2.5 rounded-xl bg-[#0e1217] hover:bg-amber-500/10 border border-zinc-800 hover:border-amber-500/50 transition-all cursor-pointer group"
+                          >
+                            <span className="text-[10px] font-mono font-black uppercase tracking-wider text-amber-400 block">
+                              {opt.tier}
+                            </span>
+                            <span className="text-xs font-bold text-white group-hover:text-amber-300 block mt-0.5 leading-snug">
+                              {opt.name}
+                            </span>
+                            <span className="text-[10px] text-zinc-400 block mt-1 leading-relaxed">
+                              {opt.reason}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-2 border-t border-zinc-800/80">
+                        <input
+                          type="text"
+                          value={customSwapName}
+                          onChange={(e) => setCustomSwapName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && customSwapName.trim()) {
+                              handleSwapCurrentExercise(customSwapName, 'Custom Swap');
+                            }
+                          }}
+                          placeholder="Or type any custom exercise name..."
+                          className="flex-1 bg-[#0e1217] border border-zinc-700 focus:border-amber-500 rounded-lg px-3 py-1.5 text-xs text-white placeholder-zinc-500 outline-none"
+                        />
+                        <button
+                          type="button"
+                          disabled={!customSwapName.trim()}
+                          onClick={() => handleSwapCurrentExercise(customSwapName, 'Custom Swap')}
+                          className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-black font-black text-xs uppercase tracking-wider font-athletic cursor-pointer transition-colors"
+                        >
+                          Apply
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Inline Rest Progress Bar (When timer is running) */}
                 {modalRestTimer && modalRestTimer.secondsRemaining > 0 && (
@@ -3059,6 +3222,146 @@ export const ActiveWorkoutModal: React.FC<ActiveWorkoutModalProps> = ({
           </div>
         </div>
       )}
+
+      {/* Official AFT & Military PFT Event Standards Slide-Over Drawer */}
+      {isStandardsDrawerOpen && (() => {
+        const activeStandard =
+          MILITARY_EVENT_STANDARDS.find((s) => s.id === selectedStandardId) ||
+          MILITARY_EVENT_STANDARDS[0];
+        return (
+          <div className="fixed inset-0 z-50 flex justify-end bg-black/75 backdrop-blur-sm animate-in fade-in duration-150">
+            <div className="w-full max-w-lg bg-[#0e1217] border-l border-zinc-800 h-full flex flex-col shadow-2xl overflow-hidden">
+              {/* Drawer Header */}
+              <div className="px-5 py-4 bg-[#090b0d] border-b border-zinc-800 flex items-center justify-between gap-3 shrink-0">
+                <div>
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-amber-400 font-bold block">
+                    In-Workout Technical Reference · Timer Keeps Running
+                  </span>
+                  <h3 className="text-lg font-black uppercase tracking-tight text-white font-athletic flex items-center gap-2">
+                    <BookOpen className="w-4 h-4 text-amber-400" />
+                    <span>Official Event Standards &amp; Cues</span>
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsStandardsDrawerOpen(false)}
+                  className="p-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                  title="Close standards drawer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Event Selector Tabs */}
+              <div className="px-4 py-3 bg-[#090b0d]/60 border-b border-zinc-800 flex items-center gap-1.5 overflow-x-auto scrollbar-none shrink-0">
+                {MILITARY_EVENT_STANDARDS.map((std) => {
+                  const isSelected = std.id === activeStandard.id;
+                  return (
+                    <button
+                      key={std.id}
+                      type="button"
+                      onClick={() => setSelectedStandardId(std.id)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-mono font-black uppercase tracking-wider transition-all cursor-pointer shrink-0 border ${
+                        isSelected
+                          ? 'bg-amber-500 text-black border-amber-400'
+                          : 'bg-[#090b0d] text-zinc-400 border-zinc-800 hover:text-white hover:border-zinc-700'
+                      }`}
+                    >
+                      {std.shortCode}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Drawer Body */}
+              <div className="flex-1 overflow-y-auto p-5 space-y-5">
+                <div>
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-amber-400 font-bold">
+                    {activeStandard.category}
+                  </span>
+                  <h4 className="text-xl font-black text-white font-athletic uppercase tracking-wide mt-0.5">
+                    {activeStandard.eventName}
+                  </h4>
+                </div>
+
+                {/* Passing vs Max Targets */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="bg-[#090b0d] border border-zinc-800 rounded-xl p-3">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-400 block">
+                      Minimum Passing Standard
+                    </span>
+                    <span className="text-xs font-bold text-white font-mono mt-1 block leading-relaxed">
+                      {activeStandard.passingTarget}
+                    </span>
+                  </div>
+                  <div className="bg-[#090b0d] border border-amber-500/35 rounded-xl p-3">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-amber-400 block">
+                      100-Point Max Standard
+                    </span>
+                    <span className="text-xs font-bold text-amber-300 font-mono mt-1 block leading-relaxed">
+                      {activeStandard.maxTarget}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Official Execution Checklist */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-emerald-400 font-athletic">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Official Execution Standards</span>
+                  </div>
+                  <div className="bg-[#090b0d] border border-zinc-800 rounded-xl p-3.5 space-y-2">
+                    {activeStandard.executionStandards.map((rule, rIdx) => (
+                      <div key={rIdx} className="flex items-start gap-2 text-xs text-zinc-200 leading-relaxed">
+                        <span className="text-emerald-400 font-mono font-bold mt-0.5">•</span>
+                        <span>{rule}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Common No-Rep Disqualifiers */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-red-400 font-athletic">
+                    <AlertTriangle className="w-4 h-4" />
+                    <span>Common No-Rep &amp; Termination Traps</span>
+                  </div>
+                  <div className="bg-red-950/20 border border-red-500/30 rounded-xl p-3.5 space-y-2">
+                    {activeStandard.commonNoReps.map((trap, tIdx) => (
+                      <div key={tIdx} className="flex items-start gap-2 text-xs text-zinc-200 leading-relaxed">
+                        <span className="text-red-400 font-mono font-bold mt-0.5">✕</span>
+                        <span>{trap}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Coach Risner's Pacing Cue */}
+                <div className="bg-[#090b0d] border border-amber-500/30 rounded-xl p-4 space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-[11px] font-mono uppercase tracking-wider text-amber-400 font-bold">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>Coach Risner&apos;s Test-Day Pacing Cue</span>
+                  </div>
+                  <p className="text-xs text-zinc-300 leading-relaxed">
+                    {activeStandard.coachPacingCue}
+                  </p>
+                </div>
+              </div>
+
+              {/* Drawer Footer */}
+              <div className="p-4 bg-[#090b0d] border-t border-zinc-800 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsStandardsDrawerOpen(false)}
+                  className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-black text-xs uppercase tracking-wider font-athletic transition-colors cursor-pointer"
+                >
+                  Return to Active Workout
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };

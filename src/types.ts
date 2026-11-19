@@ -694,3 +694,70 @@ export interface OfficerAssignedProgram {
   updatedAt?: string;
 }
 
+export type OperationalCondition =
+  | 'garrison'
+  | 'unit_pt_run'
+  | 'ftx_low_sleep'
+  | 'austere_field';
+
+export type AftAgeBracket =
+  | '17-21'
+  | '22-26'
+  | '27-31'
+  | '32-36'
+  | '37-41'
+  | '42-46'
+  | '47-51'
+  | '52-56'
+  | '57-61'
+  | '62+';
+
+export type PtTestTag = 'baseline' | 'mock' | 'rehearsal' | 'record';
+
+export interface PtEventScoreRecord {
+  key: string;
+  label: string;
+  rawDisplay: string;
+  rawValue: number;
+  points: number;
+  passed: boolean;
+}
+
+export interface PtTestRecord {
+  id: string;
+  userId?: string;
+  athleteId?: string;
+  testType: 'aft' | 'general_pft';
+  standard: 'combat' | 'general';
+  sex: 'male' | 'female';
+  ageBracket: AftAgeBracket;
+  date: string; // YYYY-MM-DD
+  tag: PtTestTag;
+  events: PtEventScoreRecord[];
+  totalScore: number;
+  maxScore: number;
+  passed: boolean;
+  promotionPoints?: number;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface RuckSessionLog {
+  id: string;
+  userId?: string;
+  athleteId?: string;
+  title: string;
+  date: string; // YYYY-MM-DD
+  distanceMiles: number;
+  weightLbs: number;
+  durationMinutes: number;
+  paceMinPerMile: number;
+  workloadIndex: number; // distanceMiles * weightLbs
+  terrain?: string;
+  heartRateAvg?: number;
+  rpe?: number;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}

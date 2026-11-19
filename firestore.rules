@@ -204,6 +204,43 @@ service cloud.firestore {
     }
 
     // ----------------------------------------------------
+    // Military PT & AFT Test Score Logs
+    // ----------------------------------------------------
+    function isValidPtTestLog(data) {
+      return data.keys().hasAll(['id', 'userId', 'testType', 'standard', 'sex', 'ageBracket', 'date', 'tag', 'events', 'totalScore', 'maxScore', 'passed']) &&
+        data.keys().hasOnly(['id', 'userId', 'athleteId', 'testType', 'standard', 'sex', 'ageBracket', 'date', 'tag', 'events', 'totalScore', 'maxScore', 'passed', 'promotionPoints', 'notes', 'createdAt', 'updatedAt']) &&
+        data.id is string && isValidId(data.id) &&
+        data.userId is string && data.userId == request.auth.uid &&
+        data.testType in ['aft', 'general_pft'] &&
+        data.standard in ['combat', 'general'] &&
+        data.sex in ['male', 'female'] &&
+        data.ageBracket is string && data.ageBracket.size() > 0 && data.ageBracket.size() <= 20 &&
+        data.date is string && data.date.size() >= 8 && data.date.size() <= 30 &&
+        data.tag in ['baseline', 'mock', 'rehearsal', 'record'] &&
+        data.events is list && data.events.size() > 0 && data.events.size() <= 10 &&
+        data.totalScore is number && data.totalScore >= 0 && data.totalScore <= 600 &&
+        data.maxScore is number && data.maxScore >= 100 && data.maxScore <= 600 &&
+        data.passed is bool &&
+        (!('athleteId' in data) || data.athleteId == null || (data.athleteId is string && data.athleteId.size() <= 128)) &&
+        (!('promotionPoints' in data) || data.promotionPoints == null || (data.promotionPoints is number && data.promotionPoints >= 0 && data.promotionPoints <= 200)) &&
+        (!('notes' in data) || data.notes == null || (data.notes is string && data.notes.size() <= 1500)) &&
+        (!('createdAt' in data) || data.createdAt == null || (data.createdAt is string && data.createdAt.size() <= 100)) &&
+        (!('updatedAt' in data) || data.updatedAt == null || (data.updatedAt is string && data.updatedAt.size() <= 100));
+    }
+
+    match /ptTestLogs/{testId} {
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidId(testId) && isValidPtTestLog(incoming());
+      allow update: if isSignedIn() && isValidId(testId) &&
+        isValidPtTestLog(incoming()) &&
+        (!('userId' in existing()) || existing().userId == request.auth.uid || isAdmin()) &&
+        incoming().userId == existing().userId;
+      allow delete: if isSignedIn() && isValidId(testId) &&
+        (existing().userId == request.auth.uid || isAdmin());
+    }
+
+    // ----------------------------------------------------
     // Individual Officer Specific Programs
     // Confidential portal programs assigned specifically to one officer account
     // Access: ONLY the targeted officer (resource.data.officerUserId == request.auth.uid) OR Admin can read.
