@@ -55,18 +55,81 @@ export function inferMovementMuscleGroup(name: string, fallback: MuscleGroup = '
 }
 
 /**
- * Splits a raw superset title/string into paired movement names.
+ * Splits a string on top-level separators (ignoring separators inside parentheses).
+ */
+function splitOutsideParens(input: string, separatorRegex: RegExp): string[] {
+  const results: string[] = [];
+  let depth = 0;
+  let lastIndex = 0;
+
+  // Walk character by character tracking parenthesis depth
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i];
+    if (ch === '(') {
+      depth++;
+    } else if (ch === ')') {
+      depth = Math.max(0, depth - 1);
+    } else if (depth === 0) {
+      const slice = input.slice(i);
+      const match = slice.match(separatorRegex);
+      if (match && match.index === 0 && match[0].length > 0) {
+        const piece = input.slice(lastIndex, i).trim();
+        if (piece) results.push(piece);
+        i += match[0].length - 1;
+        lastIndex = i + 1;
+      }
+    }
+  }
+  const tail = input.slice(lastIndex).trim();
+  if (tail) results.push(tail);
+  return results;
+}
+
+/**
+ * Strips any trailing balanced "(sets x reps ...)" parenthetical or ": sets x reps" suffix from a title.
+ */
+function stripTrailingSetRepSpec(raw: string): string {
+  let str = raw.replace(/\[.*?\]/g, '').trim().replace(/\.$/, '');
+
+  // If ends with ")", check if the last balanced parenthetical is a (sets x reps) spec
+  if (str.endsWith(')')) {
+    let depth = 0;
+    let openIdx = -1;
+    for (let i = str.length - 1; i >= 0; i--) {
+      if (str[i] === ')') depth++;
+      else if (str[i] === '(') {
+        depth--;
+        if (depth === 0) {
+          openIdx = i;
+          break;
+        }
+      }
+    }
+    if (openIdx > 0) {
+      const inside = str.slice(openIdx + 1, -1).trim();
+      if (/^\d+(?:\s*[-–]\s*\d+)?\s*[x×]\s*/i.test(inside)) {
+        str = str.slice(0, openIdx).trim();
+      }
+    }
+  }
+
+  // Also strip trailing ": <sets>x<reps>..." if present
+  str = str.replace(/:\s*\d+(?:\s*[-–]\s*\d+)?\s*[x×]\s*[^()]+$/i, '').trim();
+  return str;
+}
+
+/**
+ * Splits a raw superset title/string into paired movement names (strictly preserving A1 & A2 without splitting unit slashes like 8/leg or 25s/side).
  */
 function splitSupersetMovementNames(rawTitle: string): string[] {
-  let cleaned = rawTitle
-    .replace(/\[.*?\]/g, '')
-    .replace(/\(\s*\d+\s*x\s*[\w\-+]+\s*\)/gi, '')
+  let cleaned = stripTrailingSetRepSpec(rawTitle)
     .replace(/\(\s*superset\s*\)/gi, '')
-    .replace(/\bsuperset\b\s*:?\s*/gi, '')
-    .replace(/\bgiant\s*set\b\s*:?\s*/gi, '')
+    .replace(/^(?:(?:finisher\s+pair|core\s+finisher|carry\s+finisher)\s*[-—–:]\s*)?(?:superset|giant\s*set)\s*\d*\s*[:.—–-]?\s*/i, '')
+    .replace(/\bsuperset\s*\d*\s*[:.—–-]\s*/gi, '')
+    .replace(/\bgiant\s*set\s*\d*\s*[:.—–-]\s*/gi, '')
     .trim();
 
-  // Handle "A1: Squat / A2: RDL" or "A1 Squat + A2 RDL"
+  // Handle explicit "A1: Squat / A2: RDL" or "A1 Squat + A2 RDL"
   if (/\b[a-z]1[:.\s-]/i.test(cleaned) && /\b[a-z]2[:.\s-]/i.test(cleaned)) {
     const parts = cleaned
       .split(/(?=\b[a-z][1-4][:. \t-])/i)
@@ -76,19 +139,20 @@ function splitSupersetMovementNames(rawTitle: string): string[] {
   }
 
   // Handle "X Superset with Y" or "X paired with Y"
-  if (/\b(?:with|paired with)\b/i.test(cleaned)) {
+  if (/\b(?:superset\s+with|paired\s+with)\b/i.test(cleaned)) {
     const parts = cleaned
-      .split(/\b(?:with|paired with)\b/i)
+      .split(/\b(?:superset\s+with|paired\s+with)\b/i)
       .map((s) => s.trim())
       .filter((s) => s.length > 2);
     if (parts.length >= 2) return parts;
   }
 
-  // Handle separators: "+", "/", " & ", " -> ", ","
-  const sepParts = cleaned
-    .split(/\s*(?:\+|\/|->|&|,)\s*/)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 2);
+  // Primary separator: top-level "+" (outside parentheses)
+  const plusParts = splitOutsideParens(cleaned, /^\s*\+\s*/).filter((s) => s.length > 2);
+  if (plusParts.length >= 2) return plusParts;
+
+  // Secondary separator: top-level " / ", " -> ", or " & " (requiring spaces around "/" so "8/leg" or "25s/side" never splits)
+  const sepParts = splitOutsideParens(cleaned, /^(?:\s+\/\s+|\s*->\s*|\s+&\s+)/).filter((s) => s.length > 2);
   if (sepParts.length >= 2) return sepParts;
 
   return [];
@@ -121,15 +185,24 @@ export function parseSupersetDetails(ex: Partial<ExerciseTemplate>): ParsedSuper
   const defaultSets = Math.max(1, ex.defaultSets || 3);
   const restBetweenRoundsSeconds = ex.restPeriodSeconds ?? 75;
   const targetRpe = ex.targetRpe ?? 8;
-  const fallbackReps = ex.targetReps || '10-12';
+  const fallbackReps = (ex.targetReps || '10-12').replace(/\s*each$/i, '').trim() || '10-12';
 
-  if (Array.isArray(ex.supersetExercises) && ex.supersetExercises.length >= 2) {
+  const partsFromName = splitSupersetMovementNames(ex.name || '');
+
+  // Only trust pre-populated ex.supersetExercises if it matches partsFromName count and doesn't contain unit-slash fragments
+  if (
+    Array.isArray(ex.supersetExercises) &&
+    ex.supersetExercises.length >= 2 &&
+    (partsFromName.length === 0 || ex.supersetExercises.length === partsFromName.length) &&
+    !ex.supersetExercises.some((m) => /^(?:leg|arm|side|each|\d+\s*reps?)\)?$/i.test((m.name || '').trim()))
+  ) {
     return {
       isSuperset: true,
-      title: ex.name || ex.supersetExercises.map((m) => m.name).join(' + '),
+      title: stripTrailingSetRepSpec(ex.name || ex.supersetExercises.map((m) => m.name).join(' + ')),
       movements: ex.supersetExercises.map((m) => ({
         ...m,
-        targetReps: m.targetReps || fallbackReps,
+        name: stripTrailingSetRepSpec(m.name),
+        targetReps: (m.targetReps || fallbackReps).replace(/\s*each$/i, '').trim(),
         muscleGroup: m.muscleGroup || inferMovementMuscleGroup(m.name, ex.muscleGroup || 'Full Body'),
       })),
       rounds: defaultSets,
@@ -138,11 +211,16 @@ export function parseSupersetDetails(ex: Partial<ExerciseTemplate>): ParsedSuper
     };
   }
 
-  const partsFromName = splitSupersetMovementNames(ex.name || '');
   let movements: SupersetMovementItem[] = [];
 
   if (partsFromName.length >= 2) {
-    const repsParts = (ex.targetReps || '').split(/\s*(?:\/|\+|&)\s*/).filter(Boolean);
+    // Split targetReps ONLY on "+" or " / " (with spaces) so "8/leg + 15 reps" or "40s + 25s/side" yields 2 clean rep targets
+    const repsParts = (ex.targetReps || '')
+      .replace(/\s*each$/i, '')
+      .split(/\s*(?:\+|\s\/\s|&)\s*/)
+      .map((r) => r.trim())
+      .filter(Boolean);
+
     movements = partsFromName.map((partName, idx) => ({
       name: partName,
       targetReps: repsParts.length === partsFromName.length ? repsParts[idx] : fallbackReps,
@@ -152,7 +230,7 @@ export function parseSupersetDetails(ex: Partial<ExerciseTemplate>): ParsedSuper
   } else if (ex.notes && /superset\s*(?:with|:)\s*([^.;\n]+)/i.test(ex.notes)) {
     const m = ex.notes.match(/superset\s*(?:with|:)\s*([^.;\n]+)/i);
     const partnerName = m?.[1]?.trim();
-    const baseName = (ex.name || 'Primary Lift').replace(/\bsuperset\b/gi, '').trim();
+    const baseName = stripTrailingSetRepSpec((ex.name || 'Primary Lift').replace(/\bsuperset\b/gi, '').trim());
     if (partnerName) {
       movements = [
         {
@@ -171,7 +249,7 @@ export function parseSupersetDetails(ex: Partial<ExerciseTemplate>): ParsedSuper
   }
 
   if (movements.length < 2 && isSupersetExercise(ex)) {
-    const baseName = (ex.name || 'Exercise A').replace(/\bsuperset\b/gi, '').trim();
+    const baseName = stripTrailingSetRepSpec((ex.name || 'Exercise A').replace(/\bsuperset\b/gi, '').trim());
     movements = [
       {
         name: `${baseName} (Part A)`,
@@ -189,7 +267,7 @@ export function parseSupersetDetails(ex: Partial<ExerciseTemplate>): ParsedSuper
 
   return {
     isSuperset: movements.length >= 2,
-    title: ex.name || movements.map((m) => m.name).join(' + '),
+    title: stripTrailingSetRepSpec(ex.name || movements.map((m) => m.name).join(' + ')),
     movements,
     rounds: defaultSets,
     restBetweenRoundsSeconds,

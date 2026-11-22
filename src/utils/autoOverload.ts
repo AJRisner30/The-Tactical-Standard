@@ -39,14 +39,19 @@ export interface SubsequentSetPacingRecommendation {
 
 export function parseRepRangeBounds(targetRepsText?: string): { min: number; max: number } {
   if (!targetRepsText) return { min: 8, max: 10 };
-  const clean = targetRepsText.trim();
+  let clean = targetRepsText.trim().replace(/(\d),(\d)/g, '$1$2');
   if (clean.includes('5x5') || clean.includes('5 x 5')) {
     return { min: 5, max: 5 };
   }
   if (clean.includes('3x3') || clean.includes('3 x 3')) {
     return { min: 3, max: 3 };
   }
-  // Check if there's an explicit range like "10-12", "6-8", "3-5", "3-4", "4-6"
+  // If string starts with "<sets> x <reps/distance>" (e.g. "6 x 400m", "6-8 x 400m", "4 x 300m"), inspect the part after x
+  const setsXMatch = clean.match(/^\d+(?:\s*[-–]\s*\d+)?\s*[x×]\s*(.+)$/i);
+  if (setsXMatch) {
+    clean = setsXMatch[1].trim();
+  }
+  // Check if there's an explicit range like "10-12", "6-8", "3-5", "3-4", "4-6", "20-40m"
   const rangeMatch = clean.match(/(\d+)\s*[-–]\s*(\d+)/);
   if (rangeMatch) {
     const min = parseInt(rangeMatch[1], 10);

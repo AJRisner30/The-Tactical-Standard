@@ -465,6 +465,89 @@ export interface ParsedExercise {
   overloadHint?: string;
 }
 
+export interface ParsedIntervalSpec {
+  sets: number;
+  setRangeMin: number;
+  setRangeMax: number;
+  targetReps: string;
+  repRangeMin?: number;
+  repRangeMax?: number;
+  restSeconds: number;
+}
+
+/**
+ * Extracts interval sets, rep distance/count, and rest period from a run or pace description
+ * (e.g., "6–8 × 400m Track Repeats", "4x800m at 5K Pace", "4 x 300m Track Intervals", "10x200m").
+ */
+export function parseIntervalSetsAndReps(runStr: string, paceStr?: string): ParsedIntervalSpec | null {
+  const combined = `${runStr || ''} ${paceStr || ''}`.trim();
+  if (!combined) return null;
+
+  const match = combined.match(
+    /(\d+)(?:\s*[-–]\s*(\d+))?\s*[x×]\s*(\d[\d,]*(?:\s*[-–]\s*\d[\d,]*)?\s*(?:m|meters|yd|yards|sec|s)\b)/i
+  );
+
+  let setRangeMin = 6;
+  let setRangeMax = 6;
+  let targetReps = '400m';
+
+  if (match) {
+    setRangeMin = parseInt(match[1], 10);
+    setRangeMax = match[2] ? parseInt(match[2], 10) : setRangeMin;
+    targetReps = match[3].replace(/,/g, '').trim();
+  } else {
+    // Fallback for named distance intervals without explicit "Nx" prefix (e.g. "400m Track Intervals")
+    const distOnlyMatch = combined.match(/\b(1,?000|800|600|400|300|200|100|60|40|30|20)\s*(m|meters|yd|yards)\b/i);
+    if (!distOnlyMatch) return null;
+    const distVal = distOnlyMatch[1].replace(/,/g, '');
+    targetReps = `${distVal}${distOnlyMatch[2].toLowerCase().startsWith('y') ? 'yd' : 'm'}`;
+    if (distVal === '1000') {
+      setRangeMin = 3;
+      setRangeMax = 4;
+    } else if (distVal === '800') {
+      setRangeMin = 4;
+      setRangeMax = 4;
+    } else if (distVal === '300') {
+      setRangeMin = 4;
+      setRangeMax = 4;
+    } else if (distVal === '200') {
+      setRangeMin = 10;
+      setRangeMax = 10;
+    } else {
+      setRangeMin = 6;
+      setRangeMax = 6;
+    }
+  }
+
+  let restSeconds = 90;
+  const secRestMatch = combined.match(/(\d+)\s*(?:sec|s)\b[^.;,)]*(?:rest|walk|jog|recovery)/i) ||
+    combined.match(/rest:\s*(\d+)\s*s/i);
+  const minRestMatch = combined.match(/(\d+(?:\.\d+)?)\s*(?:min|minute)s?\b[^.;,)]*(?:rest|walk|jog|recovery)/i);
+  if (secRestMatch) {
+    restSeconds = parseInt(secRestMatch[1], 10);
+  } else if (minRestMatch) {
+    restSeconds = Math.round(parseFloat(minRestMatch[1]) * 60);
+  } else if (targetReps.startsWith('800') || targetReps.startsWith('1000')) {
+    restSeconds = 120;
+  } else if (targetReps.startsWith('300')) {
+    restSeconds = 150;
+  }
+
+  const numericDist = parseInt(targetReps.replace(/[^\d]/g, ''), 10);
+  const repRangeMin = !isNaN(numericDist) ? numericDist : undefined;
+  const repRangeMax = repRangeMin;
+
+  return {
+    sets: setRangeMin,
+    setRangeMin,
+    setRangeMax,
+    targetReps,
+    repRangeMin,
+    repRangeMax,
+    restSeconds
+  };
+}
+
 export function parseExerciseString(exerciseStr: string): ParsedExercise {
   let overloadHint = '';
   const bracketMatches = [...exerciseStr.matchAll(/\[(.*?)\]/g)];
@@ -482,60 +565,91 @@ export function parseExerciseString(exerciseStr: string): ParsedExercise {
   let repRangeMax: number | undefined;
   const notes = overloadHint;
 
-  // Match the LAST parenthetical group as the (sets x reps) specification, preserving earlier parens in exercise name
-  const lastOpenParen = cleanStr.lastIndexOf('(');
-  const lastCloseParen = cleanStr.lastIndexOf(')');
-  if (lastOpenParen > 0 && lastCloseParen === cleanStr.length - 1) {
-    name = cleanStr.slice(0, lastOpenParen).trim().replace(/\.$/, '');
-    const spec = cleanStr.slice(lastOpenParen + 1, lastCloseParen).trim();
-
-    if (spec.toLowerCase() === '5x5' || spec.toLowerCase() === '5 x 5') {
+  const applySpec = (spec: string) => {
+    const cleanSpec = spec.trim();
+    if (cleanSpec.toLowerCase() === '5x5' || cleanSpec.toLowerCase() === '5 x 5') {
       defaultSets = 5;
       setRangeMin = 5;
       setRangeMax = 5;
       targetReps = '5';
       repRangeMin = 5;
       repRangeMax = 5;
-    } else if (spec.toLowerCase() === '3x3' || spec.toLowerCase() === '3 x 3') {
+      return true;
+    }
+    if (cleanSpec.toLowerCase() === '3x3' || cleanSpec.toLowerCase() === '3 x 3') {
       defaultSets = 3;
       setRangeMin = 3;
       setRangeMax = 3;
       targetReps = '3';
       repRangeMin = 3;
       repRangeMax = 3;
-    } else {
-      const xMatch = spec.match(/^(\d+(?:\s*[-–]\s*\d+)?)\s*[x×]\s*(.+)$/i);
-      if (xMatch) {
-        const setPart = xMatch[1].trim();
-        const repPart = xMatch[2].trim();
-        const setNums = setPart.match(/\d+/g);
-        if (setNums && setNums.length >= 2) {
-          setRangeMin = parseInt(setNums[0], 10);
-          setRangeMax = parseInt(setNums[1], 10);
-          // Start at the low end of the set range until session history dictates more
-          defaultSets = setRangeMin;
-        } else if (setNums && setNums.length === 1) {
-          setRangeMin = parseInt(setNums[0], 10);
-          setRangeMax = setRangeMin;
-          defaultSets = setRangeMin;
-        }
+      return true;
+    }
+    const xMatch = cleanSpec.match(/^(\d+(?:\s*[-–]\s*\d+)?)\s*[x×]\s*(.+)$/i);
+    if (xMatch) {
+      const setPart = xMatch[1].trim();
+      const repPart = xMatch[2].trim().replace(/,/g, '');
+      const setNums = setPart.match(/\d+/g);
+      if (setNums && setNums.length >= 2) {
+        setRangeMin = parseInt(setNums[0], 10);
+        setRangeMax = parseInt(setNums[1], 10);
+        defaultSets = setRangeMin;
+      } else if (setNums && setNums.length === 1) {
+        setRangeMin = parseInt(setNums[0], 10);
+        setRangeMax = setRangeMin;
+        defaultSets = setRangeMin;
+      }
 
-        targetReps = repPart;
-        // Parse rep range min/max if purely numeric or starting with a range (e.g., "10-12", "6-8", "3-5", "3-4", "10/leg")
-        const rangeMatch = repPart.match(/^(\d+)\s*[-–]\s*(\d+)/);
-        if (rangeMatch) {
-          repRangeMin = parseInt(rangeMatch[1], 10);
-          repRangeMax = parseInt(rangeMatch[2], 10);
-        } else {
-          const singleRepMatch = repPart.match(/^(\d+)/);
-          if (singleRepMatch) {
-            repRangeMin = parseInt(singleRepMatch[1], 10);
-            repRangeMax = repRangeMin;
-          }
+      targetReps = repPart;
+      const rangeMatch = repPart.match(/^(\d+)\s*[-–]\s*(\d+)/);
+      if (rangeMatch) {
+        repRangeMin = parseInt(rangeMatch[1], 10);
+        repRangeMax = parseInt(rangeMatch[2], 10);
+      } else {
+        const singleRepMatch = repPart.match(/^(\d+)/);
+        if (singleRepMatch) {
+          repRangeMin = parseInt(singleRepMatch[1], 10);
+          repRangeMax = repRangeMin;
         }
+      }
+      return true;
+    }
+    return false;
+  };
+
+  // 1) Match the LAST balanced parenthetical group at the end of cleanStr
+  const lastCloseParen = cleanStr.lastIndexOf(')');
+  let matchedSetsReps = false;
+  if (lastCloseParen === cleanStr.length - 1) {
+    let depth = 0;
+    let matchingOpen = -1;
+    for (let i = lastCloseParen; i >= 0; i--) {
+      if (cleanStr[i] === ')') depth++;
+      else if (cleanStr[i] === '(') {
+        depth--;
+        if (depth === 0) {
+          matchingOpen = i;
+          break;
+        }
+      }
+    }
+    if (matchingOpen > 0) {
+      const spec = cleanStr.slice(matchingOpen + 1, lastCloseParen).trim();
+      name = cleanStr.slice(0, matchingOpen).trim().replace(/\.$/, '');
+      if (applySpec(spec)) {
+        matchedSetsReps = true;
       } else {
         targetReps = spec;
       }
+    }
+  }
+
+  // 2) If not matched yet, check for colon-delimited ": <sets>x<reps>" (e.g. "Exercise Name: 4x8-10 each")
+  if (!matchedSetsReps) {
+    const colonMatch = cleanStr.match(/^(.*?):\s*(\d+(?:\s*[-–]\s*\d+)?\s*[x×]\s*[^()]+?)(?:\s*\(([^)]+)\))?$/i);
+    if (colonMatch && applySpec(colonMatch[2])) {
+      name = colonMatch[1].trim();
+      matchedSetsReps = true;
     }
   }
 
@@ -550,7 +664,6 @@ export function parseExerciseString(exerciseStr: string): ParsedExercise {
     }
   }
 
-  // Extract targetRpe if specified in brackets (e.g. "RPE 7", "RPE 8", "RPE 8.5-9", "RPE 8-8.5")
   let targetRpe: number | undefined;
   if (overloadHint) {
     const rpeMatch = overloadHint.match(/rpe\s*(\d+(?:\.\d+)?)/i);
@@ -603,7 +716,7 @@ export const APEX_PROTOCOL_PHASES: Record<string, ProtocolPhase> = {
           'Forward or Reverse Lunges (3x10/leg) [Overload: Start at 3 sets x 10/leg; add light DBs once stable - Effort: Bodyweight / Light DBs (RPE 7) - Rest: 60s]',
           'Front Plank + Glute Bridges (3x30 sec / 15 reps) [Effort: Bodyweight (RPE 7) - Rest: 45s - Spine-safe core bracing; skip sit-ups and twisting crunches]'
         ],
-        run: 'Post-Lift Aerobic Run: 3,200m (2 miles) (1 set)',
+        run: 'Post-Lift Aerobic Run: 3,200m (2 miles)',
         pace: 'Easy Conversational Pace (Rest: 0s)',
         progressionRule: 'Start at 3 sets x 10 reps (RPE 7, 3s eccentric). Build to 12 reps across all sets before adding +5–10 lbs. Post-Lift Run: 3,200m (2 miles) easy conversational pace.'
       },
@@ -635,7 +748,7 @@ export const APEX_PROTOCOL_PHASES: Record<string, ProtocolPhase> = {
         focus: 'Mid-Week Aerobic Run & Mobility',
         warmup: DIME_WARMUP_TEXT,
         strength: [],
-        run: 'Steady Aerobic Run + 10-Min Mobility: 4,800m (3 miles) (1 set)',
+        run: 'Steady Aerobic Run + 10-Min Mobility: 4,800m (3 miles)',
         pace: 'Easy Conversational Pace (Rest: 0s)',
         progressionRule: '4,800m (3 miles) easy conversational Zone 2 run followed by 10 minutes of foam rolling and mobility.'
       },
@@ -658,7 +771,7 @@ export const APEX_PROTOCOL_PHASES: Record<string, ProtocolPhase> = {
         focus: 'Entry Ruck March (Flat to Rolling Hills)',
         warmup: DIME_WARMUP_TEXT,
         strength: [],
-        run: 'Entry Ruck March (Flat to Rolling Hills): 3,200–4,800m (2–3 miles) (1 set)',
+        run: 'Entry Ruck March (Flat to Rolling Hills): 3,200–4,800m (2–3 miles)',
         pace: '35 lb pack (5–6 km/h brisk pace — add distance first; only add +5–10 lbs pack weight on a week distance stays the same)',
         progressionRule: 'Start at 3,200m (2 miles) with a 35 lb pack at 5–6 km/h. Build toward 4,800m (3 miles); never increase pack weight and distance in the same week.'
       },
@@ -693,7 +806,7 @@ export const APEX_PROTOCOL_PHASES: Record<string, ProtocolPhase> = {
           'Bulgarian Split Squat (rear foot elevated) (3x8/leg) [Overload: +5 lbs DBs when 3x8/leg is solid - Effort: Moderate Dumbbells (RPE 8) - Rest: 90s]',
           'Pallof Press (Anti-Rotation) + Hanging Knee Raise (3x10/side + 12 reps) [Effort: Moderate Band/Cable (RPE 8) - Rest: 60s]'
         ],
-        run: 'Post-Lift Aerobic Run: 3,200m (2 miles) (1 set)',
+        run: 'Post-Lift Aerobic Run: 3,200m (2 miles)',
         pace: 'Easy Recovery Pace (Rest: 0s)',
         progressionRule: 'Back Squat: Start at 4x6 (RPE 8), build to 8 reps then +5–10 lbs. Deadlift: 4x6 at RPE 8. Finish with 3,200m (2 miles) easy recovery run.'
       },
@@ -702,7 +815,7 @@ export const APEX_PROTOCOL_PHASES: Record<string, ProtocolPhase> = {
         focus: 'Cardio Intervals & Speed Endurance (400m Repeats)',
         warmup: DIME_WARMUP_TEXT,
         strength: [
-          '400m Run Repeats (or 10 x 100m Tempo Runs) (6-8x400m (~75-90s)) [Overload: Start at 6 sets x 400m; build to 8 repeats - Effort: Hard (75-80% effort, RPE 8) - Rest: 120s (2 min walk)]'
+          '400m Run Repeats (~75-90s per 400m) (6-8x400m) [Overload: Start at 6 sets x 400m; build to 8 repeats - Effort: Hard (75-80% effort, RPE 8) - Rest: 120s (2 min walk)]'
         ],
         run: '6–8 × 400m Run Repeats (~75–90s) or 10 × 100m Tempo Runs',
         pace: 'Hard (75–80% effort) • 2 min walk recovery between repeats',
@@ -750,7 +863,7 @@ export const APEX_PROTOCOL_PHASES: Record<string, ProtocolPhase> = {
         focus: 'Progressive Ruck March (Rolling Hills)',
         warmup: DIME_WARMUP_TEXT,
         strength: [],
-        run: 'Progressive Ruck March (Rolling Hills): 4,800–6,400m (3–4 miles) (1 set)',
+        run: 'Progressive Ruck March (Rolling Hills): 4,800–6,400m (3–4 miles)',
         pace: '40–50 lb pack (5–6 km/h brisk pace on rolling hills)',
         progressionRule: 'Progress from 4,800m (3 miles) to 6,400m (4 miles) with a 40–50 lb pack at 5–6 km/h. Never increase weight and distance in the same week.'
       },
@@ -794,9 +907,9 @@ export const APEX_PROTOCOL_PHASES: Record<string, ProtocolPhase> = {
         focus: 'Hill / Sled Sprint Speed + Easy Recovery Run',
         warmup: DIME_WARMUP_TEXT,
         strength: [
-          'Hill Sprints or Weighted Sled Sprints (8-10x20-40m (<= 6 sec)) [Overload: Start at 8 sets x 20-40m; build to 10 sprints - Effort: All-Out (95-100%, RPE 9.5) - Rest: 90s (90-120 sec)]'
+          'Hill Sprints or Weighted Sled Sprints (<= 6 sec work) (8-10x20-40m) [Overload: Start at 8 sets x 20-40m; build to 10 sprints - Effort: All-Out (95-100%, RPE 9.5) - Rest: 90s (90-120 sec)]'
         ],
-        run: 'Easy Recovery Run: 3,200m (2 miles) (1 set)',
+        run: 'Easy Recovery Run: 3,200m (2 miles)',
         pace: 'Easy Pace (after 8–10 × 20–40m Hill or Weighted Sled Sprints)',
         progressionRule: 'Execute 8–10x20–40m Hill Sprints or Weighted Sled Sprints (<= 6 sec work, 90–120s full rest) at 95–100% effort, then 3,200m (2 miles) easy recovery run.'
       },
@@ -842,7 +955,7 @@ export const APEX_PROTOCOL_PHASES: Record<string, ProtocolPhase> = {
         focus: 'Heavy Hill Ruck March',
         warmup: DIME_WARMUP_TEXT,
         strength: [],
-        run: 'Heavy Hill Ruck March (Deload 20 lbs every 4th wk): 4,000–6,000m (2.5–3.7 miles) (1 set)',
+        run: 'Heavy Hill Ruck March (Deload 20 lbs every 4th wk): 4,000–6,000m (2.5–3.7 miles)',
         pace: '60–80 lb pack (4–5.5 km/h — Deload pack weight by 20 lbs every 4th week)',
         progressionRule: '4,000–6,000m Heavy Hill Ruck March with a 60–80 lb pack at 4–5.5 km/h. Drop pack weight by 20 lbs on every 4th Deload week.'
       },
@@ -909,7 +1022,7 @@ export const APEX_PROTOCOL_PHASES: Record<string, ProtocolPhase> = {
         focus: 'Mid-Week Steady Zone 2 Recovery Run',
         warmup: DIME_WARMUP_TEXT,
         strength: [],
-        run: 'Steady Zone 2 Recovery Run: 4,800m (3 miles) (1 set)',
+        run: 'Steady Zone 2 Recovery Run: 4,800m (3 miles)',
         pace: 'Easy Conversational Pace (Rest: 0s)',
         progressionRule: 'Maintain an easy conversational Zone 2 pace across 4,800m (3 miles) to flush fatigue before Day 5 Combat Medley & Day 6 Battle Simulation.'
       },
@@ -929,7 +1042,7 @@ export const APEX_PROTOCOL_PHASES: Record<string, ProtocolPhase> = {
         focus: 'Battle Simulation March & Obstacle Course',
         warmup: DIME_WARMUP_TEXT,
         strength: [],
-        run: 'Battle Simulation March & Obstacle Course: 5,000m (3.1 miles) (1 set)',
+        run: 'Battle Simulation March & Obstacle Course: 5,000m (3.1 miles)',
         pace: '60 lb pack / full kit',
         progressionRule: 'Complete a 5,000m (3.1 miles) Battle Simulation March & Obstacle Course under a 60 lb pack / full kit.'
       },
@@ -1571,11 +1684,9 @@ export const AFT_PROTOCOL_BLOCKS: Record<'aft_block1' | 'aft_block2' | 'aft_bloc
         day: 'Day 4',
         focus: 'Steady Aerobic Base Run & Mobility (Aerobic Run)',
         warmup: AFT_DIME_WARMUP_TEXT,
-        strength: [
-          '10-Min Hip Mobility & Post-Run Stretching (1x10 mins) [Hip flexors, calves, hamstrings, and thoracic spine mobility]'
-        ],
+        strength: [],
         run: 'Steady Zone 2 Run + 10-Min Hip Mobility: 3 miles',
-        pace: 'Easy Conversational Pace (3–4 mile conversational Zone 2 run to build cardiovascular foundation)',
+        pace: 'Easy Conversational Pace (3–4 mile conversational Zone 2 run to build cardiovascular foundation + 10-min hip/ankle mobility)',
         progressionRule: 'Maintain comfortable conversational Zone 2 breathing throughout all 3 miles'
       },
       {
@@ -1596,9 +1707,7 @@ export const AFT_PROTOCOL_BLOCKS: Record<'aft_block1' | 'aft_block2' | 'aft_bloc
         day: 'Day 6',
         focus: 'Long Aerobic Run (or Light Ruck) (Long Run)',
         warmup: AFT_DIME_WARMUP_TEXT,
-        strength: [
-          'Post-Run Cool-Down Walk & Static Stretches (1x10 mins) [20–30 second static stretches for calves, hamstrings, hip flexors, and chest]'
-        ],
+        strength: [],
         run: 'Long Steady Aerobic Run: 3.5 miles',
         pace: 'Easy Conversational Pace (3.5–4.5 mile steady aerobic run so a 2-mile test effort feels controlled)',
         progressionRule: 'Increase easy run distance by 0.5 miles every 2 weeks (3.5 miles in Weeks 1–2 → 4.0 miles in Weeks 3–6)'
@@ -1668,9 +1777,7 @@ export const AFT_PROTOCOL_BLOCKS: Record<'aft_block1' | 'aft_block2' | 'aft_bloc
         day: 'Day 4',
         focus: 'Sustained Tempo Run (Tempo Run)',
         warmup: AFT_DIME_WARMUP_TEXT,
-        strength: [
-          'Post-Run Cool-Down & Static Stretches (1x10 mins) [Easy walking + 20–30s static stretches for calves, hamstrings, hip flexors, and chest]'
-        ],
+        strength: [],
         run: 'Sustained Tempo Run (fast, controlled aerobic effort): 3 miles',
         pace: 'Threshold (75–80% HRR) — Fast, controlled aerobic effort',
         progressionRule: 'Hold steady lactate threshold pace across all 3 miles without slowing in Mile 3'
@@ -1692,9 +1799,7 @@ export const AFT_PROTOCOL_BLOCKS: Record<'aft_block1' | 'aft_block2' | 'aft_bloc
         day: 'Day 6',
         focus: 'Long Steady Aerobic Run (Long Run)',
         warmup: AFT_DIME_WARMUP_TEXT,
-        strength: [
-          'Post-Run Cool-Down Walk & Static Stretches (1x10 mins) [20–30 second static stretches for calves, hamstrings, hip flexors, and chest]'
-        ],
+        strength: [],
         run: 'Long Steady Aerobic Run: 4 miles',
         pace: 'Easy Zone 2 Pace (+0.5 miles progression from Weeks 1–2)',
         progressionRule: 'Complete 4.0 continuous miles at relaxed conversational Zone 2 effort'
@@ -1763,9 +1868,7 @@ export const AFT_PROTOCOL_BLOCKS: Record<'aft_block1' | 'aft_block2' | 'aft_bloc
         day: 'Day 4',
         focus: 'Steady Zone 2 Aerobic Run (Aerobic Run)',
         warmup: AFT_DIME_WARMUP_TEXT,
-        strength: [
-          'Post-Run Cool-Down & Static Stretches (1x10 mins) [Easy walking and 20–30s static stretches for calves, hamstrings, hip flexors, and chest]'
-        ],
+        strength: [],
         run: 'Steady Zone 2 Aerobic Run: 3.5 miles',
         pace: 'Easy Conversational Pace (+0.5 miles progression from Weeks 1–4)',
         progressionRule: 'Flush lower-body soreness and build aerobic recovery capacity'
@@ -1786,9 +1889,7 @@ export const AFT_PROTOCOL_BLOCKS: Record<'aft_block1' | 'aft_block2' | 'aft_bloc
         day: 'Day 6',
         focus: 'Long Steady Aerobic Run (Long Run)',
         warmup: AFT_DIME_WARMUP_TEXT,
-        strength: [
-          'Post-Run Cool-Down Walk & Static Stretches (1x10 mins) [20–30 second static stretches for calves, hamstrings, hip flexors, and chest]'
-        ],
+        strength: [],
         run: 'Long Steady Aerobic Run: 4 miles',
         pace: 'Steady Zone 2 Pace',
         progressionRule: 'Maintain effortless aerobic rhythm across 4 miles so the 2-mile AFT run feels controlled'
@@ -1854,9 +1955,7 @@ export const AFT_PROTOCOL_BLOCKS: Record<'aft_block1' | 'aft_block2' | 'aft_bloc
         day: 'Day 4',
         focus: 'Steady Zone 2 Aerobic Run + 10-Min Mobility',
         warmup: AFT_DIME_WARMUP_TEXT,
-        strength: [
-          '10-Min Hip & Thoracic Mobility (1x10 mins) [Easy decompression and static stretching]'
-        ],
+        strength: [],
         run: 'Steady Zone 2 Aerobic Run + 10-Min Mobility: 2.5 miles',
         pace: 'Easy conversational pace',
         progressionRule: 'Keep effort light and restorative ahead of Day 5 AFT Finisher Combo'
@@ -2030,6 +2129,383 @@ export function getAftWeekData(weekNumber: number): ProtocolPhase {
     days: clonedDays,
   };
 }
+
+// ============================================================================
+// 12-WEEK MILITARY EXPRESS 30-MINUTE DUMBBELL PROGRAM
+// Coach AJ Risner's Personal Preferred Program (Busy Schedule • 30-Min Express)
+// Dumbbell & Bodyweight Edition: Building Strength, Lean Muscle & Endurance in 30 Minutes a Day
+// ============================================================================
+
+const EXPRESS_DIME_WARMUP_TEXT =
+  'Mandatory 6-Minute Express DIME Warm-Up (Minutes 0:00–6:00): Complete 1 fast, crisp round of 1) Bodyweight Squats (10 reps), 2) Squat Jumps (8 reps), 3) Forward Lunges (6/leg), 4) Side Plank (15s/side), 5) Push-Ups (10 reps), 6) Single-Leg Reach (6/leg), 7) Side Hop to Balance (6/side), 8) Ice Skaters (8/side), 9) "L" Hops (5/leg). Express Cool-Down (Minutes 26:00–30:00): 2-min walk + 20s static stretches for calves, hamstrings, hip flexors, and chest.';
+
+export const EXPRESS_DB_PHASES: Record<'express_db_phase1' | 'express_db_phase2' | 'express_db_phase3', ProtocolPhase> = {
+  express_db_phase1: {
+    id: 'express_db_phase1',
+    title: 'Phase 1: Foundation Strength, Muscle & Cardio Base',
+    weeks: 'Weeks 1–4',
+    desc: "Coach AJ's Personal Preferred Busy-Schedule Program (30 Mins/Day). Build lean muscle with 8–12 rep dumbbell antagonist supersets (3-second lowering count) and establish a 3-day/week running & incline ruck base inside a strict 20-minute main work window. Week 4 Deload: Cut sets by 40% and run at an easy recovery pace.",
+    coachRule:
+      "30-Minute Session Clock Law: Minutes 0:00–6:00 = Express DIME Warm-Up • Minutes 6:00–26:00 = 20-Minute Main Work Block • Minutes 26:00–30:00 = Express Cool-Down. Double Progression: 1) Reps First (+1–2 reps/set each week until hitting top of rep range on all sets) → 2) Weight Second (+5 lbs/hand on compounds or +2.5–5 lbs on shoulders/arms; if heavier DBs aren't available, add a 3s negative or 1s bottom pause) → 3) Density & Rest (never exceed the 20m work window; trim 10–15s rest if needed).",
+    days: [
+      {
+        day: 'Day 1',
+        focus: 'Upper-Body Dumbbell Strength & Muscle Supersets (30m Express)',
+        warmup: EXPRESS_DIME_WARMUP_TEXT,
+        strength: [
+          'Superset 1: Flat Dumbbell Bench Press + Chest-Supported Dumbbell Row (4x8-10 each) [Challenging RPE 8 • 3-sec lowering • Rest: 60s after pair • Overload: +1-2 reps/wk to 10, then +5 lbs/hand]',
+          'Superset 2: Standing Dumbbell Shoulder Press + Pull-Ups (or Band-Assisted Pull-Ups) (3x8-10 each) [Moderate-Heavy • Rest: 45s after pair • Overload: +1-2 reps/wk to 10, then +2.5-5 lbs]',
+          'Finisher Pair — Superset 3: Dumbbell Hammer Curls + Overhead Dumbbell Triceps Extensions (2x12-15 each) [Moderate • Rest: 30s after pair • Overload: +2.5-5 lbs at 15 reps]'
+        ],
+        run: 'Rest from running (No Cardio — 20-Min Upper-Body Superset Block)',
+        pace: 'N/A — Strict 30-Minute Clock: 6m DIME Warm-Up → 20m Upper Supersets → 4m Express Cool-Down',
+        progressionRule: 'Double Progression: Hit 10 reps on all sets with 3s eccentric before adding +5 lbs/hand'
+      },
+      {
+        day: 'Day 2',
+        focus: 'Cardio Engine: 400m Speed-Endurance Intervals (30m Express)',
+        warmup: EXPRESS_DIME_WARMUP_TEXT,
+        strength: [
+          '400m Track/Treadmill Repeats (~80-95s per repeat) (6-8x400m) [Hard 80% effort • Rest: 60s walk between repeats • Fits in 20-min main work window • Overload: Shave 2-3s off 400m repeats]'
+        ],
+        run: '6–8 × 400m Track/Treadmill Repeats (~80–95s per 400m)',
+        pace: 'Hard (80% Effort) • Walk 60 sec recovery between repeats (Fits in 20 mins)',
+        progressionRule: 'Speed-Endurance: Progress from 6 to 8 repeats and shave 2–3 seconds off 400m splits'
+      },
+      {
+        day: 'Day 3',
+        focus: 'Lower-Body Dumbbell Strength & Core Stiffness (30m Express)',
+        warmup: EXPRESS_DIME_WARMUP_TEXT,
+        strength: [
+          'Superset 1: Dumbbell Goblet Squat (Parallel Depth) + Dumbbell Romanian Deadlift (RDL) (4x10-12 each) [Challenging RPE 8 • 3-sec lowering • Rest: 75s after pair • Overload: +5 lbs/hand at 12 reps]',
+          'Superset 2: Dumbbell Reverse Lunges + Dumbbell Glute Bridges (DB on Hips) (3x8/leg + 15 reps) [Moderate • Rest: 45s after pair • Overload: +5 lbs at top reps]',
+          'Core Finisher — Superset 3: Forearm Plank (40s) + Side Plank (25s/side) (2x40s + 25s/side) [Bodyweight • Rest: 30s after round • Overload: +5-10s hold]'
+        ],
+        run: 'Rest from running (No Cardio — 20-Min Lower-Body & Core Block)',
+        pace: 'N/A — Strict 30-Minute Clock: 6m DIME Warm-Up → 20m Lower Supersets → 4m Express Cool-Down',
+        progressionRule: 'Lower Double Progression: Hit 12 reps on all Goblet Squat & RDL sets before adding +5 lbs/hand'
+      },
+      {
+        day: 'Day 4',
+        focus: 'Cardio Base: Steady Zone 2 Aerobic Run (30m Express)',
+        warmup: EXPRESS_DIME_WARMUP_TEXT,
+        strength: [],
+        run: 'Steady Zone 2 Aerobic Run: 2.5 miles (~20–22 min)',
+        pace: '60–70% Heart Rate Reserve (Conversational Talk Test Pace)',
+        progressionRule: 'Aerobic Base: Increase easy run distance by +0.25–0.5 miles every 2 weeks (staying within 20–24 mins)'
+      },
+      {
+        day: 'Day 5',
+        focus: 'Total-Body Dumbbell Power, Density & Carries (30m Express)',
+        warmup: EXPRESS_DIME_WARMUP_TEXT,
+        strength: [
+          'Superset 1: Double Dumbbell Suitcase Deadlift + Strict Push-Ups (4x10 + 12-15 reps) [Heavy DBs / Bodyweight • Rest: 60s after pair • Overload: +5 lbs/hand on Suitcase DL]',
+          'Superset 2: Two-Hand Dumbbell Swing (Hold Hex Head) + Single-Arm Dumbbell Row (3x15 + 10/arm) [Moderate-Heavy DB • Rest: 45s after pair • Overload: +5 lbs DB]',
+          "Carry Finisher: Heavy Dumbbell Farmer's Walk (3x30m) [Heavy Grip • Rest: 45s • Overload: +5 lbs/hand]"
+        ],
+        run: 'Rest from running (No Cardio — 20-Min Total-Body Power & Carries Block)',
+        pace: 'N/A — Strict 30-Minute Clock: 6m DIME Warm-Up → 20m Total-Body Density → 4m Express Cool-Down',
+        progressionRule: "Total-Body Density: Add +5 lbs/hand on Suitcase Deadlifts & 30m Farmer's Walks once all sets are crisp"
+      },
+      {
+        day: 'Day 6',
+        focus: 'Endurance & Load Carriage Express (30m Express)',
+        warmup: EXPRESS_DIME_WARMUP_TEXT,
+        strength: [],
+        run: '20-Minute Steep Incline Weighted Ruck March (~2,000m @ 8% Incline) or 3-Mile Tempo Run',
+        pace: '35 lb Pack / Vest • 8% Incline at Brisk 5.5–6.0 km/h Pace',
+        progressionRule: 'Load Carriage Express: Maintain brisk 5.5–6.0 km/h pace at 8% incline with 35 lb pack/vest'
+      },
+      {
+        day: 'Day 7',
+        focus: 'Complete Rest & Recovery',
+        warmup: 'None. Full recovery; 7–9 hours of sleep and meal prep.',
+        strength: [
+          'Complete Rest: Full muscular and nervous system recovery, 7–9 hours of sleep, hydration, and meal prep (0.75–1.0g protein/lb body weight).'
+        ],
+        run: 'Complete Rest',
+        pace: 'N/A',
+        progressionRule: 'Full recovery prior to next 6-day express cycle'
+      }
+    ]
+  },
+  express_db_phase2: {
+    id: 'express_db_phase2',
+    title: 'Phase 2: Heavy Dumbbell Overload & Threshold Speed',
+    weeks: 'Weeks 5–8',
+    desc: "Coach AJ's Personal Preferred Busy-Schedule Program (30 Mins/Day). Progress to heavier dumbbells with 1-second bottom pauses and unilateral work to drive strength and muscle density while pushing running pace with 800m repeats and 2.75–3 mile runs. Week 8 Deload: Cut sets by 40%.",
+    coachRule:
+      'Phase 2 Paused & Unilateral Overload Law: Eliminate elastic rebound with a strict 1-second bottom pause on Flat DB Bench Press and Double DB Front Squats. Push 800m track repeats at your goal 2-mile race pace and increase Saturday incline ruck to 45 lbs at 10% grade. Week 8 Deload cuts sets by 40%.',
+    days: [
+      {
+        day: 'Day 1',
+        focus: 'Upper-Body Heavy Paused Dumbbell Overload (30m Express)',
+        warmup: EXPRESS_DIME_WARMUP_TEXT,
+        strength: [
+          'Superset 1: Flat Dumbbell Bench Press (1-Sec Bottom Pause) + Weighted Pull-Ups (4x6-8 each) [Heavy RPE 8.5 • Rest: 75s after pair • Overload: +5 lbs/hand at 8 reps]',
+          'Superset 2: Incline Dumbbell Press + Bent-Over Two-Arm Dumbbell Row (3x8-10 each) [Moderate-Heavy • Rest: 60s after pair • Overload: +5 lbs/hand at 10 reps]',
+          'Finisher Pair — Superset 3: Dumbbell Lateral Raises + Rear-Delt Bent-Over Flys (3x12-15 each) [Moderate / Light • Rest: 30s after pair • Overload: +2.5 lbs at 15 reps]'
+        ],
+        run: 'Rest from running (No Cardio — 20-Min Heavy Upper-Body Paused Supersets)',
+        pace: 'N/A — Strict 30-Minute Clock: 6m DIME Warm-Up → 20m Heavy Upper Block → 4m Express Cool-Down',
+        progressionRule: 'Paused Strength: Complete 4x8 with a 1-sec bottom pause before adding +5 lbs/hand'
+      },
+      {
+        day: 'Day 2',
+        focus: 'Cardio Engine: 800m Race-Pace Threshold Repeats (30m Express)',
+        warmup: EXPRESS_DIME_WARMUP_TEXT,
+        strength: [
+          '800m Track/Treadmill Repeats (~3:00-3:30 per repeat) (4x800m) [Hard 85% effort at goal 2-mile race pace • Rest: 90s walk between repeats]'
+        ],
+        run: '4 × 800m Track/Treadmill Repeats (~3:00–3:30 per 800m)',
+        pace: 'Hard (85% Effort • Goal 2-Mile Race Pace) • Walk 90 sec between repeats',
+        progressionRule: 'Threshold Expansion: Hold goal 2-mile race pace across all 4 × 800m repeats'
+      },
+      {
+        day: 'Day 3',
+        focus: 'Lower-Body Paused Front Squat & Unilateral Split Strength (30m Express)',
+        warmup: EXPRESS_DIME_WARMUP_TEXT,
+        strength: [
+          'Superset 1: Double Dumbbell Front Squat (1-Sec Pause) + Bird-Dog Rows (4x8 + 8/arm) [Heavy Dumbbells • Rest: 75s after pair • Overload: +5 lbs/hand at 8 reps]',
+          'Superset 2: Dumbbell Bulgarian Split Squat + Single-Leg Dumbbell RDL (3x8/leg each) [Moderate-Heavy • Rest: 60s after pair • Overload: +5 lbs/hand at 8/leg]',
+          'Core Finisher: Dumbbell Plank Pull-Throughs (Drag DB Side-to-Side Under Body) (3x12 drags) [Moderate DB • Rest: 30s • Overload: +5 lbs DB]'
+        ],
+        run: 'Rest from running (No Cardio — 20-Min Heavy Paused Lower & Core Block)',
+        pace: 'N/A — Strict 30-Minute Clock: 6m DIME Warm-Up → 20m Lower Unilateral Block → 4m Express Cool-Down',
+        progressionRule: 'Unilateral Leg Drive: Fix left-to-right imbalances on Bulgarian Split Squats & Single-Leg RDLs'
+      },
+      {
+        day: 'Day 4',
+        focus: 'Cardio Base: Steady Zone 2 Aerobic Run (30m Express)',
+        warmup: EXPRESS_DIME_WARMUP_TEXT,
+        strength: [],
+        run: 'Steady Zone 2 Aerobic Run: 2.75–3.0 miles (~22 min)',
+        pace: '65–70% Heart Rate Reserve (Conversational Talk Test Pace)',
+        progressionRule: 'Aerobic Volume: Sustain 2.75–3.0 miles inside the 22-minute main running window'
+      },
+      {
+        day: 'Day 5',
+        focus: 'Total-Body Heavy Sumo Power, Step-Ups & Suitcase Carries (30m Express)',
+        warmup: EXPRESS_DIME_WARMUP_TEXT,
+        strength: [
+          'Superset 1: Heavy Dumbbell Sumo Deadlift + Standing Dumbbell Push Press (4x8 + 6-8 reps) [Heavy Dumbbells • Rest: 75s after pair • Overload: +5 lbs/hand]',
+          'Superset 2: Dumbbell Step-Ups (Knee at 90°) + Inverted Rows (or Staggered Push-Ups) (3x8/leg + 12 reps) [Moderate-Heavy • Rest: 45s after pair]',
+          'Carry Finisher — Superset 3: One-Arm Dumbbell Suitcase Carry (25m/arm) + 15 DB Swings (2x25m/arm + 15 reps) [Heavy DB • Rest: 45s]'
+        ],
+        run: 'Rest from running (No Cardio — 20-Min Heavy Total-Body Power & Carry Block)',
+        pace: 'N/A — Strict 30-Minute Clock: 6m DIME Warm-Up → 20m Total-Body Power → 4m Express Cool-Down',
+        progressionRule: 'Explosive Hip-to-Overhead Transfer: Drive heavy DB Push Press & 25m/arm Suitcase Carries'
+      },
+      {
+        day: 'Day 6',
+        focus: 'Endurance & Steep 10% Incline Load Carriage Express (30m Express)',
+        warmup: EXPRESS_DIME_WARMUP_TEXT,
+        strength: [],
+        run: '20-Minute Steep Incline Treadmill Ruck (~2,000m @ 10% Incline, 45 lb Pack)',
+        pace: '45 lb Pack / Vest • 10% Incline at Brisk 5.5 km/h Pace',
+        progressionRule: 'Steep Grade Overload: Progress from 35 lb @ 8% grade to 45 lb @ 10% grade for 20 minutes'
+      },
+      {
+        day: 'Day 7',
+        focus: 'Complete Rest & Recovery',
+        warmup: 'None. Full recovery; 7–9 hours of sleep and meal prep.',
+        strength: [
+          'Complete Rest: Full muscular and nervous system recovery, 7–9 hours of sleep, hydration, and meal prep.'
+        ],
+        run: 'Complete Rest',
+        pace: 'N/A',
+        progressionRule: 'Full recovery prior to next 6-day express cycle'
+      }
+    ]
+  },
+  express_db_phase3: {
+    id: 'express_db_phase3',
+    title: 'Phase 3: Peak Strength, Muscle Density & Combat Stamina',
+    weeks: 'Weeks 9–12',
+    desc: "Coach AJ's Personal Preferred Busy-Schedule Program (30 Mins/Day). Maximize muscle tension and power with paused dumbbell lifts, unilateral presses/squats, and a 20-minute continuous Dumbbell Combat AMRAP while sharpening running speed. Week 12: Taper volume by 50% on Day 1–Day 3 and test your 2-Mile Run, Push-Ups, Pull-Ups, and Plank on Day 5/Day 6.",
+    coachRule:
+      'Phase 3 Peak Tension & Combat Density Law: Single-arm heavy presses force maximum anti-rotational core bracing; Heavy Goblet Squats use a 3s eccentric + 2s bottom pause paired with explosive Box Jumps. Week 12 cuts Day 1–Day 3 sets by 50% so you hit peak benchmarks on Day 5/Day 6.',
+    days: [
+      {
+        day: 'Day 1',
+        focus: 'Upper-Body Peak Unilateral Press & Weighted Pull-Ups (30m Express)',
+        warmup: EXPRESS_DIME_WARMUP_TEXT,
+        strength: [
+          'Superset 1: Single-Arm Dumbbell Bench Press + Weighted Pull-Ups (4x6/arm + 5-6 reps) [Heavy Explosive Up • Rest: 75s after pair • Overload: +5 lbs]',
+          'Superset 2: Single-Arm Dumbbell Push Press + Chest-Supported Dumbbell Row (3x6/arm + 10 reps) [Heavy • Rest: 60s after pair • Overload: +5 lbs]',
+          'Finisher Pair — Superset 3: Hand-Release Push-Ups (or Weighted Dips) + Alternating DB Curls (2x12-15 + 10/arm) [Challenging • Rest: 30s after pair]'
+        ],
+        run: 'Rest from running (No Cardio — 20-Min Peak Unilateral Upper-Body Power Block)',
+        pace: 'N/A — Strict 30-Minute Clock: 6m DIME Warm-Up → 20m Peak Upper Block → 4m Express Cool-Down',
+        progressionRule: 'Peak Unilateral Output: Target 0.45–0.55+ × BW per hand on 6-rep DB Bench Press'
+      },
+      {
+        day: 'Day 2',
+        focus: 'Cardio Engine: Hill Sprints or 100m Track Repeats (30m Express)',
+        warmup: EXPRESS_DIME_WARMUP_TEXT,
+        strength: [
+          'Hill Sprints or 100m Track Repeats (10s all-out sprint, 50s walk recovery) (12-15x40m) [All-Out 95% effort • Rest: 50s walk]'
+        ],
+        run: '12–15 × 40m Hill Sprints or 100m Track Repeats (10s Sprint / 50s Walk)',
+        pace: 'All-Out (95% Effort) • 50 sec walk recovery (12–15 rounds in 15 mins)',
+        progressionRule: 'Peak Anaerobic Power: 10-second all-out bursts with strict 50-second walk recovery'
+      },
+      {
+        day: 'Day 3',
+        focus: 'Lower-Body Contrast Power & Weighted Core Peak (30m Express)',
+        warmup: EXPRESS_DIME_WARMUP_TEXT,
+        strength: [
+          'Superset 1: Heavy Goblet Squat (3s Down, 2s Pause) + Box Jumps (Step Down) (4x6-8 + 3 reps) [Heaviest DB / Max Jump • Rest: 75s after pair]',
+          'Superset 2: Double Dumbbell RDL (1-Sec Pause) + Hanging Leg Raises (or McGill Curl-Up) (3x8 + 12 reps) [Heavy DBs / Bodyweight • Rest: 60s after pair]',
+          'Core Finisher: Weighted Forearm Plank (15–25 lb Plate/DB on Back) (2x60 sec) [Weighted • Rest: 45s]'
+        ],
+        run: 'Rest from running (No Cardio — 20-Min Lower-Body Contrast & Weighted Core Block)',
+        pace: 'N/A — Strict 30-Minute Clock: 6m DIME Warm-Up → 20m Lower Peak Block → 4m Express Cool-Down',
+        progressionRule: 'Contrast Power: Target 0.60–0.75+ × BW on 8-rep Heavy Goblet Squat + crisp Box Jumps'
+      },
+      {
+        day: 'Day 4',
+        focus: 'Cardio Base: Sustained Race-Pace Tempo Run (30m Express)',
+        warmup: EXPRESS_DIME_WARMUP_TEXT,
+        strength: [],
+        run: 'Sustained Tempo Run: 2.5–3.0 miles (~20 min)',
+        pace: 'Threshold (75–80% Heart Rate Reserve • Fast Controlled Race-Pace)',
+        progressionRule: 'Lactate Threshold: Hold fast race-pace rhythm across 2.5–3.0 miles in ~20 minutes'
+      },
+      {
+        day: 'Day 5',
+        focus: '20-Minute Dumbbell Combat Conditioning Circuit (AMRAP — 30m Express)',
+        warmup: EXPRESS_DIME_WARMUP_TEXT,
+        strength: [
+          '20-Minute Dumbbell Conditioning Circuit (AMRAP): 15 Two-Hand Heavy DB Swings + 10 Double DB Thrusters + 12 Hand-Release Push-Ups + 30m Heavy DB Front-Rack Carry (5x1 full circuit) [Hard 85% effort; crisp form • Rest: 30s as needed]'
+        ],
+        run: 'Rest from running (No Separate Run — 20-Min Dumbbell AMRAP in Strength Block)',
+        pace: 'N/A — Included in 20-Minute Dumbbell Combat AMRAP Circuit',
+        progressionRule: 'Combat Work Capacity: Beat your total completed rounds + reps each week from Week 9 to Week 11'
+      },
+      {
+        day: 'Day 6',
+        focus: 'Fast-Paced 50-lb Ruck March or 3-Mile Aerobic Run (30m Express)',
+        warmup: EXPRESS_DIME_WARMUP_TEXT,
+        strength: [],
+        run: '20-Minute Fast-Paced 50-lb Ruck March (~2,000m @ 6–8% Incline) or 3-Mile Aerobic Run',
+        pace: '50 lb Pack / Vest • 6–8% Incline at Fast 6.0 km/h Pace',
+        progressionRule: 'Peak Load Carriage: 50 lb pack/vest at 6.0 km/h (6–8% incline) for 20 minutes'
+      },
+      {
+        day: 'Day 7',
+        focus: 'Complete Rest & Recovery',
+        warmup: 'None. Full recovery; 7–9 hours of sleep and meal prep.',
+        strength: [
+          'Complete Rest: Full muscular and nervous system recovery, 7–9 hours of sleep, hydration, and meal prep.'
+        ],
+        run: 'Complete Rest',
+        pace: 'N/A',
+        progressionRule: 'Full recovery & glycogen replenishment'
+      }
+    ]
+  }
+};
+
+export const EXPRESS_DB_BASE_PROTOCOL: ProtocolPhase = EXPRESS_DB_PHASES.express_db_phase1;
+PROTOCOL_DATA.hybrid_db = EXPRESS_DB_BASE_PROTOCOL;
+
+/**
+ * Returns customized week data for any week 1 through 12 of the
+ * 12-Week Military Express 30-Minute Dumbbell Program (Coach AJ's Personal Preferred Program),
+ * applying automatic 40% deloads on Weeks 4 & 8 and the Week 12 50% Taper + Benchmark Test on Days 5 & 6.
+ */
+export function getExpressDbWeekData(weekNumber: number): ProtocolPhase {
+  const week = Math.max(1, Math.min(12, weekNumber));
+  const basePhase =
+    week <= 4
+      ? EXPRESS_DB_PHASES.express_db_phase1
+      : week <= 8
+      ? EXPRESS_DB_PHASES.express_db_phase2
+      : EXPRESS_DB_PHASES.express_db_phase3;
+
+  const isDeload4Or8 = week === 4 || week === 8;
+  const isWeek12TaperTest = week === 12;
+
+  const clonedDays = JSON.parse(JSON.stringify(basePhase.days)) as ProtocolDay[];
+
+  if (isDeload4Or8) {
+    clonedDays.forEach((d) => {
+      if (d.focus.toLowerCase().includes('rest')) return;
+      d.focus = `${d.focus} [Week ${week} Deload: -40% Sets & Effort]`;
+      d.progressionRule = `WEEK ${week} DELOAD (-40% VOLUME): Cut working sets and running effort by 40% so joints and CNS rebuild stronger.`;
+      d.strength = d.strength.map((s) =>
+        s
+          .replace(/\(4x/g, '(2x')
+          .replace(/\(3x/g, '(2x')
+          .replace(/\(6-8x/g, '(4x')
+          .replace(/\[/g, `[Week ${week} Deload -40% Sets • `)
+      );
+      if (d.run && !d.run.toLowerCase().includes('none') && !d.run.toLowerCase().includes('rest')) {
+        d.run = `${d.run} [Week ${week} Deload: Easy Recovery Effort]`;
+      }
+    });
+  } else if (isWeek12TaperTest) {
+    clonedDays.forEach((d, idx) => {
+      if (idx <= 2) {
+        d.focus = `${d.focus} [Week 12 Taper: -50% Volume]`;
+        d.progressionRule = 'WEEK 12 TAPER (-50% VOLUME): Cut sets in half on Day 1–Day 3 to shed fatigue before Day 5/Day 6 Benchmark Testing.';
+        d.strength = d.strength.map((s) =>
+          s
+            .replace(/\(4x/g, '(2x')
+            .replace(/\(3x/g, '(2x')
+            .replace(/\(12-15x/g, '(6x')
+            .replace(/\[/g, '[Week 12 Taper -50% Volume • ')
+        );
+      } else if (idx === 3) {
+        d.focus = 'Pre-Test Shakeout & Mobility Flush (30m Express)';
+        d.strength = [];
+        d.run = '1.5-Mile Easy Pre-Test Shakeout Jog (~15 min)';
+        d.pace = 'Easy Recovery Pace (60% HRR) • Prepare for Day 5 & Day 6 Express Benchmarks';
+        d.progressionRule = 'Stay fresh for Day 5 & Day 6 12-Week Express Benchmark Testing';
+      } else if (idx === 4) {
+        d.focus = 'Week 12 Express Strength & Muscular Stamina Benchmark Test (30m Express)';
+        d.strength = [
+          'Benchmark 1 — Flat Dumbbell Bench Press (6RM Test) (3x6) [Solid: 0.35x BW/hand • Strong: 0.45x BW/hand • Elite: 0.55+x BW/hand • Rest: 120s]',
+          'Benchmark 2 — Heavy Dumbbell Goblet Squat (8RM Test) (3x8) [Solid: 0.45x BW • Strong: 0.60x BW • Elite: 0.75+x BW • Rest: 120s]',
+          'Benchmark 3 — Strict Pull-Ups Max Effort + 2-Min Hand-Release Push-Ups (HRP) (1xMax Reps Each) [Solid: 8 Pull-Ups / 35 HRP • Strong: 12 Pull-Ups / 45 HRP • Elite: 15+ Pull-Ups / 55+ HRP • Rest: 120s]',
+          "Benchmark 4 — Max Forearm Plank + 30m Heavy Farmer's Walk (1xMax Hold + 30m) [Solid: 2:15 Plank / 0.75x BW Carry • Strong: 3:00 / 1.0x BW • Elite: 3:40+ / 1.25+x BW]"
+        ];
+        d.run = 'Rest from running (No Cardio — Day 5 Express Strength & Calisthenics Benchmark Battery)';
+        d.pace = 'N/A — Full Recovery Between Benchmark Tests within 30-Min Window';
+        d.progressionRule = 'WEEK 12 RECORD BENCHMARK: Log your 6RM DB Bench, 8RM Goblet Squat, Max Pull-Ups, 2-Min HRP, Plank & 30m Carry';
+      } else if (idx === 5) {
+        d.focus = 'Week 12 Official 2-Mile Run Time Trial Benchmark (30m Express)';
+        d.strength = [];
+        d.run = 'Official 2-Mile Run Benchmark Time Trial: 2.0 miles';
+        d.pace = 'Race Effort • Solid Military Baseline: ≤15:30 • Strong Target: ≤14:00 • Elite Target: ≤12:45';
+        d.progressionRule = 'WEEK 12 RECORD 2-MILE TEST: Log your official 2-Mile Time in the AFT & PT Score Tracker';
+      }
+    });
+  }
+
+  const phaseShortLabel =
+    week <= 4
+      ? 'Phase 1 (Wks 1–4): Foundation Strength, Muscle & Cardio Base'
+      : week <= 8
+      ? 'Phase 2 (Wks 5–8): Heavy Dumbbell Overload & Threshold Speed'
+      : 'Phase 3 (Wks 9–12): Peak Strength, Muscle Density & Combat Stamina';
+
+  const statusTag = isDeload4Or8
+    ? ' • 40% Deload Week'
+    : isWeek12TaperTest
+    ? ' • 50% Taper & Benchmark Test Week'
+    : '';
+
+  return {
+    ...basePhase,
+    id: `express_db_week_${week}`,
+    title: `12-Week Military Express 30-Min Dumbbell Program — Week ${week}${statusTag}`,
+    weeks: `Week ${week} of 12 • ${phaseShortLabel}${statusTag}`,
+    days: clonedDays,
+  };
+}
+
 
 
 

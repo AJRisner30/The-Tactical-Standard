@@ -6,7 +6,7 @@ import {
   AlertTriangle, RotateCcw, Filter, Check, ShieldAlert,
   ShieldCheck, Eye, Zap, ArrowRight, User
 } from 'lucide-react';
-import { WorkoutSessionLog, MuscleGroup, WorkoutProgram, isBodyweightExercise, isExerciseTimed } from '../types';
+import { WorkoutSessionLog, MuscleGroup, WorkoutProgram, isBodyweightExercise, isExerciseTimed, isCarryDistanceExercise, isIntervalRunExercise } from '../types';
 import { 
   deleteWorkoutLog, 
   calculate1RM, 
@@ -1121,12 +1121,14 @@ export const WorkoutLogsTab: React.FC<WorkoutLogsTabProps> = ({
 
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                               {ex.sets.map((set) => {
-                                const isTimed = set.isTimed || ex.isTimed || Boolean(set.timeFormatted);
+                                const isInterval = Boolean(ex.isIntervalRun || isIntervalRunExercise(ex.exerciseName));
+                                const isCarry = Boolean(!isInterval && (ex.isCarryDistance || isCarryDistanceExercise(ex.exerciseName)));
+                                const isTimed = Boolean(!isInterval && !isCarry && (set.isTimed || ex.isTimed || Boolean(set.timeFormatted)));
                                 return (
                                   <div
                                     key={set.setNumber}
                                     className={`p-2 rounded-lg border text-xs flex flex-col justify-between tabular-nums ${
-                                      isTimed 
+                                      isTimed || isInterval
                                         ? 'bg-emerald-950/20 border-emerald-500/30' 
                                         : 'bg-[#0e1217] border-zinc-800'
                                     }`}
@@ -1135,7 +1137,20 @@ export const WorkoutLogsTab: React.FC<WorkoutLogsTabProps> = ({
                                       <span>SET {set.setNumber}</span>
                                       {set.rpe && <span className="text-amber-400 font-bold">RPE {set.rpe}</span>}
                                     </div>
-                                    {isTimed ? (
+                                    {isInterval ? (
+                                      <div className="font-mono font-bold text-sm text-emerald-400 my-0.5">
+                                        {set.distanceMeters || set.reps}m
+                                        {set.timeFormatted
+                                          ? ` · ${set.timeFormatted}`
+                                          : set.timeSeconds
+                                          ? ` · ${Math.floor(set.timeSeconds / 60)}:${set.timeSeconds % 60 < 10 ? '0' : ''}${set.timeSeconds % 60}`
+                                          : ''}
+                                      </div>
+                                    ) : isCarry ? (
+                                      <div className="font-mono font-bold text-sm text-white my-0.5">
+                                        {set.weightLbs} lbs × {set.distanceMeters || set.reps}m
+                                      </div>
+                                    ) : isTimed ? (
                                       <div className="font-mono font-bold text-sm text-emerald-400 my-0.5">
                                         {set.timeFormatted || (set.timeSeconds ? `${Math.floor(set.timeSeconds / 60)}:${set.timeSeconds % 60 < 10 ? '0' : ''}${set.timeSeconds % 60}` : 'Done')}
                                         {set.distanceMiles ? ` · ${set.distanceMiles} mi` : ''}
@@ -1147,7 +1162,17 @@ export const WorkoutLogsTab: React.FC<WorkoutLogsTabProps> = ({
                                       </div>
                                     )}
                                     <div className="text-[10px] font-mono text-amber-400">
-                                      {!isTimed && set.estimated1RM ? `1RM: ${set.estimated1RM} lbs` : isTimed ? (set.distanceMiles && set.timeSeconds ? `${((set.timeSeconds / 60) / set.distanceMiles).toFixed(1)} min/mi` : 'Timed Effort') : ''}
+                                      {isInterval
+                                        ? 'Interval Split'
+                                        : isCarry
+                                        ? 'Loaded Carry'
+                                        : !isTimed && set.estimated1RM
+                                        ? `1RM: ${set.estimated1RM} lbs`
+                                        : isTimed
+                                        ? set.distanceMiles && set.timeSeconds
+                                          ? `${((set.timeSeconds / 60) / set.distanceMiles).toFixed(1)} min/mi`
+                                          : 'Timed Effort'
+                                        : ''}
                                     </div>
                                   </div>
                                 );

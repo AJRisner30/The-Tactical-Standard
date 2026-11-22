@@ -106,6 +106,9 @@ export interface SupersetLiveEntry {
   prevReps?: number;
   isBodyweight?: boolean;
   isTimed?: boolean;
+  isCarryDistance?: boolean;
+  distanceMeters?: number;
+  prevDistanceMeters?: number;
   timeSeconds?: number;
   timeFormatted?: string;
   targetHoldSeconds?: number;
@@ -117,8 +120,9 @@ export interface LiveSet {
   weightLbs: number;
   reps: number;
   timeSeconds?: number;
-  timeFormatted?: string; // e.g. "30:00", "45s", "08:15"
+  timeFormatted?: string; // e.g. "30:00", "45s", "08:15", "01:25"
   distanceMiles?: number;
+  distanceMeters?: number;
   rpe?: number;
   completed: boolean;
   restSeconds: number;
@@ -126,6 +130,7 @@ export interface LiveSet {
   prevReps?: number;
   prevTimeFormatted?: string;
   prevDistanceMiles?: number;
+  prevDistanceMeters?: number;
   isTimed?: boolean;
   supersetEntries?: SupersetLiveEntry[];
   amrapRoundsCompleted?: number;
@@ -170,6 +175,8 @@ export interface LiveExerciseSession {
   progressionRules?: ProgressionRule;
   isTimed?: boolean;
   isBodyweight?: boolean;
+  isCarryDistance?: boolean;
+  isIntervalRun?: boolean;
   hasDistance?: boolean;
   targetHoldSeconds?: number;
   format?: WorkoutFormat;
@@ -209,6 +216,8 @@ export interface WorkoutSessionLog {
     exerciseName: string;
     muscleGroup: MuscleGroup;
     isTimed?: boolean;
+    isCarryDistance?: boolean;
+    isIntervalRun?: boolean;
     format?: WorkoutFormat;
     supersetGroupName?: string;
     sets: {
@@ -218,6 +227,8 @@ export interface WorkoutSessionLog {
       timeSeconds?: number;
       timeFormatted?: string;
       distanceMiles?: number;
+      distanceMeters?: number;
+      isTimed?: boolean;
       rpe?: number;
       estimated1RM: number;
       amrapRoundsCompleted?: number;
@@ -505,8 +516,246 @@ export function isTimedHoldExercise(
 }
 
 /**
- * Checks if an exercise is timed (cardio runs, interval sprints, planks, isometric holds)
- * rather than traditional repetition sets.
+ * Checks if an exercise is an interval run, track repeat, sprint repeat, stride, or shuttle drill
+ * that should be displayed and logged as Sets and Reps (rather than a single continuous distance/time log).
+ */
+export function isIntervalRunExercise(
+  exerciseName: string,
+  targetReps?: string,
+  notes?: string
+): boolean {
+  const name = (exerciseName || '').toLowerCase().trim();
+  const reps = (targetReps || '').toLowerCase().trim();
+  const noteText = (notes || '').toLowerCase().trim();
+
+  if (!name) return false;
+
+  // Exclude traditional strength, calisthenics, core, carries, sled drags, and full-event SDC simulations
+  if (
+    /\b(squat|squats|deadlift|deadlifts|rdl|bench|press|presses|row|rows|pull-up|pull-ups|pullup|pullups|chin-up|chin-ups|push-up|push-ups|pushup|pushups|dip|dips|curl|curls|raise|raises|swing|swings|lunge|lunges|step-up|step-ups|plank|planks|copenhagen|wall\s+sit|dead\s+hang|hollow\s+body|hollow\s+hold|rollout|rollouts|hip\s+thrust|glute\s+bridge|calf|calves|shrug|shrugs|thruster|thrusters|clean|snatch|woodchop|woodchopper|russian\s+twist|bird-?dog|dead\s+bug|mcgill|crunch|sit-up|farmer|farmers|suitcase|bear-hug|casualty\s+drag|backward\s+sled\s+drag|reverse\s+sled\s+drag|heavy\s+sled\s+push|sprint-drag-carry|250m\s+sprint-drag-carry|combat\s+medley|amrap|emom|box\s+jump|broad\s+jump|trap-bar\s+jump)\b/i.test(
+      name
+    ) &&
+    !/\b(hill\s+sprints?|sled\s+sprints?|flying\s+sprints?|build-up\s+sprints?|prone-to-sprint)\b/i.test(name)
+  ) {
+    return false;
+  }
+
+  // Exclude continuous runs / rucks / benchmarks even if their notes mention strides or intervals
+  if (
+    /\b(steady\s+aerobic|steady\s+zone\s*2|zone\s*2\s+run|zone\s*2\s+aerobic|zone\s*2\s+recovery|post-lift\s+aerobic|long\s+steady|long\s+aerobic|long\s+run|long\s+slow|base\s+run|recovery\s+run|recovery\s+spin|flush\s+run|flush\s+jog|shakeout|tempo\s+run|threshold\s+run|threshold\s+pace\s+run|threshold\s+push|over-distance|time\s+trial|benchmark\s+run|benchmark\s+time\s+trial|mock\s+assessment\s+run|benchmark\s+assessment|official\s+2-mile\s+run|2-mile\s+run|1\.5-mile|3-mile|fartlek|ruck|ruck\s+march|battle\s+simulation\s+march|cross-training|optional\s+light\s+spin)\b/i.test(
+      name
+    ) &&
+    !/\b(track\s+intervals?|track\s+repeats?|track\/treadmill\s+repeats?|run\s+repeats?|pace\s+repeats?|400m\s+repeats?|800m\s+repeats?|1,?000m\s+repeats?|300m\s+track|hill\s+sprints?)\b/i.test(
+      name
+    )
+  ) {
+    return false;
+  }
+
+  // Explicit interval / repeat / sprint keywords in the exercise name
+  if (
+    /\b(track\s+intervals?|short\s+sprint\s+intervals?|long\s+intervals?|interval\s+speed|speed\s+intervals?|speed-endurance\s+intervals?|test-simulation\s+intervals?|high-speed\s+openers?|technical\s+strides?|track\s+repeats?|track\/treadmill\s+repeats?|unmarked\s+field\s+shuttle\s+repeats?|unmarked\s+field\s+threshold\s+repeats?|unmarked\s+field\s+threshold\s+runs?|unmarked\s+field\s+patrol\s+shuttles?|field\s+combat\s+sprints?|run\s+repeats?|pace\s+repeats?|sprint\s+repeats?|hill\s+sprints?|sled\s+sprints?|flying\s+sprints?|build-up\s+sprints?|prone-to-sprint|pro\s+agility|t-drill|t-test|imt\s+bound|strides?|30:30|60:60)\b/i.test(
+      name
+    )
+  ) {
+    return true;
+  }
+
+  // Explicit NxDistance repeat pattern in name or targetReps (e.g. "6x400m", "6-8x400m", "4x800m", "3-4x1,000m", "4x300m", "10x200m", "12-15x40m")
+  const hasRepeatPattern =
+    /\b(\d+(?:\s*[-–]\s*\d+)?)\s*[x×]\s*(\d[\d,]*(?:\s*[-–]\s*\d[\d,]*)?\s*(?:m|meters?|yds?|yards?))\b/i.test(
+      `${name} ${reps}`
+    ) ||
+    (/^\d[\d,]*(?:\s*[-–]\s*\d[\d,]*)?\s*m\b/i.test(reps) &&
+      /\b(repeat|repeats|interval|intervals|sprint|sprints|stride|strides|track|shuttle)\b/i.test(`${name} ${noteText}`));
+
+  if (hasRepeatPattern) {
+    return true;
+  }
+
+  // Hybrid Protocol Day 3 "Speed Work" with "8x200m" or "10x200m" in notes/pace
+  if (
+    /\b(speed\s+work|track\s+intervals|long\s+intervals|sprint\s+intervals)\b/i.test(name) &&
+    /\b\d+\s*[x×]\s*\d+\s*m\b/i.test(`${reps} ${noteText}`)
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Checks if an exercise is a loaded carry or weighted distance drag/walk
+ * (e.g., Farmer's Walk, Suitcase Carry, Bear-Hug Sandbag Carry, Front-Rack Carry, Sled Push/Drag)
+ * where each set should log Weight Used (lbs) and Distance Gone (m).
+ */
+export function isCarryDistanceExercise(
+  exerciseName: string,
+  targetReps?: string,
+  notes?: string
+): boolean {
+  const name = (exerciseName || '').toLowerCase().trim();
+  const reps = (targetReps || '').toLowerCase().trim();
+  if (!name) return false;
+
+  if (
+    isIntervalRunExercise(exerciseName, targetReps, notes) ||
+    isTimedHoldExercise(exerciseName, targetReps)
+  ) {
+    return false;
+  }
+
+  // Exclude continuous ruck marches / runs
+  if (
+    /\b(ruck\s+march|weighted\s+ruck\s+march|treadmill\s+ruck|patrol\s+ruck\s+march|aerobic\s+run|tempo\s+run|zone\s*2)\b/i.test(
+      name
+    )
+  ) {
+    return false;
+  }
+
+  if (
+    /\b(carry|carries|farmer|farmers|farmer's\s+walk|farmers\s+walk|suitcase\s+walk|suitcase\s+carry|front-rack\s+carry|bear-hug|overhead\s+carry|waiter\s+walk|waiter\s+carry|yoke\s+walk|yoke\s+carry|sandbag\s+carry|water-can|ammo-can\s+carry|sled\s+push|sled\s+pull|sled\s+drag|backward\s+sled\s+drag|reverse\s+sled\s+drag|backward\s+drag|partner\s+drag|buddy\s+drag|casualty\s+drag|dummy\s+drag)\b/i.test(
+      name
+    )
+  ) {
+    return true;
+  }
+
+  // Also match weighted exercises whose targetReps explicitly specify meters or yards (e.g. "30m", "25m/arm", "40m")
+  if (
+    /\b\d+(?:\s*[-–]\s*\d+)?\s*(?:m|meters?|yds?|yards?)(?:\/(?:arm|side|hand|leg))?\b/i.test(reps) &&
+    !/\b(run|jog|sprint|stride|shuttle|repeat|interval|swim|row|rower|skierg|bike)\b/i.test(name)
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Extracts the prescribed distance in meters (or yards) for a carry or interval set.
+ * Strips leading set prefixes like "3x30m" or "6-8x400m" first so "30" or "400" is returned.
+ */
+export function parseDefaultDistanceMeters(
+  targetReps?: string,
+  exerciseName?: string,
+  fallbackMeters = 30
+): number {
+  const candidates = [targetReps || '', exerciseName || ''];
+  for (const raw of candidates) {
+    if (!raw) continue;
+    // Strip leading "<sets>x" like "6-8x400m" or "3x30m" or "2x25m/arm"
+    const cleaned = raw.replace(/\(\s*\d+(?:\s*[-–]\s*\d+)?\s*[x×]\s*/gi, '(').replace(/^\s*\d+(?:\s*[-–]\s*\d+)?\s*[x×]\s*/i, '');
+    const mMatch = cleaned.match(/(\d[\d,]*)(?:\s*[-–]\s*\d[\d,]*)?\s*(?:m|meters?|yds?|yards?)(?:\b|\/)/i);
+    if (mMatch) {
+      const val = parseInt(mMatch[1].replace(/,/g, ''), 10);
+      if (!isNaN(val) && val > 0 && val <= 5000) {
+        return val;
+      }
+    }
+  }
+  return fallbackMeters;
+}
+
+/**
+ * Extracts or estimates a default interval split time ("mm:ss") for an interval repeat exercise.
+ */
+export function parseDefaultIntervalTimeFormatted(
+  targetReps?: string,
+  exerciseName?: string,
+  notes?: string
+): string {
+  const combined = `${targetReps || ''} ${exerciseName || ''} ${notes || ''}`;
+
+  // Look for explicit mm:ss range like "~3:00-3:30" or "3:15"
+  const clockMatch = combined.match(/~?\s*(\d{1,2}):(\d{2})(?:\s*[-–]\s*\d{1,2}:\d{2})?/);
+  if (clockMatch) {
+    const mins = parseInt(clockMatch[1], 10);
+    const secs = parseInt(clockMatch[2], 10);
+    if (!isNaN(mins) && !isNaN(secs)) {
+      return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    }
+  }
+
+  // Look for explicit seconds range for the work repeat (e.g., "~80-95s per repeat", "10s all-out sprint", "90s Hard Effort")
+  const secMatch = combined.match(/~?\s*(\d+)(?:\s*[-–]\s*(\d+))?\s*(?:s|sec|secs)\s*(?:per\s+repeat|per\s+\d+m|all-out|sprint|hard\s+effort|work)/i);
+  if (secMatch) {
+    const s1 = parseInt(secMatch[1], 10);
+    const s2 = secMatch[2] ? parseInt(secMatch[2], 10) : s1;
+    const avgSec = Math.round((s1 + s2) / 2);
+    if (!isNaN(avgSec) && avgSec > 0) {
+      const m = Math.floor(avgSec / 60);
+      const s = avgSec % 60;
+      return `${m}:${s < 10 ? '0' : ''}${s}`;
+    }
+  }
+
+  // Fallback based on prescribed distance in meters
+  const dist = parseDefaultDistanceMeters(targetReps, exerciseName, 400);
+  if (dist <= 50) return '0:10';
+  if (dist <= 110) return '0:18';
+  if (dist <= 220) return '0:38';
+  if (dist <= 320) return '1:05';
+  if (dist <= 450) return '1:25';
+  if (dist <= 650) return '2:15';
+  if (dist <= 850) return '3:15';
+  if (dist <= 1050) return '4:05';
+  return '1:30';
+}
+
+/**
+ * Checks if an exercise is a continuous/easy run, tempo run, long run, time trial, or ruck march
+ * that should be displayed and logged purely as Distance (mi) and Time / Stopwatch (never as sets & reps).
+ */
+export function isContinuousRunOrRuckExercise(
+  exerciseName: string,
+  targetReps?: string,
+  type?: string,
+  notes?: string
+): boolean {
+  const name = (exerciseName || '').toLowerCase().trim();
+  const reps = (targetReps || '').toLowerCase().trim();
+  if (!name) return false;
+
+  if (isIntervalRunExercise(exerciseName, targetReps, notes)) {
+    return false;
+  }
+  if (isTimedHoldExercise(exerciseName, targetReps)) {
+    return false;
+  }
+
+  // Exclude strength, carries, sleds, SDC, jumps, core, circuits, supersets
+  if (
+    /\b(squat|squats|deadlift|deadlifts|rdl|bench|press|presses|row|rows|pull-up|pull-ups|pullup|pullups|chin-up|chin-ups|push-up|push-ups|pushup|pushups|dip|dips|curl|curls|raise|raises|swing|swings|lunge|lunges|step-up|step-ups|plank|planks|copenhagen|wall\s+sit|dead\s+hang|hollow\s+body|hollow\s+hold|rollout|rollouts|hip\s+thrust|glute\s+bridge|calf|calves|shrug|shrugs|thruster|thrusters|clean|snatch|woodchop|woodchopper|russian\s+twist|bird-?dog|dead\s+bug|mcgill|crunch|sit-up|farmer|farmers|suitcase|bear-hug|carry|carries|sled|sprint-drag-carry|sdc|lateral\s+shuffle|box\s+jump|broad\s+jump|trap-bar\s+jump|combat\s+medley|amrap|emom|superset|circuit)\b/i.test(
+      name
+    )
+  ) {
+    return false;
+  }
+
+  if (
+    /\b(run|runs|running|jog|jogging|ruck|rucking|march|aerobic|zone\s*2|tempo|threshold|long\s+slow|shakeout|flush|time\s+trial|2-mile|1\.5-mile|3-mile|fartlek|spin|cross-training)\b/i.test(
+      name
+    )
+  ) {
+    return true;
+  }
+
+  if (
+    (type || '').toLowerCase() === 'cardio' &&
+    /\b(mile|miles|mi|km|min|mins|minute|minutes|m)\b/i.test(`${name} ${reps}`)
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Checks if an exercise is timed (continuous cardio runs, rucks, planks, isometric holds)
+ * rather than repetition sets.
+ * Note: Interval runs / track repeats return FALSE here so they render as Sets and Reps.
  */
 export function isExerciseTimed(
   exerciseName: string,
@@ -515,6 +764,16 @@ export function isExerciseTimed(
 ): boolean {
   const normalizedType = (type || '').toLowerCase().trim();
   if (normalizedType === 'superset') return false;
+
+  // Interval runs and sprint repeats must show up as Sets and Reps, NOT a single distance/time log
+  if (isIntervalRunExercise(exerciseName, targetReps)) {
+    return false;
+  }
+
+  // Easy / continuous runs and rucks ALWAYS show up as the Distance & Time log
+  if (isContinuousRunOrRuckExercise(exerciseName, targetReps, type)) {
+    return true;
+  }
 
   const name = (exerciseName || '').toLowerCase();
   const reps = (targetReps || '').toLowerCase().trim();
@@ -554,10 +813,10 @@ export function isExerciseTimed(
     return true;
   }
 
-  // Distance/time cardio & carries
+  // Distance/time continuous cardio
   if (
-    /\b\d+(?:\.\d+)?\s*(?:mile|miles|mi|km|meter|meters)\b/i.test(reps) ||
-    /\b(?:repeat|repeats|time trial)\b/i.test(reps)
+    /\b\d+(?:\.\d+)?\s*(?:mile|miles|mi|km)\b/i.test(reps) ||
+    /\b(?:time trial)\b/i.test(reps)
   ) {
     return true;
   }
@@ -585,14 +844,14 @@ export function isExerciseTimed(
   // Pure rep prescriptions (e.g. "8-10 reps", "12 reps", "10-12")
   if (
     (/\b\d+(?:\s*[-–]\s*\d+)?\s*reps?\b/i.test(reps) || /^\d+(?:\s*[-–]\s*\d+)?$/.test(reps)) &&
-    !/\b(hold|plank|sprint|run|mile|miles|yard|yd|yds|meter|meters|min|mins|minute|minutes|sec|secs|second|seconds)\b/i.test(reps) &&
-    !/\b(plank|wall sit|hollow body|bear crawl|carry|carries|farmer|run|jog|sprint|time trial|shuttle)\b/i.test(name)
+    !/\b(hold|plank|mile|miles|min|mins|minute|minutes|sec|secs|second|seconds)\b/i.test(reps) &&
+    !/\b(plank|wall sit|hollow body|bear crawl|run|jog|time trial)\b/i.test(name)
   ) {
     return false;
   }
 
-  // Name matching for runs, carries, sprints
-  return /\b(run|runs|running|jog|jogging|sprint|sprints|tempo\s+run|tempo\s+jog|intervals|bear\s+crawl\s+hold|carry|carries|farmer\s+walk|farmers\s+walk|farmer\s+walks|farmers\s+walks|ruck|rucking|spin|bike|rower|skierg|active\s+recovery|shakeout|time\s+trial|shuttle)\b/i.test(
+  // Name matching for continuous runs, rucks, carries
+  return /\b(run|runs|running|jog|jogging|tempo\s+run|tempo\s+jog|bear\s+crawl\s+hold|ruck|rucking|spin|bike|rower|skierg|active\s+recovery|shakeout|time\s+trial)\b/i.test(
     name
   );
 }
@@ -617,6 +876,11 @@ export function isBodyweightExercise(
     )
   ) {
     return false;
+  }
+
+  // Unloaded running intervals, track repeats, sprints, strides, and agility shuttles are bodyweight (no weight column)
+  if (isIntervalRunExercise(exerciseName) && !/\b(sled|farmer|suitcase|carry|sandbag)\b/i.test(name)) {
+    return true;
   }
 
   const hasExplicitExternalEquipmentTool =
@@ -644,7 +908,7 @@ export function isBodyweightExercise(
 
   // Bodyweight calisthenics, core, isometric holds, and unloaded speed/agility/cardio
   const isCalisthenicMovement =
-    /\b(calisthenics?|air\s+squat|air\s+squats|squat\s+jump|squat\s+jumps|jump\s+squat|jump\s+squats|box\s+jump|box\s+jumps|broad\s+jump|broad\s+jumps|depth\s+jump|depth\s+jumps|tuck\s+jump|tuck\s+jumps|l-hop|l-hops|pogo\s+hop|pogo\s+hops|ice\s+skater|ice\s+skaters|skater|skaters|squat\s+thrust|burpee|burpees|sprawl|sprawls|push-?up|push-?ups|pushup|pushups|pull-?up|pull-?ups|pullup|pullups|chin-?up|chin-?ups|chinup|chinups|muscle-?up|muscle-?ups|inverted\s+(?:bodyweight\s+)?row|inverted\s+rows|trx\s+row|trx\s+rows|ring\s+row|ring\s+rows|pike\s+push|diamond\s+push|hand-release|scapular\s+push|bench\s+dip|box\s+dip|ring\s+dip|dip|dips|plank|planks|copenhagen|side\s+plank|hollow\s+body|hollow\s+rock|hollow\s+rocks|hollow\s+hold|hollow\s+holds|dead\s+bug|dead\s+bugs|deadbug|deadbugs|bird-?dog|bird-?dogs|mcgill|superman|supermans|prone\s+y-t-w|wall\s+sit|wall\s+sits|dead\s+hang|dead\s+hangs|active\s+hang|passive\s+hang|l-sit|mountain\s+climber|mountain\s+climbers|flutter\s+kick|flutter\s+kicks|bicycle\s+crunch|v-?up|v-?ups|sit-?up|sit-?ups|situp|situps|crunch|crunches|leg\s+raise|leg\s+raises|knee\s+raise|knee\s+raises|toes\s+to\s+bar|hanging\s+(?:knee|leg|l-sit)|ab\s+wheel|rollout|rollouts|russian\s+twist|russian\s+twists|bear\s+crawl|crab\s+walk|glute\s+bridge|glute\s+bridges|single-?leg\s+bridge|clamshell|clamshells|fire\s+hydrant|sorensen|back\s+extension|hyperextension|nordic|slider\s+leg\s+curl|jumping\s+jack|jumping\s+jacks|high\s+knee|high\s+knees|butt\s+kick|inchworm|inchworms|mobility|stretch|stretching|foam\s+roll|yoga|cat-cow|90\/90|sprint|sprints|shuttle|shuttles|pro\s+agility|t-drill|agility\s+run|agility\s+runs|zone\s+2\s+run|aerobic\s+run|recovery\s+run|tempo\s+run|tempo\s+runs|finisher\s+run|assault\s+bike|air\s+bike|airdyne|echo\s+bike|treadmill|rowing\s+machine|skierg)\b/i.test(
+    /\b(calisthenics?|air\s+squat|air\s+squats|squat\s+jump|squat\s+jumps|jump\s+squat|jump\s+squats|box\s+jump|box\s+jumps|broad\s+jump|broad\s+jumps|depth\s+jump|depth\s+jumps|tuck\s+jump|tuck\s+jumps|l-hop|l-hops|pogo\s+hop|pogo\s+hops|ice\s+skater|ice\s+skaters|skater|skaters|squat\s+thrust|burpee|burpees|sprawl|sprawls|push-?up|push-?ups|pushup|pushups|pull-?up|pull-?ups|pullup|pullups|chin-?up|chin-?ups|chinup|chinups|muscle-?up|muscle-?ups|inverted\s+(?:bodyweight\s+)?row|inverted\s+rows|trx\s+row|trx\s+rows|ring\s+row|ring\s+rows|pike\s+push|diamond\s+push|hand-release|scapular\s+push|bench\s+dip|box\s+dip|ring\s+dip|dip|dips|plank|planks|copenhagen|side\s+plank|hollow\s+body|hollow\s+rock|hollow\s+rocks|hollow\s+hold|hollow\s+holds|dead\s+bug|dead\s+bugs|deadbug|deadbugs|bird-?dog|bird-?dogs|mcgill|superman|supermans|prone\s+y-t-w|wall\s+sit|wall\s+sits|dead\s+hang|dead\s+hangs|active\s+hang|passive\s+hang|l-sit|mountain\s+climber|mountain\s+climbers|flutter\s+kick|flutter\s+kicks|bicycle\s+crunch|v-?up|v-?ups|sit-?up|sit-?ups|situp|situps|crunch|crunches|leg\s+raise|leg\s+raises|knee\s+raise|knee\s+raises|toes\s+to\s+bar|hanging\s+(?:knee|leg|l-sit)|ab\s+wheel|rollout|rollouts|russian\s+twist|russian\s+twists|bear\s+crawl|crab\s+walk|glute\s+bridge|glute\s+bridges|single-?leg\s+bridge|clamshell|clamshells|fire\s+hydrant|sorensen|back\s+extension|hyperextension|nordic|slider\s+leg\s+curl|jumping\s+jack|jumping\s+jacks|high\s+knee|high\s+knees|butt\s+kick|inchworm|inchworms|mobility|stretch|stretching|foam\s+roll|yoga|cat-cow|90\/90|sprint|sprints|shuttle|shuttles|pro\s+agility|t-drill|imt\s+bound|strides?|track\s+intervals?|track\s+repeats?|pace\s+repeats?|run\s+repeats?|agility\s+run|agility\s+runs|zone\s+2\s+run|aerobic\s+run|recovery\s+run|tempo\s+run|tempo\s+runs|finisher\s+run|assault\s+bike|air\s+bike|airdyne|echo\s+bike|treadmill|rowing\s+machine|skierg)\b/i.test(
       name
     );
 

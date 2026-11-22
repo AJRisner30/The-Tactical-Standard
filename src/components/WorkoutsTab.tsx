@@ -6,11 +6,11 @@ import {
   ChevronLeft, ChevronRight, CheckCircle2,
   SlidersHorizontal, ArrowRight, Activity, Award, RotateCcw,
   LogOut, RefreshCw, BatteryCharging, Compass,
-  Layers, Edit3, Trash2, EyeOff, Plus, Sparkles
+  Layers, Edit3, Trash2, EyeOff, Plus, Sparkles, Star
 } from 'lucide-react';
-import { WorkoutProgram, ExerciseTemplate, MuscleGroup, AthleteProfile, ProgramKey, WorkoutSessionLog, WorkoutFormat, OperationalCondition, isBodyweightExercise, isExerciseTimed } from '../types';
-import { PROTOCOL_DATA, COACH_RULES, ProtocolDay, getDefaultRestPeriod, parseExerciseString, getApexWeekData, getTacticalHypertrophyWeekData, getUniversalPatWeekData, getAftWeekData } from '../data/protocolData';
-import { OPERATIONAL_CONDITIONS, applyOperationalConditionToDay, applyOperationalConditionToProgram } from '../utils/operationalAdjuster';
+import { WorkoutProgram, ExerciseTemplate, MuscleGroup, AthleteProfile, ProgramKey, WorkoutSessionLog, WorkoutFormat, OperationalCondition, isBodyweightExercise, isExerciseTimed, isIntervalRunExercise, isContinuousRunOrRuckExercise } from '../types';
+import { PROTOCOL_DATA, COACH_RULES, ProtocolDay, getDefaultRestPeriod, parseExerciseString, parseIntervalSetsAndReps, getApexWeekData, getTacticalHypertrophyWeekData, getUniversalPatWeekData, getAftWeekData, getExpressDbWeekData } from '../data/protocolData';
+import { OPERATIONAL_CONDITIONS, applyOperationalConditionToDay, applyOperationalConditionToExercises, applyOperationalConditionToProgram } from '../utils/operationalAdjuster';
 import { soundManager } from '../utils/audio';
 import { useRestTimer } from '../hooks/useRestTimer';
 import { TacticalStandardCompanyEmblem } from './BrandingLogos';
@@ -106,10 +106,9 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
     currentAthlete?.questionnaire && currentAthlete.questionnaire.completedAt
   );
 
-  // Primary program selector: 'apex_protocol' vs 'tactical_hypertrophy' vs 'hybrid_protocol' vs 'universal_pat' vs 'custom_ai'
+  // Primary program selector: 'hybrid_db' (Coach AJ's Personal Preferred 30m Express DB) vs 'apex_protocol' vs 'tactical_hypertrophy' vs 'hybrid_protocol' vs 'aft_protocol' vs 'universal_pat' vs 'custom_ai'
   const normalizeProgramKey = (key?: ProgramKey | 'custom_ai'): ProgramKey | 'custom_ai' => {
-    if (!key) return 'apex_protocol';
-    if (key === 'hybrid_db') return 'hybrid_protocol';
+    if (!key) return 'hybrid_db';
     return key;
   };
 
@@ -119,7 +118,7 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
     if (!isMasterExempt && currentAthlete?.questionnaire?.recommendedProgramKey) {
       return normalizeProgramKey(currentAthlete.questionnaire.recommendedProgramKey);
     }
-    return normalizeProgramKey(currentAthlete?.questionnaire?.recommendedProgramKey || 'apex_protocol');
+    return normalizeProgramKey(currentAthlete?.questionnaire?.recommendedProgramKey || 'hybrid_db');
   });
 
   useEffect(() => {
@@ -157,6 +156,10 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
   // Active block & week inside Army Fitness Test (AFT) 8-Week Training Program
   const [activeAftBlockKey, setActiveAftBlockKey] = useState<'aft_block1' | 'aft_block2' | 'aft_block3' | 'aft_block4'>('aft_block1');
   const [activeAftWeek, setActiveAftWeek] = useState<number>(1);
+
+  // Active phase & week inside 12-Week Military Express 30-Minute Dumbbell Program (Coach AJ's Personal Preferred Program)
+  const [activeExpressDbPhaseKey, setActiveExpressDbPhaseKey] = useState<'express_db_phase1' | 'express_db_phase2' | 'express_db_phase3'>('express_db_phase1');
+  const [activeExpressDbWeek, setActiveExpressDbWeek] = useState<number>(1);
 
   // 1-Tap Operational Condition Auto-Adjuster (non-destructive overlay for Garrison / Unit PT / FTX / Austere Field)
   const [operationalCondition, setOperationalCondition] = useState<OperationalCondition>('garrison');
@@ -208,6 +211,9 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
     if (selectedProgram === 'tactical_hypertrophy') {
       return getTacticalHypertrophyWeekData(activeTacticalWeek);
     }
+    if (selectedProgram === 'hybrid_db') {
+      return getExpressDbWeekData(activeExpressDbWeek);
+    }
     if (selectedProgram === 'aft_protocol') {
       return getAftWeekData(activeAftWeek);
     }
@@ -215,7 +221,7 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
       return getUniversalPatWeekData(activePatWeek);
     }
     return PROTOCOL_DATA[activeProtocolPhaseKey] || PROTOCOL_DATA.phase1;
-  }, [selectedProgram, activeApexWeek, activeTacticalWeek, activeAftWeek, activePatWeek, activeProtocolPhaseKey]);
+  }, [selectedProgram, activeApexWeek, activeTacticalWeek, activeExpressDbWeek, activeAftWeek, activePatWeek, activeProtocolPhaseKey]);
 
   const getExerciseRest = (exerciseString: string): number => {
     const cleanStr = exerciseString.replace(/\[.*?\]/g, '').trim();
@@ -303,11 +309,15 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
       clean.startsWith('rest/') ||
       clean.startsWith('rest /') ||
       clean.startsWith('rest -') ||
+      clean.startsWith('rest —') ||
       clean.startsWith('rest:') ||
+      clean.startsWith('none') ||
       clean.includes('complete rest') ||
       clean.includes('rest from running') ||
+      clean.includes('no cardio') ||
+      clean.includes('no separate run') ||
+      clean.includes('included in session') ||
       clean.includes('cns recovery') ||
-      clean === 'none' ||
       clean === 'n/a'
     ) {
       return false;
@@ -651,121 +661,154 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
         return candidateTemplate;
       });
 
+    const dayRunIsInterval = isIntervalRunExercise(day.run, day.pace);
     const alreadyHasMatchingRunInList = exercises.some(
       (ex) =>
-        ex.type === 'cardio' &&
-        (ex.name.toLowerCase() === day.run.trim().toLowerCase() ||
-          (day.run.toLowerCase().includes('zone 2') && ex.name.toLowerCase().includes('zone 2')) ||
-          (day.run.toLowerCase().includes('400m run repeats') && ex.name.toLowerCase().includes('400m run repeats')) ||
-          (day.run.toLowerCase().includes('track intervals') && ex.name.toLowerCase().includes('track intervals')) ||
-          (day.run.toLowerCase().includes('sprint-drag-carry') && ex.name.toLowerCase().includes('sprint-drag-carry')) ||
-          (day.run.toLowerCase().includes('1-mile time trial') && ex.name.toLowerCase().includes('1-mile time trial')) ||
-          (day.run.toLowerCase().includes('event 5: 2-mile run') && ex.name.toLowerCase().includes('event 5: 2-mile run')))
+        (dayRunIsInterval && isIntervalRunExercise(ex.name, ex.targetReps)) ||
+        (ex.type === 'cardio' &&
+          (ex.name.toLowerCase() === day.run.trim().toLowerCase() ||
+            (day.run.toLowerCase().includes('zone 2') && ex.name.toLowerCase().includes('zone 2')) ||
+            (day.run.toLowerCase().includes('400m') && ex.name.toLowerCase().includes('400m')) ||
+            (day.run.toLowerCase().includes('800m') && ex.name.toLowerCase().includes('800m')) ||
+            (day.run.toLowerCase().includes('1,000m') && ex.name.toLowerCase().includes('1,000m')) ||
+            (day.run.toLowerCase().includes('track intervals') && ex.name.toLowerCase().includes('track intervals')) ||
+            (day.run.toLowerCase().includes('sprint-drag-carry') && ex.name.toLowerCase().includes('sprint-drag-carry')) ||
+            (day.run.toLowerCase().includes('1-mile time trial') && ex.name.toLowerCase().includes('1-mile time trial')) ||
+            (day.run.toLowerCase().includes('event 5') && ex.name.toLowerCase().includes('event 5'))))
     );
 
     // If day has conditioning (run / pursuit / sprints) and is not already explicitly listed inside day.strength, append as trackable cardio
     if (isRealConditioningRun(day.run) && !alreadyHasMatchingRunInList) {
-      const combined = `${day.run} ${day.pace} ${day.focus}`.toLowerCase();
-      const isIntervals = combined.includes('interval') || combined.includes('track') || combined.includes('sprint') || combined.includes('repeats');
-
-      // Accurate distance extraction from day.run title and pace (starting at low end of ranges)
-      let distance: number | undefined;
-      const rangeMatch = day.run.match(/(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)\s*mile/i);
-      if (rangeMatch) {
-        distance = parseFloat(rangeMatch[1]);
+      if (dayRunIsInterval) {
+        const intervalSpec = parseIntervalSetsAndReps(day.run, day.pace) || {
+          sets: 6,
+          setRangeMin: 6,
+          setRangeMax: 6,
+          targetReps: '400m',
+          repRangeMin: 400,
+          repRangeMax: 400,
+          restSeconds: 90,
+        };
+        exercises.push({
+          id: `proto-cardio-${Date.now()}`,
+          name: day.run.trim(),
+          muscleGroup: 'Full Body',
+          type: 'cardio',
+          defaultSets: intervalSpec.sets,
+          targetReps: intervalSpec.targetReps,
+          restPeriodSeconds: intervalSpec.restSeconds,
+          pace: day.pace,
+          progression_rules: {
+            metric: 'seconds',
+            trigger: 'pace_progression',
+            increment_value: -2,
+            action: 'drop 2-3s per interval repeat',
+          },
+          notes: `${day.run} • Target Pace: ${day.pace}`,
+        });
       } else {
-        const singleMatch = day.run.match(/(\d+(?:\.\d+)?)\s*mile/i);
-        if (singleMatch) {
-          distance = parseFloat(singleMatch[1]);
+        // Accurate distance extraction from day.run title and pace (starting at low end of ranges)
+        let distance: number | undefined;
+        const rangeMatch = day.run.match(/(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)\s*mile/i);
+        if (rangeMatch) {
+          distance = parseFloat(rangeMatch[1]);
         } else {
-          // Check meter ranges (e.g., 4,000–5,000m or 3,000m or 2,400m) — start at low end
-          const meterRangeMatch = day.run.match(/(\d[\d,]*)\s*[-–]\s*(\d[\d,]*)\s*m\b/i);
-          const singleMeterMatch = day.run.match(/(\d[\d,]{3,})\s*m\b/i);
-          if (meterRangeMatch) {
-            const lowMeters = parseInt(meterRangeMatch[1].replace(/,/g, ''), 10);
-            if (!isNaN(lowMeters) && lowMeters >= 400) {
-              distance = parseFloat((lowMeters / 1609.34).toFixed(1));
-            }
-          } else if (singleMeterMatch) {
-            const meters = parseInt(singleMeterMatch[1].replace(/,/g, ''), 10);
-            if (!isNaN(meters) && meters >= 800) {
-              distance = parseFloat((meters / 1609.34).toFixed(1));
-            }
+          const singleMatch = day.run.match(/(\d+(?:\.\d+)?)\s*mile/i);
+          if (singleMatch) {
+            distance = parseFloat(singleMatch[1]);
           } else {
-            const paceRangeMatch = day.pace.match(/(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)\s*mile/i);
-            if (paceRangeMatch) {
-              distance = parseFloat(paceRangeMatch[1]);
+            // Check meter ranges (e.g., 4,000–5,000m or 3,000m or 2,400m) — start at low end
+            const meterRangeMatch = day.run.match(/(\d[\d,]*)\s*[-–]\s*(\d[\d,]*)\s*m\b/i);
+            const singleMeterMatch = day.run.match(/(\d[\d,]{3,})\s*m\b/i);
+            if (meterRangeMatch) {
+              const lowMeters = parseInt(meterRangeMatch[1].replace(/,/g, ''), 10);
+              if (!isNaN(lowMeters) && lowMeters >= 400) {
+                distance = parseFloat((lowMeters / 1609.34).toFixed(1));
+              }
+            } else if (singleMeterMatch) {
+              const meters = parseInt(singleMeterMatch[1].replace(/,/g, ''), 10);
+              if (!isNaN(meters) && meters >= 800) {
+                distance = parseFloat((meters / 1609.34).toFixed(1));
+              }
             } else {
-              const paceSingleMatch = day.pace.match(/(\d+(?:\.\d+)?)\s*mile/i);
-              if (paceSingleMatch) {
-                distance = parseFloat(paceSingleMatch[1]);
+              const paceRangeMatch = day.pace.match(/(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)\s*mile/i);
+              if (paceRangeMatch) {
+                distance = parseFloat(paceRangeMatch[1]);
+              } else {
+                const paceSingleMatch = day.pace.match(/(\d+(?:\.\d+)?)\s*mile/i);
+                if (paceSingleMatch) {
+                  distance = parseFloat(paceSingleMatch[1]);
+                }
               }
             }
           }
         }
-      }
 
-      // Duration in minutes (only when explicitly prescribed in minutes in day.run or day.pace)
-      let durationMins: number | undefined;
-      const minMatch = day.run.match(/(\d+(?:\.\d+)?)\s*(?:[-–]\s*(\d+(?:\.\d+)?))?\s*min(?!\s*hip|\s*between)/i);
-      if (minMatch) {
-        durationMins = Math.round(parseFloat(minMatch[1]));
-      } else {
-        const paceMinMatch = day.pace.match(/(\d+(?:\.\d+)?)\s*(?:[-–]\s*(\d+(?:\.\d+)?))?\s*min(?!\s*rest|\s*between)/i);
-        if (paceMinMatch) {
-          durationMins = Math.round(parseFloat(paceMinMatch[1]));
-        }
-      }
-
-      // Sensible defaults if neither distance nor duration was specified
-      if (!distance && !durationMins) {
-        if (isIntervals) {
-          distance = 2.0;
+        // Duration in minutes (only when explicitly prescribed in minutes in day.run or day.pace)
+        let durationMins: number | undefined;
+        const minMatch = day.run.match(/(\d+(?:\.\d+)?)\s*(?:[-–]\s*(\d+(?:\.\d+)?))?\s*min(?!\s*hip|\s*between)/i);
+        if (minMatch) {
+          durationMins = Math.round(parseFloat(minMatch[1]));
         } else {
-          distance = 2.5;
+          const paceMinMatch = day.pace.match(/(\d+(?:\.\d+)?)\s*(?:[-–]\s*(\d+(?:\.\d+)?))?\s*min(?!\s*rest|\s*between)/i);
+          if (paceMinMatch) {
+            durationMins = Math.round(parseFloat(paceMinMatch[1]));
+          }
         }
-      } else if (!distance && durationMins) {
-        distance = Math.round((durationMins / 10) * 2) / 2;
+
+        // Sensible defaults if neither distance nor duration was specified
+        if (!distance && !durationMins) {
+          distance = 2.5;
+        } else if (!distance && durationMins) {
+          distance = Math.round((durationMins / 10) * 2) / 2;
+        }
+
+        const targetText =
+          distance && !durationMins
+            ? `${distance} ${distance === 1 ? 'mile' : 'miles'}`
+            : durationMins
+            ? `${durationMins} mins${distance ? ` (${distance} mi target)` : ''}`
+            : `${distance} miles`;
+
+        exercises.push({
+          id: `proto-cardio-${Date.now()}`,
+          name: day.run.trim(),
+          muscleGroup: 'Full Body',
+          type: 'cardio',
+          defaultSets: 1,
+          targetReps: targetText,
+          restPeriodSeconds: 0,
+          distance_miles: distance,
+          pace: day.pace,
+          progression_rules: {
+            metric: 'distance_miles',
+            trigger: 'per_week',
+            increment_value: 0.5,
+            action: '+0.5 mi weekly aerobic expansion',
+          },
+          notes: `${day.run} • Target Pace: ${day.pace}`,
+        });
       }
-
-      const targetText =
-        distance && !durationMins
-          ? `${distance} ${distance === 1 ? 'mile' : 'miles'}`
-          : durationMins
-          ? `${durationMins} mins${distance ? ` (${distance} mi target)` : ''}`
-          : `${distance} miles`;
-
-      exercises.push({
-        id: `proto-cardio-${Date.now()}`,
-        name: day.run.trim(),
-        muscleGroup: 'Full Body',
-        type: 'cardio',
-        defaultSets: 1,
-        targetReps: targetText,
-        restPeriodSeconds: 0,
-        distance_miles: distance,
-        pace: day.pace,
-        progression_rules: isIntervals
-          ? { metric: 'seconds', trigger: 'pace_progression', increment_value: -2, action: 'drop 2-3s per interval repeat' }
-          : { metric: 'distance_miles', trigger: 'per_week', increment_value: 0.5, action: '+0.5 mi weekly aerobic expansion' },
-        notes: `${day.run} • Target Pace: ${day.pace}`
-      });
     }
 
     const programTitle = selectedProgram === 'apex_protocol'
       ? `52-Week Military Combat Fitness Program (${currentPhase.title.split(':')[0]} • ${day.day}: ${day.focus})`
       : selectedProgram === 'tactical_hypertrophy'
       ? `12-Week Military Tactical Bodybuilding (${currentPhase.weeks} • ${day.day}: ${day.focus})`
+      : selectedProgram === 'hybrid_db'
+      ? `12-Week Military Express 30-Min DB Program (${currentPhase.weeks} • ${day.day}: ${day.focus})`
       : selectedProgram === 'hybrid_protocol'
       ? `The Tactical Standard Hybrid Protocol (${currentPhase.title.split(':')[0]} • ${day.day}: ${day.focus})`
       : selectedProgram === 'aft_protocol'
       ? `Army Fitness Test (AFT) 8-Week Program (${currentPhase.weeks} • ${day.day}: ${day.focus})`
       : `General Military PFT & Selection (${currentPhase.weeks} • ${day.day}: ${day.focus})`;
 
-    // Mandatory DIME Warm-Up is recommended for all programs (8-min protocol dedicated on Tactical Bodybuilding)
+    // Mandatory DIME Warm-Up is recommended for all programs (6-min Express DIME on Express 30m DB, 8-min on Tactical Bodybuilding)
     const recommendedWarmupId =
       selectedProgram === 'tactical_hypertrophy'
         ? 'warmup-dime-tactical-bb'
+        : selectedProgram === 'hybrid_db'
+        ? 'warmup-dime-express-6min'
         : 'warmup-dime-mandatory';
 
     return {
@@ -774,7 +817,7 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
       subtitle: `${currentPhase.title} (${currentPhase.weeks})`,
       category: 'Hybrid',
       frequency: 'Scheduled',
-      estimatedDurationMinutes: 60,
+      estimatedDurationMinutes: selectedProgram === 'hybrid_db' ? 30 : 60,
       recommendedWarmupId,
       description: `${currentPhase.title} - ${day.day}: ${day.focus}. Auto-Overload enabled session starting at the low end of prescribed set/rep ranges.`,
       exercises: exercises.length > 0 ? exercises : [
@@ -901,6 +944,37 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
       focus: 'Main 3–5 • Acc 6–8 • Split 6/leg • Day 3 60m Prone-to-Sprint & T-Drill • Day 6 6-Mi Ruck (55 lbs) + Arms • Wk 12 Deload',
       weekRange: [9, 10, 11, 12],
       defaultWeek: 9
+    },
+  ];
+
+  // Mesocycle phase options for the 12-Week Military Express 30-Minute Dumbbell Program (Coach AJ's Personal Preferred Program)
+  const expressDbMesocycles = [
+    {
+      id: 'express_db_phase1' as const,
+      label: 'Phase 1: Foundation Strength & Cardio Base',
+      weeks: 'Weeks 1–4',
+      badge: '8–12 Rep Antagonist Supersets & 400m Repeats',
+      focus: '3s Lowering DB Supersets • Day 2 400m Repeats • Day 4 2.5-Mi Zone 2 • Day 6 20m Incline Ruck (35 lb) • Wk 4 Deload (-40%)',
+      weekRange: [1, 2, 3, 4],
+      defaultWeek: 1,
+    },
+    {
+      id: 'express_db_phase2' as const,
+      label: 'Phase 2: Heavy DB Overload & Threshold Speed',
+      weeks: 'Weeks 5–8',
+      badge: '1-Sec Bottom Pauses & 800m Race-Pace Repeats',
+      focus: '1s Paused DB Bench & Front Squat • Day 2 800m Repeats • Day 4 2.75–3 Mi Zone 2 • Day 6 20m 10% Ruck (45 lb) • Wk 8 Deload (-40%)',
+      weekRange: [5, 6, 7, 8],
+      defaultWeek: 5,
+    },
+    {
+      id: 'express_db_phase3' as const,
+      label: 'Phase 3: Peak Strength & Combat Stamina',
+      weeks: 'Weeks 9–12',
+      badge: 'Unilateral Peak, Hill Sprints & 20m Combat AMRAP',
+      focus: 'Single-Arm DB Press • Heavy Goblet + Box Jumps • Hill Sprints • 20m DB Combat AMRAP • 50 lb Ruck • Wk 12 Taper & Benchmark Test',
+      weekRange: [9, 10, 11, 12],
+      defaultWeek: 9,
     },
   ];
 
@@ -1673,6 +1747,8 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
                     <>
                       <span className="text-amber-400">Custom Track:</span> {activeCustomProgram.title}
                     </>
+                  ) : selectedProgram === 'hybrid_db' ? (
+                    <>12-Week Military Express <span className="text-amber-400">30-Minute Dumbbell Program</span></>
                   ) : selectedProgram === 'apex_protocol' ? (
                     <>Military 52-Week <span className="text-amber-400">Fitness &amp; Readiness Program</span></>
                   ) : selectedProgram === 'tactical_hypertrophy' ? (
@@ -1685,6 +1761,11 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
                     <>General Military <span className="text-amber-400">PFT &amp; Selection Readiness (PFT / CFT / PRT)</span></>
                   )}
                 </span>
+                {selectedProgram === 'hybrid_db' && (
+                  <span className="text-[10px] font-mono font-black uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500 text-black">
+                    Coach AJ&apos;s Personal Preferred • Busy Schedule
+                  </span>
+                )}
                 <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-300 border border-zinc-700">
                   {selectedProgram === 'custom_ai' && activeCustomProgram ? activeCustomProgram.frequency : currentPhase.weeks}
                 </span>
@@ -1701,7 +1782,7 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
                   onOpenAIGenerator(
                     selectedProgram !== 'custom_ai'
                       ? selectedProgram
-                      : ((activeCustomProgram?.baseProgramKey as ProgramKey) || 'apex_protocol')
+                      : ((activeCustomProgram?.baseProgramKey as ProgramKey) || 'hybrid_db')
                   )
                 }
                 className="px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer border bg-[#141a21] hover:bg-amber-500/15 text-amber-300 border-amber-500/50 shadow-md active:scale-95 whitespace-nowrap"
@@ -1778,10 +1859,41 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
           </div>
         </div>
 
-        {/* Program Selector: 5-Program Grid for Coach AJ, or Prescribed Protocol Header for Regular Users */}
+        {/* Program Selector: 6-Program Grid for Coach AJ, or Prescribed Protocol Header for Regular Users */}
         {isMasterExempt ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 mt-3 pt-3 border-t border-zinc-800/80">
-            {/* Program 1: 52-Week Military Combat Fitness & Readiness Program */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-3 pt-3 border-t border-zinc-800/80">
+            {/* Program 1 (Featured): 12-Week Military Express 30-Minute Dumbbell Program — Coach AJ's Personal Preferred */}
+            <button
+              type="button"
+              onClick={() => handleProgramSwitch('hybrid_db')}
+              className={`px-3 py-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between gap-2 ${
+                selectedProgram === 'hybrid_db'
+                  ? 'bg-amber-500/15 border-amber-400 shadow-md ring-1 ring-amber-400/40 text-white'
+                  : 'bg-[#090b0d] border-amber-500/30 hover:border-amber-400 text-zinc-300 hover:text-white'
+              }`}
+            >
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className={`w-2 h-2 rounded-full ${selectedProgram === 'hybrid_db' ? 'bg-amber-400' : 'bg-amber-500/70'}`} />
+                  <span className="text-xs font-black uppercase tracking-wide truncate font-athletic">
+                    12-Wk Express 30m DB
+                  </span>
+                  <span className="text-[9px] font-mono font-black uppercase px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                    Coach&apos;s Preferred • Busy Schedule
+                  </span>
+                </div>
+                <span className="text-[10px] text-zinc-400 block font-mono truncate mt-0.5">
+                  30m/Day (6m DIME + 20m Work + 4m Cool-Down) • DBs, Bench &amp; Pull-Up Bar
+                </span>
+              </div>
+              <span className={`text-[10px] font-black px-1.5 py-0.5 rounded font-mono shrink-0 ${
+                selectedProgram === 'hybrid_db' ? 'bg-amber-500 text-black' : 'bg-zinc-800 text-amber-300'
+              }`}>
+                30 MIN
+              </span>
+            </button>
+
+            {/* Program 2: 52-Week Military Combat Fitness & Readiness Program */}
             <button
               type="button"
               onClick={() => handleProgramSwitch('apex_protocol')}
@@ -1805,7 +1917,7 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
               </span>
             </button>
 
-            {/* Program 2: 12-Week Military Tactical Bodybuilding Program */}
+            {/* Program 3: 12-Week Military Tactical Bodybuilding Program */}
             <button
               type="button"
               onClick={() => handleProgramSwitch('tactical_hypertrophy')}
@@ -1829,7 +1941,7 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
               </span>
             </button>
 
-            {/* Program 3: Hybrid Protocol */}
+            {/* Program 4: Hybrid Protocol */}
             <button
               type="button"
               onClick={() => handleProgramSwitch('hybrid_protocol')}
@@ -1844,7 +1956,7 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
                   <span className={`w-2 h-2 rounded-full ${selectedProgram === 'hybrid_protocol' ? 'bg-amber-400' : 'bg-zinc-600'}`} />
                   <span className="text-xs font-black uppercase tracking-wide truncate font-athletic">Hybrid Protocol</span>
                 </div>
-                <span className="text-[10px] text-zinc-400 block font-mono truncate">12-Wk Master • Strength &amp; Run (AI DB Ready)</span>
+                <span className="text-[10px] text-zinc-400 block font-mono truncate">12-Wk Master • Barbell Strength &amp; Run</span>
               </div>
               <span className={`text-[10px] font-black px-1.5 py-0.5 rounded font-mono shrink-0 ${
                 selectedProgram === 'hybrid_protocol' ? 'bg-amber-500 text-black' : 'bg-zinc-800 text-zinc-400'
@@ -1853,7 +1965,7 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
               </span>
             </button>
 
-            {/* Program 4: Army Fitness Test (AFT) 8-Week Specific Plan */}
+            {/* Program 5: Army Fitness Test (AFT) 8-Week Specific Plan */}
             <button
               type="button"
               onClick={() => handleProgramSwitch('aft_protocol')}
@@ -1877,7 +1989,7 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
               </span>
             </button>
 
-            {/* Program 5: General Military PFT & Selection Readiness */}
+            {/* Program 6: General Military PFT & Selection Readiness */}
             <button
               type="button"
               onClick={() => handleProgramSwitch('universal_pat')}
@@ -1901,12 +2013,12 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
               </span>
             </button>
 
-            {/* Program 6: AI-Generated Personalized Plan */}
+            {/* Program 7: AI-Generated Personalized Plan */}
             {activeCustomProgram && (
               <button
                 type="button"
                 onClick={() => handleProgramSwitch('custom_ai')}
-                className={`px-3 py-2 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between gap-2 ${
+                className={`px-3 py-2 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between gap-2 sm:col-span-2 lg:col-span-3 ${
                   selectedProgram === 'custom_ai'
                     ? 'bg-amber-500/15 border-amber-400 shadow-md ring-1 ring-amber-400/40 text-white'
                     : 'bg-[#090b0d] border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-zinc-200'
@@ -1955,14 +2067,31 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={onOpenQuestionnaire}
-              className="px-3 py-1.5 rounded-lg border border-amber-500/40 bg-[#141a21] hover:bg-amber-500/15 text-amber-300 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 self-start sm:self-auto shrink-0 shadow-sm whitespace-nowrap"
-            >
-              <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
-              <span>Retake Assessment</span>
-            </button>
+            <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto shrink-0">
+              {selectedProgram !== 'hybrid_db' ? (
+                <button
+                  type="button"
+                  onClick={() => handleProgramSwitch('hybrid_db')}
+                  className="px-3 py-1.5 rounded-lg border border-amber-400/60 bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm whitespace-nowrap"
+                >
+                  <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                  <span>Use Coach&apos;s Preferred 30-Min DB Plan</span>
+                </button>
+              ) : (
+                <span className="px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-400/50 text-amber-300 text-[10px] font-mono uppercase tracking-wider font-black flex items-center gap-1.5">
+                  <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
+                  Coach&apos;s Preferred Busy-Schedule Plan Active
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={onOpenQuestionnaire}
+                className="px-3 py-1.5 rounded-lg border border-amber-500/40 bg-[#141a21] hover:bg-amber-500/15 text-amber-300 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm whitespace-nowrap"
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
+                <span>Retake Assessment</span>
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -1971,7 +2100,7 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
       {renderCoachLibrarySection()}
 
       {/* Dynamic Program Content - Smooth CSS Fade-in Transition When Switching Programs */}
-      <div key={`${selectedProgram}-${activeApexPhaseKey}-${activeApexWeek}-${activeTacticalWeek}-${activeAftWeek}-${activePatWeek}`} className="animate-tab-fade space-y-6">
+      <div key={`${selectedProgram}-${activeApexPhaseKey}-${activeApexWeek}-${activeTacticalWeek}-${activeExpressDbWeek}-${activeAftWeek}-${activePatWeek}`} className="animate-tab-fade space-y-6">
         {selectedProgram === 'custom_ai' ? (
           activeCustomProgram ? (
             <div className="space-y-6">
@@ -2021,13 +2150,23 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
                     onClick={() => {
                       if (activeCustomProgram.schedule?.[0]) {
                         const day1 = activeCustomProgram.schedule[0];
-                        onStartWorkout({
-                          ...activeCustomProgram,
-                          title: `${activeCustomProgram.title} - ${day1.focus}`,
-                          exercises: day1.exercises,
-                        });
+                        const cleanExercises = (day1.exercises || []).filter(
+                          (ex) => !ex.name.trim().toLowerCase().startsWith('none')
+                        );
+                        onStartWorkout(
+                          applyOperationalConditionToProgram(
+                            {
+                              ...activeCustomProgram,
+                              title: `${activeCustomProgram.title} - ${day1.focus}`,
+                              exercises: cleanExercises,
+                            },
+                            operationalCondition
+                          )
+                        );
                       } else {
-                        onStartWorkout(activeCustomProgram);
+                        onStartWorkout(
+                          applyOperationalConditionToProgram(activeCustomProgram, operationalCondition)
+                        );
                       }
                     }}
                     className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-black text-xs uppercase tracking-wider rounded-xl shadow-lg transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
@@ -2037,6 +2176,77 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
                   </button>
                 </div>
               </div>
+            </div>
+
+            {/* 1-TAP OPERATIONAL CONDITION AUTO-ADJUSTER FOR ADAPTED / CUSTOM PROGRAMS */}
+            <div className="bg-[#0e1217] border border-zinc-800 rounded-2xl p-3 sm:p-4 shadow-md space-y-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <BatteryCharging className="w-4 h-4 text-amber-400" />
+                  <span className="text-xs font-black uppercase tracking-wider text-white font-athletic">
+                    1-Tap Operational Condition Adjuster
+                  </span>
+                  <span className="text-[10px] font-mono text-zinc-500 hidden sm:inline">
+                    · Full-day strength &amp; cardio volume + intensity overlay
+                  </span>
+                </div>
+                {operationalCondition !== 'garrison' && (
+                  <button
+                    type="button"
+                    onClick={() => setOperationalCondition('garrison')}
+                    className="text-[11px] font-mono font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer transition-colors"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>Reset to Garrison</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                {OPERATIONAL_CONDITIONS.map((cond) => {
+                  const isActive = operationalCondition === cond.id;
+                  return (
+                    <button
+                      key={cond.id}
+                      type="button"
+                      onClick={() => {
+                        setOperationalCondition(cond.id);
+                        soundManager.playSetLogged();
+                      }}
+                      className={`text-left px-3 py-2 rounded-xl border transition-all cursor-pointer ${
+                        isActive
+                          ? 'bg-amber-500 text-black border-amber-400 shadow-md'
+                          : 'bg-[#090b0d] text-zinc-300 border-zinc-800 hover:border-amber-500/40 hover:text-white'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-1">
+                        <span className={`text-xs font-black uppercase tracking-wider font-athletic ${isActive ? 'text-black' : 'text-white'}`}>
+                          {cond.shortLabel}
+                        </span>
+                        {isActive && (
+                          <span className="text-[9px] font-mono font-black uppercase tracking-wider text-black/80">
+                            Active
+                          </span>
+                        )}
+                      </div>
+                      <p className={`text-[10px] mt-0.5 line-clamp-1 ${isActive ? 'text-black/80 font-medium' : 'text-zinc-400'}`}>
+                        {cond.summary}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {operationalCondition !== 'garrison' && (
+                <div className="bg-[#090b0d] border border-amber-500/30 rounded-xl px-3 py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px]">
+                  <span className="text-zinc-300">
+                    <strong className="text-amber-400 uppercase font-mono mr-1.5">
+                      {OPERATIONAL_CONDITIONS.find((c) => c.id === operationalCondition)?.label}:
+                    </strong>
+                    {OPERATIONAL_CONDITIONS.find((c) => c.id === operationalCondition)?.ruleDetail}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* AI Plan Day Schedule Navigator */}
@@ -2168,7 +2378,18 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
                 })
                 .map(({ day, idx }) => {
                 const dayNum = day.day || (dayViewMode === 'all' ? idx + 1 : (typeof dayViewMode === 'number' ? dayViewMode + 1 : idx + 1));
-                const isRest = !day.exercises || day.exercises.length === 0;
+                const rawValidExercises = (day.exercises || []).filter(
+                  (ex) => !ex.name.trim().toLowerCase().startsWith('none')
+                );
+                const displayExercises = applyOperationalConditionToExercises(
+                  rawValidExercises,
+                  operationalCondition
+                );
+                const isRest = displayExercises.length === 0;
+                const activeConditionMeta =
+                  operationalCondition !== 'garrison'
+                    ? OPERATIONAL_CONDITIONS.find((c) => c.id === operationalCondition)
+                    : undefined;
 
                 return (
                   <div
@@ -2190,6 +2411,7 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
                           </h3>
                           <span className="text-xs text-amber-400 font-bold tracking-wide">
                             {day.focus}
+                            {activeConditionMeta ? ` [${activeConditionMeta.shortLabel} Adjusted]` : ''}
                           </span>
                         </div>
                       </div>
@@ -2198,11 +2420,16 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
                         <button
                           type="button"
                           onClick={() => {
-                            onStartWorkout({
-                              ...activeCustomProgram,
-                              title: `${activeCustomProgram.title} - ${day.focus}`,
-                              exercises: day.exercises,
-                            });
+                            onStartWorkout(
+                              applyOperationalConditionToProgram(
+                                {
+                                  ...activeCustomProgram,
+                                  title: `${activeCustomProgram.title} - ${day.focus}`,
+                                  exercises: rawValidExercises,
+                                },
+                                operationalCondition
+                              )
+                            );
                           }}
                           className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-black font-black rounded-xl text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-md cursor-pointer active:scale-95 whitespace-nowrap"
                         >
@@ -2213,6 +2440,15 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
                     </div>
 
                     <div className="p-4 sm:p-6 space-y-4">
+                      {!isRest && activeConditionMeta && (
+                        <div className="bg-amber-500/10 border border-amber-500/35 rounded-xl px-3.5 py-2.5 flex items-start gap-2.5 text-xs text-amber-200">
+                          <BatteryCharging className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                          <span className="leading-relaxed">
+                            <strong className="text-amber-300">{activeConditionMeta.label}:</strong>{' '}
+                            {activeConditionMeta.ruleDetail}
+                          </span>
+                        </div>
+                      )}
                       {isRest ? (
                         <div className="p-6 text-center bg-[#090b0d] rounded-xl border border-zinc-800">
                           <Flame className="w-8 h-8 text-amber-400 mx-auto mb-2" />
@@ -2223,7 +2459,7 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
                         </div>
                       ) : (
                         <div className="space-y-3">
-                          {day.exercises.map((ex, exIdx) => {
+                          {displayExercises.map((ex, exIdx) => {
                             if (isCircuitExercise(ex)) {
                               return (
                                 <div key={ex.id || exIdx} className="space-y-1.5">
@@ -2359,12 +2595,25 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
 
                                 <div className="flex items-center gap-3 shrink-0 ml-7 sm:ml-0">
                                   <div className="text-right">
-                                    <span className="text-xs font-black font-mono text-white block">
-                                      {ex.defaultSets} sets × {ex.targetReps}
-                                    </span>
-                                    <span className="text-[10px] font-mono text-amber-400">
-                                      Target RPE {ex.targetRpe || 8}
-                                    </span>
+                                    {isContinuousRunOrRuckExercise(ex.name, ex.targetReps, ex.type) ? (
+                                      <>
+                                        <span className="text-xs font-black font-mono text-sky-300 block">
+                                          {ex.targetReps}
+                                        </span>
+                                        <span className="text-[10px] font-mono text-sky-400/80">
+                                          Distance &amp; Time Log
+                                        </span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <span className="text-xs font-black font-mono text-white block">
+                                          {ex.defaultSets} sets × {ex.targetReps}
+                                        </span>
+                                        <span className="text-[10px] font-mono text-amber-400">
+                                          Target RPE {ex.targetRpe || 8}
+                                        </span>
+                                      </>
+                                    )}
                                   </div>
 
                                   {/* Dedicated Rest Timer for this AI Exercise */}
@@ -2525,6 +2774,100 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
           </div>
         )) : (
           <>
+        {/* COMPACT 12-WEEK MILITARY EXPRESS 30-MINUTE DUMBBELL PROGRAM (COACH AJ'S PREFERRED) PHASE & WEEK SELECTOR RAIL */}
+        {selectedProgram === 'hybrid_db' && (
+          <div className="bg-[#0e1217] border border-amber-500/45 rounded-2xl p-3 sm:p-3.5 shadow-md space-y-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-zinc-800/80">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-mono font-black uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500 text-black">
+                  Coach AJ&apos;s Personal Preferred Program • Busy Schedule Edition
+                </span>
+                <span className="text-xs font-bold text-zinc-200 font-mono">
+                  30-Min Session Clock: 0:00–6:00 Express DIME • 6:00–26:00 Main Work • 26:00–30:00 Cool-Down
+                </span>
+              </div>
+              <span className="text-[10px] font-mono text-amber-300 hidden xl:inline">
+                Dumbbells, Bench &amp; Pull-Up Bar Only
+              </span>
+            </div>
+
+            {/* 3 Four-Week Phase Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+              <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 shrink-0 flex items-center gap-1 mr-1">
+                <Activity className="w-3 h-3" />
+                Express Phase:
+              </span>
+              {expressDbMesocycles.map((m) => {
+                const isSelected = activeExpressDbPhaseKey === m.id;
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => {
+                      setActiveExpressDbPhaseKey(m.id);
+                      setActiveExpressDbWeek(m.defaultWeek);
+                      setDayViewMode('all');
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer shrink-0 border flex items-center gap-1.5 ${
+                      isSelected
+                        ? 'bg-amber-500 text-black border-amber-400 shadow-sm font-black'
+                        : 'bg-[#090b0d] text-zinc-300 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800'
+                    }`}
+                  >
+                    <span>{m.label} ({m.weeks})</span>
+                    {isSelected && <CheckCircle2 className="w-3 h-3 text-black" />}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* 12-Week Selector */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pt-1.5 border-t border-zinc-800/80 scrollbar-none">
+              <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400 shrink-0 flex items-center gap-1 mr-1">
+                <Calendar className="w-3 h-3 text-amber-400" />
+                Week:
+              </span>
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((w) => {
+                const isSelectedWeek = activeExpressDbWeek === w;
+                const isDeload = w === 4 || w === 8;
+                const isTaperTest = w === 12;
+                const phaseIdForWeek = w <= 4 ? 'express_db_phase1' : w <= 8 ? 'express_db_phase2' : 'express_db_phase3';
+                return (
+                  <button
+                    key={w}
+                    type="button"
+                    onClick={() => {
+                      setActiveExpressDbWeek(w);
+                      setActiveExpressDbPhaseKey(phaseIdForWeek);
+                      setDayViewMode('all');
+                    }}
+                    className={`px-2.5 py-0.5 rounded-md text-xs font-mono font-bold transition-all cursor-pointer border flex items-center gap-1 shrink-0 tabular-nums ${
+                      isSelectedWeek
+                        ? 'bg-amber-500 text-black border-amber-400 shadow-sm font-black'
+                        : 'bg-[#090b0d] text-zinc-400 border-zinc-800 hover:text-white hover:border-zinc-700'
+                    }`}
+                  >
+                    <span>W{w}</span>
+                    {isDeload && (
+                      <span className="text-[8px] font-black uppercase bg-red-950/80 text-red-300 border border-red-500/40 px-1 rounded">
+                        Deload
+                      </span>
+                    )}
+                    {isTaperTest && (
+                      <span className="text-[8px] font-black uppercase bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 px-1 rounded">
+                        Taper/Test
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+              <span className="text-[10px] font-mono text-amber-400 ml-auto hidden sm:inline shrink-0 tabular-nums">
+                Week {activeExpressDbWeek} of 12 Active • 30-Min Clock
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* COMPACT ARMY FITNESS TEST (AFT) 8-WEEK BLOCK & WEEK SELECTOR RAIL */}
         {selectedProgram === 'aft_protocol' && (
           <div className="bg-[#0e1217] border border-amber-500/40 rounded-2xl p-2.5 sm:p-3 shadow-md space-y-2">
@@ -2839,6 +3182,8 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
                     ? `52-Week Military Progression Rules & Benchmarks (${currentPhase.weeks})`
                     : selectedProgram === 'tactical_hypertrophy'
                     ? `12-Week Military Tactical Bodybuilding Double Progression & Field Rules (${currentPhase.weeks})`
+                    : selectedProgram === 'hybrid_db'
+                    ? `12-Week Military Express 30-Min DB Rules & Benchmarks (${currentPhase.weeks})`
                     : selectedProgram === 'hybrid_protocol'
                     ? '12-Week Hybrid Protocol Auto-Overload Benchmarks'
                     : selectedProgram === 'aft_protocol'
@@ -2851,7 +3196,30 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
               </span>
             </div>
 
-          {selectedProgram === 'apex_protocol' ? (
+          {selectedProgram === 'hybrid_db' ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mt-2.5">
+              <div className="p-2.5 bg-[#090b0d] rounded-xl border border-amber-500/30">
+                <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider block">1. Reps First &rarr; 2. Weight Second</span>
+                <span className="text-sm font-black text-amber-400 font-mono tabular-nums">+1–2 Reps &rarr; +5 lb/hand</span>
+                <span className="text-[10px] text-zinc-400 block mt-0.5">Hit top rep target on all sets before adding +5 lb/hand (or 3s negative / 1s pause)</span>
+              </div>
+              <div className="p-2.5 bg-[#090b0d] rounded-xl border border-amber-500/30">
+                <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider block">30-Minute Session Clock</span>
+                <span className="text-sm font-black text-amber-400 font-mono tabular-nums">6m DIME • 20m Work • 4m Cool</span>
+                <span className="text-[10px] text-zinc-400 block mt-0.5">Never exceed 20m work window; trim 10–15s rest if running short on time</span>
+              </div>
+              <div className="p-2.5 bg-[#090b0d] rounded-xl border border-amber-500/30">
+                <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider block">Express Strength Benchmarks</span>
+                <span className="text-sm font-black text-amber-400 font-mono tabular-nums">Goblet 0.60–0.75x • DB Bench 0.45–0.55x</span>
+                <span className="text-[10px] text-zinc-400 block mt-0.5">8-Rep Goblet Squat &amp; 6-Rep Flat DB Bench/hand • 12–15+ Pull-Ups • 45–55+ HRP</span>
+              </div>
+              <div className="p-2.5 bg-[#090b0d] rounded-xl border border-amber-500/30">
+                <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider block">2-Mile Run, Plank &amp; Carry</span>
+                <span className="text-sm font-black text-amber-400 font-mono tabular-nums">2MR &le;14:00 / &le;12:45</span>
+                <span className="text-[10px] text-zinc-400 block mt-0.5">Plank 3:00–3:40+ • 30m Farmer&apos;s Walk 1.0–1.25x BW • Protein 0.75–1.0g/lb</span>
+              </div>
+            </div>
+          ) : selectedProgram === 'apex_protocol' ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mt-2.5">
               <div className="p-2.5 bg-zinc-950/80 rounded-xl border border-zinc-800/80">
                 <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">1. Reps First &rarr; 2. Weight Second</span>
@@ -3307,13 +3675,21 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
                         onSelectWarmup(
                           selectedProgram === 'tactical_hypertrophy'
                             ? 'warmup-dime-tactical-bb'
+                            : selectedProgram === 'hybrid_db'
+                            ? 'warmup-dime-express-6min'
                             : 'warmup-dime-mandatory'
                         );
                       }}
                       className="shrink-0 px-3 py-1.5 bg-[#0e1217] hover:bg-zinc-800 text-amber-300 hover:text-white text-xs font-bold rounded-lg border border-amber-500/30 transition-colors flex items-center gap-1.5 self-start sm:self-center cursor-pointer"
                     >
                       <Clock className="w-3.5 h-3.5" />
-                      <span>{selectedProgram === 'tactical_hypertrophy' ? 'DIME 8-Min Primer' : 'DIME Guided Primer'}</span>
+                      <span>
+                        {selectedProgram === 'tactical_hypertrophy'
+                          ? 'DIME 8-Min Primer'
+                          : selectedProgram === 'hybrid_db'
+                          ? 'DIME 6-Min Express Primer'
+                          : 'DIME Guided Primer'}
+                      </span>
                     </button>
                   )}
                 </div>
@@ -3549,7 +3925,7 @@ export const WorkoutsTab: React.FC<WorkoutsTabProps> = ({
                   <div className="pt-2">
                     <button
                       type="button"
-                      onClick={() => handleLaunchDayLifts(day)}
+                      onClick={() => handleLaunchDayLifts(rawDay)}
                       className="w-full py-3 bg-amber-500 hover:bg-amber-400 text-black font-black rounded-xl text-xs sm:text-sm uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer active:scale-98"
                     >
                       <Play className="w-4 h-4 fill-black" />

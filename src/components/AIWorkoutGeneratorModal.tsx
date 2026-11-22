@@ -14,6 +14,7 @@ import {
   isBodyweightExercise,
   isExerciseTimed,
   isTimedHoldExercise,
+  isContinuousRunOrRuckExercise,
 } from '../types';
 import { 
   generateWorkoutPlanClient, 
@@ -87,13 +88,15 @@ export const AIWorkoutGeneratorModal: React.FC<AIWorkoutGeneratorModalProps> = (
 
   const handleSelectBaseProgram = (progKey: ProgramKey) => {
     setSelectedCustomProgram(null);
-    const normalizedKey = progKey === 'hybrid_db' ? 'hybrid_protocol' : progKey;
-    setBaseProgramKey(normalizedKey);
-    const meta = getMasterProgramMetadata(normalizedKey);
-    const defaultWks = normalizedKey === 'universal_pat' || normalizedKey === 'aft_protocol' ? 8 : 12;
+    setBaseProgramKey(progKey);
+    const meta = getMasterProgramMetadata(progKey);
+    const defaultWks = progKey === 'universal_pat' || progKey === 'aft_protocol' ? 8 : 12;
     setScheduleWeeks(defaultWks);
     setScheduleDuration(`${defaultWks}weeks`);
     setFrequency(meta.frequency);
+    if (progKey === 'hybrid_db') {
+      setSessionDurationMinutes(30);
+    }
   };
 
   const handleSelectCustomProgram = (prog: WorkoutProgram) => {
@@ -426,7 +429,9 @@ export const AIWorkoutGeneratorModal: React.FC<AIWorkoutGeneratorModalProps> = (
       recommendedWarmupId:
         (planData.baseProgramKey || baseProgramKey) === 'tactical_hypertrophy'
           ? 'warmup-dime-tactical-bb'
-          : 'warmup-dime-mandatory',
+          : (planData.baseProgramKey || baseProgramKey) === 'hybrid_db'
+            ? 'warmup-dime-express-6min'
+            : 'warmup-dime-mandatory',
       description: planData.description || `Adapted from ${selectedMasterMeta.title} for ${fitnessLevel} ability and clinical joint guardrails.`,
       baseProgramKey: planData.baseProgramKey || baseProgramKey,
       programKind: planData.programKind,
@@ -1042,14 +1047,27 @@ export const AIWorkoutGeneratorModal: React.FC<AIWorkoutGeneratorModalProps> = (
                               )}
                             </div>
 
-                            {/* Sets x Reps */}
+                            {/* Sets x Reps or Distance & Time Log */}
                             <div className="col-span-3 sm:col-span-2 text-center">
-                              <span className="text-xs sm:text-sm font-black font-mono text-white">
-                                {ex.defaultSets} <span className="text-[10px] text-zinc-400 font-sans">sets</span>
-                              </span>
-                              <span className="block text-[11px] text-amber-300 font-mono font-bold">
-                                {ex.targetReps}
-                              </span>
+                              {isContinuousRunOrRuckExercise(ex.name, ex.targetReps, ex.type) ? (
+                                <>
+                                  <span className="text-xs sm:text-sm font-black font-mono text-sky-300">
+                                    {ex.targetReps}
+                                  </span>
+                                  <span className="block text-[10px] text-sky-400/80 font-mono">
+                                    Distance &amp; Time
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="text-xs sm:text-sm font-black font-mono text-white">
+                                    {ex.defaultSets} <span className="text-[10px] text-zinc-400 font-sans">sets</span>
+                                  </span>
+                                  <span className="block text-[11px] text-amber-300 font-mono font-bold">
+                                    {ex.targetReps}
+                                  </span>
+                                </>
+                              )}
                             </div>
 
                             {/* Rest Period Controls & Timer */}

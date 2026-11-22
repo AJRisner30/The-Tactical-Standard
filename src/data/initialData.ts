@@ -1622,6 +1622,114 @@ export const INITIAL_WARMUPS: WarmUpRoutine[] = [
     ]
   },
   {
+    id: 'warmup-dime-express-6min',
+    title: 'Mandatory 6-Minute Express DIME Warm-Up (12-Week Express 30-Min DB Program)',
+    category: 'Full Body / CNS',
+    durationMinutes: 6,
+    description:
+      'Minutes 0:00–6:00 of the 30-Minute Session Clock. Complete 1 fast, crisp round of this 9-move Dynamic Integrated Movement Enhancement (DIME) warm-up before every 30-minute workout to lubricate joints and prime your nervous system. Express Cool-Down (Minutes 26:00–30:00): Walk for 2 minutes to bring heart rate down, then hold 20-second static stretches for calves, hamstrings, hip flexors, and chest.',
+    focusMuscles: ['Hips & Knees', 'Lateral Core', 'Chest & Shoulders', 'Hamstrings & Glutes', 'Ankle Reactivity'],
+    steps: [
+      {
+        id: 'exp-dime-1-squats',
+        name: '1. Bodyweight Squats',
+        targetArea: 'Hips, Knees & Quads',
+        repsText: '10 reps',
+        cues: [
+          'Feet shoulder-width apart, brace your core and lower to parallel depth.',
+          'Drive smoothly through mid-foot to standing for 10 crisp reps.'
+        ],
+        coachingPoint: 'Lubricates knees and hips for the 20-minute main work block.'
+      },
+      {
+        id: 'exp-dime-2-jumps',
+        name: '2. Squat Jumps',
+        targetArea: 'Lower-Body Elastic Power',
+        repsText: '8 reps',
+        cues: [
+          'Load into a quarter squat and jump explosively upward.',
+          'Land softly on mid-foot with knees tracking cleanly over toes.'
+        ],
+        coachingPoint: 'Wakes up fast-twitch motor units in under 30 seconds.'
+      },
+      {
+        id: 'exp-dime-3-lunges',
+        name: '3. Forward Lunges',
+        targetArea: 'Hip Flexors & Unilateral Leg Drive',
+        repsText: '6 reps / leg',
+        cues: [
+          'Step forward with an upright torso until both knees reach 90 degrees.',
+          'Push decisively through the front heel to return to stance (6 per leg).'
+        ],
+        coachingPoint: 'Opens tight hip flexors before goblet squats, split squats, or running.'
+      },
+      {
+        id: 'exp-dime-4-side-plank',
+        name: '4. Side Plank',
+        targetArea: 'Obliques & Lateral Spinal Stiffness',
+        repsText: '15 sec / side',
+        cues: [
+          'Stack elbow directly under shoulder in a rigid straight line from head to heels.',
+          'Hold strict lateral core tension for 15 seconds per side.'
+        ],
+        coachingPoint: 'Locks in lateral trunk stability for unilateral dumbbell presses and carries.'
+      },
+      {
+        id: 'exp-dime-5-pushups',
+        name: '5. Push-Ups',
+        targetArea: 'Chest, Shoulders, Triceps & Scapulae',
+        repsText: '10 reps',
+        cues: [
+          'Hands under shoulders, body locked in a rigid plank.',
+          'Lower chest with elbows at ~45° and press to crisp lockout.'
+        ],
+        coachingPoint: 'Primes upper-body pressing tendons and anterior core.'
+      },
+      {
+        id: 'exp-dime-6-sl-reach',
+        name: '6. Single-Leg Reach',
+        targetArea: 'Hamstrings, Glutes & Balance',
+        repsText: '6 reps / leg',
+        cues: [
+          'Balance on one foot with a soft knee; hinge at the hips while reaching forward.',
+          'Keep hips square to the floor for 6 controlled reps per leg.'
+        ],
+        coachingPoint: 'Activates posterior chain balance before RDLs, swings, and track repeats.'
+      },
+      {
+        id: 'exp-dime-7-side-hop',
+        name: '7. Side Hop to Balance',
+        targetArea: 'Ankle & Knee Lateral Stabilization',
+        repsText: '6 hops / side',
+        cues: [
+          'Hop laterally from one foot to the other and stick the landing for 1 second.',
+          'Keep knee aligned over mid-foot (6 hops per side).'
+        ],
+        coachingPoint: 'Protects ankles and knees during lateral movement and uneven terrain runs.'
+      },
+      {
+        id: 'exp-dime-8-skaters',
+        name: '8. Ice Skaters (Lateral)',
+        targetArea: 'Frontal-Plane Power & Heart Rate',
+        repsText: '8 / side',
+        cues: [
+          'Bound smoothly side-to-side from leg to leg in an athletic stance for 8 reps per side.'
+        ],
+        coachingPoint: 'Elevates heart rate into working zone ahead of Minute 6:00.'
+      },
+      {
+        id: 'exp-dime-9-l-hops',
+        name: '9. "L" Hops (Forward/Side)',
+        targetArea: 'Multi-Planar Ankle Reactivity',
+        repsText: '5 hops / leg',
+        cues: [
+          'On one leg, hop forward then immediately hop laterally in an "L" pattern (5 per leg).'
+        ],
+        coachingPoint: 'Completes the 6-minute Express DIME Warm-Up so you hit Minute 6:00 ready to work.'
+      }
+    ]
+  },
+  {
     id: 'warmup-universal-tactical',
     title: 'Universal Tactical Dynamic Warm-Up',
     category: 'Full Body / CNS',

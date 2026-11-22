@@ -184,10 +184,10 @@ export const GOAL_OPTIONS = [
   },
   {
     id: 'station_db_minimal' as const,
-    label: 'Dumbbell & Bodyweight Hybrid Adaptation',
-    badge: 'Minimal Gear • AI Adapted Hybrid',
-    description: 'Uses the 12-Week Hybrid Protocol automatically adapted by the AI Adaptation Engine for dumbbells, bodyweight calisthenics, and running.',
-    preferredProgram: 'hybrid_protocol' as ProgramKey,
+    label: "12-Week Military Express 30-Minute Dumbbell Program (Coach AJ's Preferred)",
+    badge: "Coach AJ's Personal Preferred • Busy Schedule 30m DB",
+    description: "Coach AJ Risner's personal preferred program for a busy schedule: build strength, lean muscle, and running/rucking endurance in strictly 30 minutes a day (6m Express DIME + 20m Work + 4m Cool-Down) using only dumbbells, a bench, and a pull-up bar.",
+    preferredProgram: 'hybrid_db' as ProgramKey,
   },
   {
     id: 'custom_ai_individualized' as const,
@@ -300,22 +300,22 @@ export function calculateProgramRecommendation(
 
   if (answers.equipmentAccess === 'bodyweight_dumbbells' || answers.primaryGoalCategory === 'station_db_minimal') {
     return {
-      programKey: 'hybrid_protocol',
-      programTitle: 'The Tactical Standard 12-Week Hybrid Protocol (AI DB & Bodyweight Ready)',
-      badge: '12-Week Hybrid • AI DB/BW Adapted',
-      durationText: '12-Week Master Protocol (3 Phases)',
-      weeklySplit: '3-4 Days Resistance + 2 Days Conditioning',
+      programKey: 'hybrid_db',
+      programTitle: "12-Week Military Express 30-Minute Dumbbell Program (Coach AJ's Preferred)",
+      badge: "Coach AJ's Personal Preferred • 30-Min Busy Schedule DB",
+      durationText: '12-Week Express Periodized Program (3 Phases • 30 Mins/Day)',
+      weeklySplit: '6 Days / Week: 3 DB Antagonist Superset Days + 3 Cardio/Ruck Days + Day 7 Rest',
       fitnessTier,
       startingWeek: 1,
-      startingPhaseTitle: 'Phase 1: Foundation (Use AI Adapter for DB & Bodyweight Gear)',
+      startingPhaseTitle: 'Phase 1 (Weeks 1–4): Foundation Strength, Muscle & Cardio Base',
       primaryRationale:
-        'Matched to your equipment setup. The 12-Week Hybrid Protocol covers full Dumbbell & Bodyweight training seamlessly—tap "Adapt This Program" to swap all barbell movements for Dumbbell & Calisthenics equivalents while preserving the 3-phase progression.',
+        "Coach AJ Risner's personal preferred training program for a busy schedule. Engineered to build serious tactical strength, lean muscle, and aerobic/anaerobic endurance in strictly 30 minutes a day using only dumbbells, a bench, and a pull-up bar (Minutes 0:00–6:00 Express DIME Warm-Up → Minutes 6:00–26:00 Main Work Block → Minutes 26:00–30:00 Express Cool-Down).",
       keyActionPoints: [
-        'Tap "Adapt Program" to automatically swap barbell lifts for goblet squats, DB floor presses, and DB rows.',
-        'Starts at the low end of prescribed set and rep ranges and progresses dynamically from your logged sets.',
-        'Includes the Mandatory 10-Minute DIME Warm-Up before every session.',
+        'Double Progression: Add 1–2 reps per set each week until hitting top of rep range, then add +5 lbs/hand (or 3s lowering / 1s pause if heavier DBs are unavailable).',
+        '3 Days Dumbbell Antagonist Supersets + 3 Days Running/Incline Rucking (400m/800m/Hill Sprints, 2.5–3 Mi Zone 2/Tempo, 20m Weighted Incline Ruck).',
+        'Every 4th Week (Weeks 4, 8, and 12) cuts sets by 40%–50% to prevent burnout and peak your 2-Mile Run, Goblet Squat, DB Bench, Pull-Ups, and Plank.',
       ],
-      equipmentNotice: 'Click "Adapt This Program" with Dumbbells & Bodyweight selected for instant 1-for-1 equipment conversion.',
+      equipmentNotice: 'Requires only Dumbbells, a Bench, and a Pull-Up Bar (Barracks / Home / Deployment Tent).',
     };
   }
 

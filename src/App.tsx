@@ -182,17 +182,14 @@ export default function App() {
     if (storedKey === 'custom_ai' && getStoredActiveCustomAIProgram()) {
       return 'custom_ai';
     }
-    if (storedKey === 'hybrid_db') {
-      return 'hybrid_protocol';
-    }
-    if (storedKey && ['apex_protocol', 'tactical_hypertrophy', 'hybrid_protocol', 'aft_protocol', 'universal_pat'].includes(storedKey)) {
+    if (storedKey && ['apex_protocol', 'tactical_hypertrophy', 'hybrid_protocol', 'hybrid_db', 'aft_protocol', 'universal_pat'].includes(storedKey)) {
       return storedKey as ProgramKey;
     }
     if (getStoredActiveCustomAIProgram()) {
       return 'custom_ai';
     }
     const recKey = getCurrentAthlete().questionnaire?.recommendedProgramKey;
-    return recKey === 'hybrid_db' ? 'hybrid_protocol' : (recKey || 'apex_protocol');
+    return recKey || 'hybrid_db';
   });
 
   // Active workout session modal state

@@ -5,16 +5,19 @@ import {
   ExerciseTemplate,
   SupersetMovementItem,
   BlockMovementItem,
+  isIntervalRunExercise,
 } from '../types';
 import {
   PROTOCOL_DATA,
   ProtocolDay,
   ProtocolPhase,
   parseExerciseString,
+  parseIntervalSetsAndReps,
   getApexWeekData,
   getTacticalHypertrophyWeekData,
   getUniversalPatWeekData,
   getAftWeekData,
+  getExpressDbWeekData,
 } from '../data/protocolData';
 import {
   extractBannedMovements,
@@ -100,6 +103,19 @@ export const MASTER_PROGRAMS_CATALOG: MasterProgramMetadata[] = [
     defaultEquipment: 'Trap Bar, Barbell, Dumbbells, 90-lb Sled, Two 40-lb KBs, Pull-Up Bar, Track',
   },
   {
+    key: 'hybrid_db',
+    title: "12-Week Military Express 30-Minute Dumbbell Program (Coach AJ's Preferred)",
+    shortTitle: '12-Wk Express 30m DB',
+    subtitle: "Coach AJ's Personal Preferred Busy-Schedule Program • Dumbbell & Bodyweight Edition (30 Mins/Day)",
+    nativeWeeks: 12,
+    recommendedWeeksOptions: [4, 8, 12],
+    frequency: '6 Days / Week (30 Mins/Day: 6m DIME + 20m Work + 4m Cool-Down)',
+    category: 'Hybrid',
+    summary:
+      "Coach AJ Risner's personal preferred training program for a busy schedule. Builds serious tactical strength, lean muscle, and aerobic/anaerobic endurance in strictly 30 minutes a day using only dumbbells, a bench, and a pull-up bar (3 dumbbell antagonist superset days + 3 running/rucking days + 4th-week 40% deloads).",
+    defaultEquipment: 'Dumbbells, Bench & Pull-Up Bar (Barracks / Home / Deployment Tent)',
+  },
+  {
     key: 'universal_pat',
     title: 'General Military PFT & Selection Readiness (PFT / CFT / PRT)',
     shortTitle: 'General PFT & Selection',
@@ -114,8 +130,7 @@ export const MASTER_PROGRAMS_CATALOG: MasterProgramMetadata[] = [
 ];
 
 export function getMasterProgramMetadata(key?: ProgramKey | string): MasterProgramMetadata {
-  const normalizedKey = key === 'hybrid_db' ? 'hybrid_protocol' : key;
-  const found = MASTER_PROGRAMS_CATALOG.find((p) => p.key === normalizedKey);
+  const found = MASTER_PROGRAMS_CATALOG.find((p) => p.key === key);
   return found || MASTER_PROGRAMS_CATALOG[0];
 }
 
@@ -471,6 +486,11 @@ function adaptMasterConditioning(
     !runClean ||
     lowerRun.startsWith('rest') ||
     lowerRun.startsWith('complete rest') ||
+    lowerRun.startsWith('none') ||
+    lowerRun.includes('rest from running') ||
+    lowerRun.includes('no cardio') ||
+    lowerRun.includes('no separate run') ||
+    lowerRun.includes('included in session') ||
     lowerRun === 'n/a' ||
     lowerRun.includes('optional 15-min light walk');
 
@@ -511,97 +531,120 @@ function adaptMasterConditioning(
     let adaptedPace = dayPace || 'Zone 2 Conversational Pace';
     let adaptationReason: string | undefined;
 
-    // Extract clean starting distance in miles or duration in minutes if present
-    const mileRangeMatch = runClean.match(/(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)\s*Miles?/i);
-    const mileMatch = runClean.match(/(\d+(?:\.\d+)?)[-\s]*Miles?/i);
-    const minRangeMatch = runClean.match(/(\d+)\s*[-–]\s*(\d+)\s*Mins?/i);
-    const minMatch = runClean.match(/(\d+)\s*Mins?/i);
-    const repeatMatch = runClean.match(/(\d+)\s*x\s*(\d+m)/i);
+    const isInterval = isIntervalRunExercise(runClean, dayPace);
+    if (isInterval) {
+      const intervalSpec = parseIntervalSetsAndReps(runClean, dayPace) || {
+        sets: 6,
+        setRangeMin: 6,
+        setRangeMax: 6,
+        targetReps: '400m',
+        repRangeMin: 400,
+        repRangeMax: 400,
+        restSeconds: 90,
+      };
+      let adaptedSets = intervalSpec.sets;
+      adaptedTargetReps = intervalSpec.targetReps;
 
-    if (mileRangeMatch) {
-      adaptedTargetReps = `${mileRangeMatch[1]} miles`;
-    } else if (mileMatch) {
-      adaptedTargetReps = `${mileMatch[1]} miles`;
-    } else if (minRangeMatch) {
-      adaptedTargetReps = `${minRangeMatch[1]}–${minRangeMatch[2]} mins`;
-    } else if (minMatch) {
-      adaptedTargetReps = `${minMatch[1]} mins`;
-    } else if (repeatMatch) {
-      adaptedTargetReps = `${repeatMatch[1]} x ${repeatMatch[2]}`;
-    }
+      if (level.includes('beginner')) {
+        adaptedSets = Math.max(3, intervalSpec.sets - 2);
+        adaptationReason = `Scaled from ${intervalSpec.sets} repeats to ${adaptedSets} repeats for Beginner tier`;
+        adaptedPace = `${adaptedPace} [Beginner Scaling: Add +30s walk recovery between repeats as needed]`;
+      } else if (level.includes('elite')) {
+        adaptedSets = intervalSpec.sets + 1;
+        adaptationReason = `Scaled from ${intervalSpec.sets} to ${adaptedSets} repeats for Elite tier`;
+      }
 
-    if (level.includes('beginner')) {
+      results.push({
+        id: `adapt-run-d${dayNum}`,
+        name: adaptedRunName,
+        muscleGroup: 'Full Body',
+        type: 'cardio',
+        defaultSets: adaptedSets,
+        targetReps: adaptedTargetReps,
+        restPeriodSeconds: intervalSpec.restSeconds,
+        targetRpe: 8.5,
+        originalExerciseName: adaptationReason ? runClean : undefined,
+        adaptationReason,
+        notes: `Target Pace: ${adaptedPace} (Week ${weekNum})`,
+      });
+    } else {
+      // Extract clean starting distance in miles or duration in minutes if present
+      const mileRangeMatch = runClean.match(/(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)\s*Miles?/i);
+      const mileMatch = runClean.match(/(\d+(?:\.\d+)?)[-\s]*Miles?/i);
+      const minRangeMatch = runClean.match(/(\d+)\s*[-–]\s*(\d+)\s*Mins?/i);
+      const minMatch = runClean.match(/(\d+)\s*Mins?/i);
+
       if (mileRangeMatch) {
-        const origLow = parseFloat(mileRangeMatch[1]);
-        const origHigh = parseFloat(mileRangeMatch[2]);
-        const scaledLow = Math.max(1.0, Math.round(origLow * 0.75 * 2) / 2);
-        const scaledHigh = Math.max(scaledLow + 0.5, Math.round(origHigh * 0.75 * 2) / 2);
-        adaptedRunName = runClean.replace(mileRangeMatch[0], `${scaledLow}–${scaledHigh} miles`);
-        adaptedTargetReps = `${scaledLow} miles`;
-        adaptationReason = `Scaled from ${origLow}–${origHigh} miles (-25% volume for Beginner tier)`;
+        adaptedTargetReps = `${mileRangeMatch[1]} miles`;
       } else if (mileMatch) {
-        const origMiles = parseFloat(mileMatch[1]);
-        const scaledMiles = Math.max(1.0, Math.round(origMiles * 0.75 * 2) / 2);
-        adaptedRunName = runClean.replace(mileMatch[0], `${scaledMiles} miles`);
-        adaptedTargetReps = `${scaledMiles} miles`;
-        adaptationReason = `Scaled from ${origMiles} miles (-25% volume for Beginner tier)`;
+        adaptedTargetReps = `${mileMatch[1]} miles`;
       } else if (minRangeMatch) {
-        const origLowMins = parseInt(minRangeMatch[1], 10);
-        const scaledMins = Math.max(15, Math.round((origLowMins * 0.75) / 5) * 5);
-        adaptedRunName = runClean.replace(minRangeMatch[0], `${scaledMins} mins`);
-        adaptedTargetReps = `${scaledMins} mins`;
-        adaptationReason = `Scaled from ${minRangeMatch[1]}–${minRangeMatch[2]} mins (-25% duration for Beginner tier)`;
+        adaptedTargetReps = `${minRangeMatch[1]}–${minRangeMatch[2]} mins`;
       } else if (minMatch) {
-        const origMins = parseInt(minMatch[1], 10);
-        const scaledMins = Math.max(15, Math.round((origMins * 0.75) / 5) * 5);
-        adaptedRunName = runClean.replace(minMatch[0], `${scaledMins} Min`);
-        adaptedTargetReps = `${scaledMins} Mins`;
-        adaptationReason = `Scaled from ${origMins} Mins (-25% duration for Beginner tier)`;
-      } else if (repeatMatch) {
-        const origReps = parseInt(repeatMatch[1], 10);
-        const scaledReps = Math.max(3, origReps - 2);
-        adaptedRunName = runClean.replace(repeatMatch[0], `${scaledReps} x ${repeatMatch[2]}`);
-        adaptedTargetReps = `${scaledReps} x ${repeatMatch[2]} Intervals`;
-        adaptationReason = `Scaled from ${origReps} repeats to ${scaledReps} repeats for Beginner tier`;
+        adaptedTargetReps = `${minMatch[1]} mins`;
       }
-      adaptedPace = `${adaptedPace} [Beginner Scaling: Add +45-60s/mi cushion or walk-jog intervals as needed]`;
-    } else if (level.includes('elite')) {
-      if (mileRangeMatch) {
-        const origLow = parseFloat(mileRangeMatch[1]);
-        const origHigh = parseFloat(mileRangeMatch[2]);
-        const scaledLow = Math.round(origLow * 1.15 * 2) / 2;
-        const scaledHigh = Math.round(origHigh * 1.15 * 2) / 2;
-        adaptedRunName = runClean.replace(mileRangeMatch[0], `${scaledLow}–${scaledHigh} miles`);
-        adaptedTargetReps = `${scaledLow} miles`;
-        adaptationReason = `Scaled from ${origLow}–${origHigh} miles (+15% volume for Elite tier)`;
-      } else if (mileMatch) {
-        const origMiles = parseFloat(mileMatch[1]);
-        const scaledMiles = Math.round(origMiles * 1.15 * 2) / 2;
-        adaptedRunName = runClean.replace(mileMatch[0], `${scaledMiles} miles`);
-        adaptedTargetReps = `${scaledMiles} miles`;
-        adaptationReason = `Scaled from ${origMiles} miles (+15% volume for Elite tier)`;
-      } else if (repeatMatch) {
-        const origReps = parseInt(repeatMatch[1], 10);
-        const scaledReps = origReps + 1;
-        adaptedRunName = runClean.replace(repeatMatch[0], `${scaledReps} x ${repeatMatch[2]}`);
-        adaptedTargetReps = `${scaledReps} x ${repeatMatch[2]} Intervals`;
-        adaptationReason = `Scaled from ${origReps} to ${scaledReps} repeats for Elite tier`;
-      }
-    }
 
-    results.push({
-      id: `adapt-run-d${dayNum}`,
-      name: adaptedRunName,
-      muscleGroup: 'Full Body',
-      type: 'cardio',
-      defaultSets: 1,
-      targetReps: adaptedTargetReps,
-      restPeriodSeconds: 0,
-      targetRpe: lowerRun.includes('interval') || lowerRun.includes('sprint') || lowerRun.includes('benchmark') ? 8.5 : 7.0,
-      originalExerciseName: adaptationReason ? runClean : undefined,
-      adaptationReason,
-      notes: `Target Pace: ${adaptedPace} (Week ${weekNum})`,
-    });
+      if (level.includes('beginner')) {
+        if (mileRangeMatch) {
+          const origLow = parseFloat(mileRangeMatch[1]);
+          const origHigh = parseFloat(mileRangeMatch[2]);
+          const scaledLow = Math.max(1.0, Math.round(origLow * 0.75 * 2) / 2);
+          const scaledHigh = Math.max(scaledLow + 0.5, Math.round(origHigh * 0.75 * 2) / 2);
+          adaptedRunName = runClean.replace(mileRangeMatch[0], `${scaledLow}–${scaledHigh} miles`);
+          adaptedTargetReps = `${scaledLow} miles`;
+          adaptationReason = `Scaled from ${origLow}–${origHigh} miles (-25% volume for Beginner tier)`;
+        } else if (mileMatch) {
+          const origMiles = parseFloat(mileMatch[1]);
+          const scaledMiles = Math.max(1.0, Math.round(origMiles * 0.75 * 2) / 2);
+          adaptedRunName = runClean.replace(mileMatch[0], `${scaledMiles} miles`);
+          adaptedTargetReps = `${scaledMiles} miles`;
+          adaptationReason = `Scaled from ${origMiles} miles (-25% volume for Beginner tier)`;
+        } else if (minRangeMatch) {
+          const origLowMins = parseInt(minRangeMatch[1], 10);
+          const scaledMins = Math.max(15, Math.round((origLowMins * 0.75) / 5) * 5);
+          adaptedRunName = runClean.replace(minRangeMatch[0], `${scaledMins} mins`);
+          adaptedTargetReps = `${scaledMins} mins`;
+          adaptationReason = `Scaled from ${minRangeMatch[1]}–${minRangeMatch[2]} mins (-25% duration for Beginner tier)`;
+        } else if (minMatch) {
+          const origMins = parseInt(minMatch[1], 10);
+          const scaledMins = Math.max(15, Math.round((origMins * 0.75) / 5) * 5);
+          adaptedRunName = runClean.replace(minMatch[0], `${scaledMins} Min`);
+          adaptedTargetReps = `${scaledMins} Mins`;
+          adaptationReason = `Scaled from ${origMins} Mins (-25% duration for Beginner tier)`;
+        }
+        adaptedPace = `${adaptedPace} [Beginner Scaling: Add +45-60s/mi cushion or walk-jog intervals as needed]`;
+      } else if (level.includes('elite')) {
+        if (mileRangeMatch) {
+          const origLow = parseFloat(mileRangeMatch[1]);
+          const origHigh = parseFloat(mileRangeMatch[2]);
+          const scaledLow = Math.round(origLow * 1.15 * 2) / 2;
+          const scaledHigh = Math.round(origHigh * 1.15 * 2) / 2;
+          adaptedRunName = runClean.replace(mileRangeMatch[0], `${scaledLow}–${scaledHigh} miles`);
+          adaptedTargetReps = `${scaledLow} miles`;
+          adaptationReason = `Scaled from ${origLow}–${origHigh} miles (+15% volume for Elite tier)`;
+        } else if (mileMatch) {
+          const origMiles = parseFloat(mileMatch[1]);
+          const scaledMiles = Math.round(origMiles * 1.15 * 2) / 2;
+          adaptedRunName = runClean.replace(mileMatch[0], `${scaledMiles} miles`);
+          adaptedTargetReps = `${scaledMiles} miles`;
+          adaptationReason = `Scaled from ${origMiles} miles (+15% volume for Elite tier)`;
+        }
+      }
+
+      results.push({
+        id: `adapt-run-d${dayNum}`,
+        name: adaptedRunName,
+        muscleGroup: 'Full Body',
+        type: 'cardio',
+        defaultSets: 1,
+        targetReps: adaptedTargetReps,
+        restPeriodSeconds: 0,
+        targetRpe: lowerRun.includes('benchmark') || lowerRun.includes('tempo') || lowerRun.includes('threshold') ? 8.0 : 7.0,
+        originalExerciseName: adaptationReason ? runClean : undefined,
+        adaptationReason,
+        notes: `Target Pace: ${adaptedPace} (Week ${weekNum})`,
+      });
+    }
   } else if (cardioPreference === 'running' && !skipSupplementalRunOnRestRun) {
     // Master day had no run, but user requested running on every training day (excluded for 52-week & Tactical BB)
     const dist = runningDistPref || '1.5-2.0 Miles';
@@ -668,7 +711,12 @@ function getMasterPhaseForWeek(baseKey: ProgramKey, weekNum: number, totalWeeksR
     return getUniversalPatWeekData(cycleWeek);
   }
 
-  // Default: 'hybrid_protocol' (also covers any legacy 'hybrid_db' key)
+  if (baseKey === 'hybrid_db') {
+    const cycleWeek = ((weekNum - 1) % 12) + 1;
+    return getExpressDbWeekData(cycleWeek);
+  }
+
+  // Default: 'hybrid_protocol'
   if (weekNum <= 4) return PROTOCOL_DATA.phase1;
   if (weekNum <= 8) return PROTOCOL_DATA.phase2;
   return PROTOCOL_DATA.phase3;
@@ -1114,7 +1162,7 @@ export function adaptMasterProgram(params: WorkoutGenerationRequest): GeneratedW
     return adaptCustomCoachProgram(params);
   }
   const rawKey = (params.baseProgramKey as ProgramKey) || 'apex_protocol';
-  const baseKey: ProgramKey = rawKey === 'hybrid_db' ? 'hybrid_protocol' : rawKey;
+  const baseKey: ProgramKey = rawKey;
   const meta = getMasterProgramMetadata(baseKey);
   const fitnessLevel = params.fitnessLevel || 'Intermediate';
 
@@ -1151,6 +1199,7 @@ export function adaptMasterProgram(params: WorkoutGenerationRequest): GeneratedW
   const is52WeekBuiltIn = baseKey === 'apex_protocol';
   const isTacticalBodybuilding = baseKey === 'tactical_hypertrophy';
   const isAftInjuryOnly = baseKey === 'aft_protocol';
+  const isExpressDb = baseKey === 'hybrid_db';
 
   if (isAftInjuryOnly) {
     weeksCount = 8;
@@ -1198,12 +1247,12 @@ export function adaptMasterProgram(params: WorkoutGenerationRequest): GeneratedW
     const phaseData = getMasterPhaseForWeek(baseKey, weekNum, weeksCount);
     const isDeloadWeek = isAftInjuryOnly
       ? weekNum === 8
-      : isTacticalBodybuilding
+      : isTacticalBodybuilding || isExpressDb
       ? weekNum === 4 || weekNum === 8 || weekNum === 12
       : (weekNum % 4 === 0 && weekNum !== 52) || weekNum === 51;
     const isPeakWeek = isAftInjuryOnly
       ? weekNum === 6 || weekNum === 8
-      : isTacticalBodybuilding
+      : isTacticalBodybuilding || isExpressDb
       ? weekNum === 11
       : (weekNum === weeksCount && weeksCount >= 4) || weekNum === 13 || weekNum === 26 || weekNum === 39 || weekNum === 52;
 
@@ -1217,6 +1266,8 @@ export function adaptMasterProgram(params: WorkoutGenerationRequest): GeneratedW
       );
       const tacticalDay3SprintsInStrength =
         isTacticalBodybuilding && dayIdx === 2;
+      const expressDbCardioInStrength =
+        isExpressDb && dayIdx === 1;
       const apexQ2Day2RepeatsInStrength =
         is52WeekBuiltIn && dayIdx === 1 && realStrengthStrings.some((s) => /400m\s+run\s+repeats/i.test(s));
       const aftTrackOrSdcInStrength =
@@ -1226,7 +1277,7 @@ export function adaptMasterProgram(params: WorkoutGenerationRequest): GeneratedW
         ) &&
         !(protoDay.run || '').toLowerCase().includes('2-mile run');
 
-      // On Tactical Bodybuilding Day 3, 52-Week Q2 Day 2, and AFT Track/SDC days, the intervals live in day.strength.
+      // On Tactical Bodybuilding Day 3, Express DB Day 2, 52-Week Q2 Day 2, and AFT Track/SDC days, the intervals live in day.strength.
       // For AFT, cardio preference is locked to 'running' unless hasRunBan is active (injury adaptation only).
       const effectiveCardioPref = isAftInjuryOnly
         ? hasRunBan
@@ -1240,7 +1291,7 @@ export function adaptMasterProgram(params: WorkoutGenerationRequest): GeneratedW
           : protoDay.run;
 
       const conditioningExercises =
-        (tacticalDay3SprintsInStrength || apexQ2Day2RepeatsInStrength || aftTrackOrSdcInStrength) &&
+        (tacticalDay3SprintsInStrength || expressDbCardioInStrength || apexQ2Day2RepeatsInStrength || aftTrackOrSdcInStrength) &&
         effectiveCardioPref !== 'cardio_circuits' &&
         !hasRunBan
           ? []
@@ -1254,7 +1305,7 @@ export function adaptMasterProgram(params: WorkoutGenerationRequest): GeneratedW
               effectiveCardioPref,
               isAftInjuryOnly ? undefined : params.runningDistancePreference,
               params.cardioCircuitType,
-              isTacticalBodybuilding || is52WeekBuiltIn || isAftInjuryOnly
+              isTacticalBodybuilding || isExpressDb || is52WeekBuiltIn || isAftInjuryOnly
             );
 
       conditioningExercises.forEach((cEx) => {
@@ -1281,12 +1332,12 @@ export function adaptMasterProgram(params: WorkoutGenerationRequest): GeneratedW
       const dayExercises: GeneratedExercise[] = [];
 
       realStrengthStrings.forEach((exStr, exIdx) => {
-        // On Tactical Bodybuilding Day 3 or 52-Wk Q2 Day 2, if athlete switched to Cardio Circuits or has a Run Ban,
-        // skip the sprint/agility/400m items inside realStrengthStrings so the swapped circuit takes over cleanly.
+        // On Tactical Bodybuilding Day 3, Express DB Day 2, or 52-Wk Q2 Day 2, if athlete switched to Cardio Circuits or has a Run Ban,
+        // skip the sprint/agility/400m/800m items inside realStrengthStrings so the swapped circuit takes over cleanly.
         if (
-          (tacticalDay3SprintsInStrength || apexQ2Day2RepeatsInStrength) &&
+          (tacticalDay3SprintsInStrength || expressDbCardioInStrength || apexQ2Day2RepeatsInStrength) &&
           (params.cardioPreference === 'cardio_circuits' || hasRunBan) &&
-          /\b(sprint|sprints|pro\s+agility|t-drill|imt\s+bound|400m\s+run)\b/i.test(exStr)
+          /\b(sprint|sprints|pro\s+agility|t-drill|imt\s+bound|400m|800m|100m)\b/i.test(exStr)
         ) {
           return;
         }

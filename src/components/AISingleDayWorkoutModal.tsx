@@ -15,6 +15,7 @@ import {
   isExerciseTimed,
   isTimedHoldExercise,
   parseTimedHoldSeconds,
+  isContinuousRunOrRuckExercise,
 } from '../types';
 import { soundManager } from '../utils/audio';
 import { 
@@ -974,12 +975,25 @@ export const AISingleDayWorkoutModal: React.FC<AISingleDayWorkoutModalProps> = (
 
                       <div className="flex flex-col sm:flex-row sm:items-center gap-3 shrink-0 ml-8 sm:ml-0">
                         <div className="text-left sm:text-right">
-                          <span className="text-xs font-black font-mono tabular-nums text-white block">
-                            {ex.defaultSets} sets × {ex.targetReps}
-                          </span>
-                          <span className="text-[10px] font-mono tabular-nums text-amber-400 block">
-                            Target RPE {ex.targetRpe || 8}
-                          </span>
+                          {isContinuousRunOrRuckExercise(ex.name, ex.targetReps, ex.type) ? (
+                            <>
+                              <span className="text-xs font-black font-mono tabular-nums text-sky-300 block">
+                                {ex.targetReps}
+                              </span>
+                              <span className="text-[10px] font-mono tabular-nums text-sky-400/80 block">
+                                Distance &amp; Time Log
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-xs font-black font-mono tabular-nums text-white block">
+                                {ex.defaultSets} sets × {ex.targetReps}
+                              </span>
+                              <span className="text-[10px] font-mono tabular-nums text-amber-400 block">
+                                Target RPE {ex.targetRpe || 8}
+                              </span>
+                            </>
+                          )}
                         </div>
 
                         {isHoldEx && (

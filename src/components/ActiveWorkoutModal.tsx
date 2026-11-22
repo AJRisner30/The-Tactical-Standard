@@ -16,6 +16,10 @@ import {
   isTimedHoldExercise,
   parseTimedHoldSeconds,
   isBodyweightExercise,
+  isIntervalRunExercise,
+  isCarryDistanceExercise,
+  parseDefaultDistanceMeters,
+  parseDefaultIntervalTimeFormatted,
   AutoOverloadRecommendation,
   SupersetLiveEntry,
 } from '../types';
@@ -85,6 +89,7 @@ export const ActiveWorkoutModal: React.FC<ActiveWorkoutModalProps> = ({
             prevWeightLbs: lastSet.weightLbs,
             prevReps: lastSet.reps,
             prevTimeFormatted: lastSet.timeFormatted,
+            prevDistanceMeters: lastSet.distanceMeters,
           };
         }
       }
@@ -92,6 +97,7 @@ export const ActiveWorkoutModal: React.FC<ActiveWorkoutModalProps> = ({
         prevWeightLbs: fallbackWeight,
         prevReps: undefined,
         prevTimeFormatted: undefined,
+        prevDistanceMeters: undefined,
       };
     };
 
@@ -116,9 +122,15 @@ export const ActiveWorkoutModal: React.FC<ActiveWorkoutModalProps> = ({
             const prev = findPrevStats(mov.name, mov.weight_lbs);
             const movTargetReps = mov.targetReps || template.targetReps || '10';
             const { min: repMin } = parseRepRangeBounds(movTargetReps);
-            const defaultReps = overloadMov.recommendedReps || repMin || 10;
-            const isBodyweightMov = isBodyweightExercise(mov.name, exContext);
-            const isTimedMov = isExerciseTimed(mov.name, undefined, movTargetReps);
+            const isCarryMov = isCarryDistanceExercise(mov.name, movTargetReps);
+            const defaultDistMeters = isCarryMov
+              ? prev.prevDistanceMeters || parseDefaultDistanceMeters(movTargetReps, mov.name, 25)
+              : undefined;
+            const defaultReps = isCarryMov
+              ? defaultDistMeters || 25
+              : overloadMov.recommendedReps || repMin || 10;
+            const isBodyweightMov = isCarryMov ? false : isBodyweightExercise(mov.name, exContext);
+            const isTimedMov = isCarryMov ? false : isExerciseTimed(mov.name, undefined, movTargetReps);
             const holdSecs = isTimedMov ? parseTimedHoldSeconds(movTargetReps, mov.name) : undefined;
 
             const startWeight = isBodyweightMov
@@ -131,6 +143,8 @@ export const ActiveWorkoutModal: React.FC<ActiveWorkoutModalProps> = ({
               ? mov.weight_lbs
               : prev.prevWeightLbs !== undefined
               ? prev.prevWeightLbs
+              : isCarryMov
+              ? 50
               : 35;
 
             return {
@@ -143,6 +157,9 @@ export const ActiveWorkoutModal: React.FC<ActiveWorkoutModalProps> = ({
               prevReps: overloadMov.previousReps || prev.prevReps || defaultReps,
               isBodyweight: isBodyweightMov,
               isTimed: isTimedMov,
+              isCarryDistance: isCarryMov,
+              distanceMeters: defaultDistMeters,
+              prevDistanceMeters: prev.prevDistanceMeters,
               targetHoldSeconds: holdSecs,
               timeSeconds: holdSecs || 0,
               timeFormatted: prev.prevTimeFormatted || (holdSecs ? formatSecondsClock(holdSecs) : undefined),
@@ -335,8 +352,9 @@ export const ActiveWorkoutModal: React.FC<ActiveWorkoutModalProps> = ({
         }
 
         const initialWeight = isBodyweight ? 0 : (template.weight_lbs || prevWeight || 0);
+        const timedSetCount = isHoldOnly ? (template.defaultSets || 1) : 1;
 
-        const initialSets: LiveSet[] = Array.from({ length: template.defaultSets || 1 }).map((_, i) => ({
+        const initialSets: LiveSet[] = Array.from({ length: timedSetCount }).map((_, i) => ({
           id: `set-${template.id}-${i + 1}`,
           setNumber: i + 1,
           weightLbs: initialWeight,
@@ -373,10 +391,15 @@ export const ActiveWorkoutModal: React.FC<ActiveWorkoutModalProps> = ({
           sets: initialSets,
         };
       } else {
-        let startingWeight = 0;
-        let prevWeight: number | undefined = isBodyweight ? undefined : template.weight_lbs;
+        const isInterval = isIntervalRunExercise(template.name, template.targetReps, template.notes);
+        const isCarry = !isInterval && isCarryDistanceExercise(template.name, template.targetReps, template.notes);
+        const effectiveIsBodyweight = isCarry ? false : isInterval ? true : isBodyweight;
 
-        if (isBodyweight) {
+        let startingWeight = 0;
+        let prevWeight: number | undefined = effectiveIsBodyweight ? undefined : template.weight_lbs;
+        const prevStats = findPrevStats(template.name, template.weight_lbs);
+
+        if (effectiveIsBodyweight) {
           startingWeight = 0;
           prevWeight = undefined;
         } else if (
@@ -388,13 +411,25 @@ export const ActiveWorkoutModal: React.FC<ActiveWorkoutModalProps> = ({
           prevWeight = overload.previousWeightLbs;
         } else if (template.weight_lbs !== undefined && template.weight_lbs > 0) {
           startingWeight = template.weight_lbs;
+        } else if (prevStats.prevWeightLbs && prevStats.prevWeightLbs > 0) {
+          startingWeight = prevStats.prevWeightLbs;
         } else {
-          startingWeight = 95;
+          startingWeight = isCarry ? 50 : 95;
         }
 
-        // Start at the low end of the rep range (or session-progressed rep target)
+        // Start at the low end of the rep range (or prescribed distance in meters for carries/intervals)
         const { min: repMin } = parseRepRangeBounds(template.targetReps);
-        const startingReps = overload.recommendedReps || repMin || 8;
+        const defaultDistanceMeters = isInterval
+          ? prevStats.prevDistanceMeters || parseDefaultDistanceMeters(template.targetReps, template.name, 400)
+          : isCarry
+          ? prevStats.prevDistanceMeters || parseDefaultDistanceMeters(template.targetReps, template.name, 30)
+          : undefined;
+
+        const defaultIntervalSplit = isInterval
+          ? prevStats.prevTimeFormatted || parseDefaultIntervalTimeFormatted(template.targetReps, template.name, template.notes)
+          : undefined;
+
+        const startingReps = defaultDistanceMeters || overload.recommendedReps || repMin || 8;
         const startingSets = overload.recommendedSets || template.defaultSets || 3;
 
         const initialSets: LiveSet[] = Array.from({ length: startingSets }).map((_, i) => ({
@@ -402,11 +437,15 @@ export const ActiveWorkoutModal: React.FC<ActiveWorkoutModalProps> = ({
           setNumber: i + 1,
           weightLbs: startingWeight,
           reps: startingReps,
+          distanceMeters: defaultDistanceMeters,
+          timeFormatted: defaultIntervalSplit,
           rpe: template.targetRpe || 8,
           completed: false,
-          restSeconds: template.restPeriodSeconds || 90,
-          prevWeightLbs: isBodyweight ? undefined : (overload.previousWeightLbs ?? prevWeight),
-          prevReps: overload.previousReps || startingReps,
+          restSeconds: template.restPeriodSeconds || (isInterval ? 60 : isCarry ? 60 : 90),
+          prevWeightLbs: effectiveIsBodyweight ? undefined : (overload.previousWeightLbs ?? prevWeight),
+          prevReps: overload.previousReps || prevStats.prevReps || startingReps,
+          prevDistanceMeters: prevStats.prevDistanceMeters || defaultDistanceMeters,
+          prevTimeFormatted: prevStats.prevTimeFormatted,
           isTimed: false,
         }));
 
@@ -414,13 +453,15 @@ export const ActiveWorkoutModal: React.FC<ActiveWorkoutModalProps> = ({
           exerciseId: template.id,
           exerciseName: template.name,
           muscleGroup: template.muscleGroup,
-          restPeriodSeconds: template.restPeriodSeconds || 90,
+          restPeriodSeconds: template.restPeriodSeconds || (isInterval ? 60 : isCarry ? 60 : 90),
           notes: template.notes,
           targetReps: template.targetReps,
           targetRpe: template.targetRpe,
           progressionRules: template.progression_rules,
           isTimed: false,
-          isBodyweight,
+          isBodyweight: effectiveIsBodyweight,
+          isCarryDistance: isCarry,
+          isIntervalRun: isInterval,
           format: 'straight',
           autoOverload: overload,
           sets: initialSets,
@@ -590,15 +631,16 @@ export const ActiveWorkoutModal: React.FC<ActiveWorkoutModalProps> = ({
     } else {
       const targetEx = exercises[exerciseIdx];
       const setItem = targetEx?.sets[setIdx];
+      const isIntervalOrDistance = Boolean(targetEx?.isIntervalRun || targetEx?.hasDistance);
       const holdSeconds =
         options?.holdSeconds ??
         (entryIdx !== undefined
           ? setItem?.supersetEntries?.[entryIdx]?.targetHoldSeconds
-          : !targetEx?.hasDistance
+          : !isIntervalOrDistance
           ? targetEx?.targetHoldSeconds || parseTimedHoldSeconds(setItem?.timeFormatted || targetEx?.targetReps, targetEx?.exerciseName)
           : undefined);
 
-      const useCountdown = Boolean(holdSeconds && holdSeconds > 0);
+      const useCountdown = Boolean(holdSeconds && holdSeconds > 0 && !targetEx?.isIntervalRun);
       setStopwatchStartTimeRef.current = Date.now();
       lastBeepedSecondRef.current = null;
       setActiveSetStopwatch({
@@ -820,6 +862,7 @@ export const ActiveWorkoutModal: React.FC<ActiveWorkoutModalProps> = ({
       | 'reps'
       | 'rpe'
       | 'distanceMiles'
+      | 'distanceMeters'
       | 'timeFormatted'
       | 'timeSeconds'
       | 'amrapRoundsCompleted'
@@ -831,10 +874,15 @@ export const ActiveWorkoutModal: React.FC<ActiveWorkoutModalProps> = ({
       const copy = [...prev];
       const ex = { ...copy[exerciseIdx] };
       const setList = [...ex.sets];
-      setList[setIdx] = {
+      const nextSet = {
         ...setList[setIdx],
         [field]: value,
       };
+      // Keep reps and distanceMeters synced for carry & interval sets
+      if (field === 'distanceMeters' && typeof value === 'number') {
+        nextSet.reps = value;
+      }
+      setList[setIdx] = nextSet;
       ex.sets = setList;
 
       // If Set 1 is already logged/completed and the user updates Set 1 weight, reps, or RPE,
@@ -860,7 +908,7 @@ export const ActiveWorkoutModal: React.FC<ActiveWorkoutModalProps> = ({
     exerciseIdx: number,
     setIdx: number,
     entryIdx: number,
-    field: 'weightLbs' | 'reps' | 'timeFormatted' | 'timeSeconds',
+    field: 'weightLbs' | 'reps' | 'distanceMeters' | 'timeFormatted' | 'timeSeconds',
     value: number | string
   ) => {
     setExercises((prev) => {
@@ -870,15 +918,19 @@ export const ActiveWorkoutModal: React.FC<ActiveWorkoutModalProps> = ({
       const targetSet = { ...setList[setIdx] };
       const entries = [...(targetSet.supersetEntries || [])];
       if (!entries[entryIdx]) return prev;
-      entries[entryIdx] = {
+      const updatedEntry = {
         ...entries[entryIdx],
         [field]: value,
       };
+      if (field === 'distanceMeters' && typeof value === 'number') {
+        updatedEntry.reps = value;
+      }
+      entries[entryIdx] = updatedEntry;
       targetSet.supersetEntries = entries;
       // Keep top-level weightLbs/reps synced to primary movement for backwards compatibility
       if (entryIdx === 0) {
         if (field === 'weightLbs' && typeof value === 'number') targetSet.weightLbs = value;
-        if (field === 'reps' && typeof value === 'number') targetSet.reps = value;
+        if ((field === 'reps' || field === 'distanceMeters') && typeof value === 'number') targetSet.reps = value;
       }
       setList[setIdx] = targetSet;
       ex.sets = setList;
@@ -1040,10 +1092,12 @@ export const ActiveWorkoutModal: React.FC<ActiveWorkoutModalProps> = ({
         prevWeightLbs: ex.isBodyweight ? undefined : lastSet?.prevWeightLbs,
         prevReps: lastSet?.prevReps,
         prevTimeFormatted: lastSet?.prevTimeFormatted,
+        prevDistanceMeters: lastSet?.prevDistanceMeters,
         isTimed: ex.isTimed,
         timeFormatted: lastSet?.timeFormatted,
         timeSeconds: lastSet?.timeSeconds,
         distanceMiles: lastSet?.distanceMiles,
+        distanceMeters: lastSet?.distanceMeters,
         supersetEntries: lastSet?.supersetEntries
           ? lastSet.supersetEntries.map((entry) => ({ ...entry }))
           : undefined,
@@ -1086,7 +1140,7 @@ export const ActiveWorkoutModal: React.FC<ActiveWorkoutModalProps> = ({
         }, 0)
       );
     }
-    if (ex.isTimed) {
+    if (ex.isTimed || ex.isIntervalRun) {
       return acc;
     }
     return (
@@ -1105,7 +1159,12 @@ export const ActiveWorkoutModal: React.FC<ActiveWorkoutModalProps> = ({
           (s) =>
             s.completed ||
             (s.supersetEntries || []).some(
-              (e) => e.weightLbs > 0 || e.reps > 0 || (e.timeSeconds && e.timeSeconds > 0) || Boolean(e.timeFormatted)
+              (e) =>
+                e.weightLbs > 0 ||
+                e.reps > 0 ||
+                (e.distanceMeters && e.distanceMeters > 0) ||
+                (e.timeSeconds && e.timeSeconds > 0) ||
+                Boolean(e.timeFormatted)
             )
         );
         const movCount = ex.sets[0]?.supersetEntries?.length || 0;
@@ -1114,24 +1173,28 @@ export const ActiveWorkoutModal: React.FC<ActiveWorkoutModalProps> = ({
           if (!movMeta) continue;
           const isSubBW = Boolean(movMeta.isBodyweight);
           const isSubTimed = Boolean(movMeta.isTimed);
+          const isSubCarry = Boolean(movMeta.isCarryDistance);
           exported.push({
             exerciseName: movMeta.name,
             muscleGroup: movMeta.muscleGroup || ex.muscleGroup,
             isTimed: isSubTimed,
+            isCarryDistance: isSubCarry,
             format: 'superset',
             supersetGroupName: ex.exerciseName,
             sets: activeSets.map((s) => {
               const entry = s.supersetEntries?.[mIdx];
               const w = isSubBW ? 0 : (entry?.weightLbs || 0);
-              const r = isSubTimed ? 1 : (entry?.reps || 0);
+              const distM = isSubCarry ? (entry?.distanceMeters ?? entry?.reps ?? 25) : undefined;
+              const r = isSubTimed ? 1 : isSubCarry ? (distM || 25) : (entry?.reps || 0);
               return {
                 setNumber: s.setNumber,
                 weightLbs: w,
                 reps: r,
+                distanceMeters: distM,
                 rpe: s.rpe,
                 timeFormatted: isSubTimed ? entry?.timeFormatted : undefined,
                 timeSeconds: isSubTimed ? entry?.timeSeconds : undefined,
-                estimated1RM: !isSubBW && !isSubTimed ? calculate1RM(w, r) : 0,
+                estimated1RM: !isSubBW && !isSubTimed && !isSubCarry ? calculate1RM(w, r) : 0,
               };
             }),
           });
@@ -1143,6 +1206,8 @@ export const ActiveWorkoutModal: React.FC<ActiveWorkoutModalProps> = ({
         exerciseName: ex.exerciseName,
         muscleGroup: ex.muscleGroup,
         isTimed: ex.isTimed,
+        isCarryDistance: ex.isCarryDistance,
+        isIntervalRun: ex.isIntervalRun,
         format: ex.format,
         sets: ex.sets
           .filter(
@@ -1151,20 +1216,32 @@ export const ActiveWorkoutModal: React.FC<ActiveWorkoutModalProps> = ({
               (!ex.isBodyweight && s.weightLbs > 0) ||
               (s.timeFormatted && s.timeFormatted !== '00:00') ||
               (s.distanceMiles && s.distanceMiles > 0) ||
+              (s.distanceMeters && s.distanceMeters > 0) ||
               (s.amrapRoundsCompleted && s.amrapRoundsCompleted > 0)
           )
           .map((s) => ({
             setNumber: s.setNumber,
             weightLbs: ex.isBodyweight ? 0 : s.weightLbs,
-            reps: ex.format === 'amrap' ? (s.amrapRoundsCompleted || s.reps || 0) : ex.isTimed ? 1 : s.reps,
+            reps:
+              ex.format === 'amrap'
+                ? s.amrapRoundsCompleted || s.reps || 0
+                : ex.isCarryDistance || ex.isIntervalRun
+                ? s.distanceMeters ?? s.reps
+                : ex.isTimed
+                ? 1
+                : s.reps,
             rpe: s.rpe,
             timeFormatted: s.timeFormatted,
             timeSeconds: s.timeSeconds,
             distanceMiles: s.distanceMiles,
+            distanceMeters: s.distanceMeters,
             amrapRoundsCompleted: s.amrapRoundsCompleted,
             amrapExtraReps: s.amrapExtraReps,
             emomRoundsCompleted: s.emomRoundsCompleted,
-            estimated1RM: !ex.isTimed && !ex.isBodyweight ? calculate1RM(s.weightLbs, s.reps) : 0,
+            estimated1RM:
+              !ex.isTimed && !ex.isBodyweight && !ex.isCarryDistance && !ex.isIntervalRun
+                ? calculate1RM(s.weightLbs, s.reps)
+                : 0,
           })),
       });
     });
@@ -1819,7 +1896,13 @@ export const ActiveWorkoutModal: React.FC<ActiveWorkoutModalProps> = ({
                     <div className="min-w-0 tabular-nums">
                       <span className="font-athletic font-bold text-amber-300 uppercase tracking-wide mr-1.5">
                         {currentExercise.isTimed
-                          ? `Timed Hold / Conditioning Target: ${currentExercise.targetReps || '45s'}`
+                          ? currentExercise.hasDistance
+                            ? `Distance & Time Log Target: ${currentExercise.targetReps || (currentExercise.distance_miles ? `${currentExercise.distance_miles} miles` : 'Prescribed Distance')}`
+                            : `Timed Hold Target: ${currentExercise.targetReps || '45s'}`
+                          : currentExercise.isIntervalRun || isIntervalRunExercise(currentExercise.exerciseName, currentExercise.targetReps)
+                          ? `Interval Distance & Time Log: ${currentExercise.sets.length} sets × ${currentExercise.targetReps || `${currentExercise.sets[0]?.distanceMeters || 400}m`}`
+                          : currentExercise.isCarryDistance
+                          ? `Loaded Carry Log (Weight & Distance): ${currentExercise.sets.length} sets × ${currentExercise.sets[0]?.distanceMeters || 30}m`
                           : currentExercise.isBodyweight
                           ? currentExercise.autoOverload.status === 'rep_progression'
                             ? `Bodyweight Overload: ${currentExercise.autoOverload.recommendedSets} × ${currentExercise.autoOverload.recommendedReps} reps`
@@ -1832,9 +1915,11 @@ export const ActiveWorkoutModal: React.FC<ActiveWorkoutModalProps> = ({
                           ? `Low-End Calibration: Starting at ${currentExercise.autoOverload.recommendedSets} sets × ${currentExercise.autoOverload.recommendedReps} reps`
                           : 'Auto-Overload: Consolidate Working Weight'}
                       </span>
-                      <span className="text-zinc-400 text-[11px] hidden md:inline truncate">
-                        — {currentExercise.autoOverload.reason}
-                      </span>
+                      {!(currentExercise.isTimed && currentExercise.hasDistance) && (
+                        <span className="text-zinc-400 text-[11px] hidden md:inline truncate">
+                          — {currentExercise.autoOverload.reason}
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -1986,13 +2071,27 @@ export const ActiveWorkoutModal: React.FC<ActiveWorkoutModalProps> = ({
                         ? 'Timed Hold Sets'
                         : currentExercise.isTimed
                         ? 'Conditioning & Time Log'
+                        : currentExercise.isIntervalRun
+                        ? 'Interval Repeats (Distance & Time Log)'
+                        : currentExercise.isCarryDistance
+                        ? 'Loaded Carry Sets (Weight & Distance)'
                         : currentExercise.isBodyweight
                         ? 'Bodyweight Sets & Reps'
                         : 'Sets & Reps'}
                     </h4>
-                    {currentExercise.isBodyweight && (
+                    {currentExercise.isBodyweight && !currentExercise.isIntervalRun && (
                       <span className="px-2 py-0.5 rounded bg-amber-500/15 border border-amber-500/35 text-amber-300 font-mono text-[10px] font-bold uppercase">
                         Bodyweight
+                      </span>
+                    )}
+                    {currentExercise.isIntervalRun && (
+                      <span className="px-2 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/35 text-emerald-300 font-mono text-[10px] font-bold uppercase">
+                        Distance &amp; Split Time
+                      </span>
+                    )}
+                    {currentExercise.isCarryDistance && (
+                      <span className="px-2 py-0.5 rounded bg-amber-500/15 border border-amber-500/35 text-amber-300 font-mono text-[10px] font-bold uppercase">
+                        Weight &amp; Distance
                       </span>
                     )}
                   </div>
@@ -2053,7 +2152,7 @@ export const ActiveWorkoutModal: React.FC<ActiveWorkoutModalProps> = ({
                   currentExercise.isTimed ? (
                     currentExercise.hasDistance ? (
                       <div className="grid grid-cols-12 gap-2 text-[11px] font-bold text-zinc-400 uppercase tracking-wider px-2 py-1 items-center">
-                        <div className="col-span-1 text-center font-mono">Set</div>
+                        <div className="col-span-1 text-center font-mono">Run</div>
                         <div className="col-span-2 hidden sm:block">Previous</div>
                         <div className="col-span-3 sm:col-span-3 text-center">Distance (mi)</div>
                         <div className="col-span-4 sm:col-span-3 text-center">Time / Stopwatch</div>
@@ -2078,6 +2177,24 @@ export const ActiveWorkoutModal: React.FC<ActiveWorkoutModalProps> = ({
                         <div className="col-span-2 sm:col-span-1 text-center">Done</div>
                       </div>
                     )
+                  ) : currentExercise.isIntervalRun ? (
+                    <div className="grid grid-cols-12 gap-2 text-[11px] font-bold text-zinc-400 uppercase tracking-wider px-2 py-1 items-center">
+                      <div className="col-span-1 text-center font-mono">Set</div>
+                      <div className="col-span-2 hidden sm:block">Previous</div>
+                      <div className="col-span-3 sm:col-span-3 text-center">Distance (m)</div>
+                      <div className="col-span-4 sm:col-span-3 text-center">Time / Stopwatch</div>
+                      <div className="col-span-2 sm:col-span-2 text-center text-amber-400 font-mono">RPE</div>
+                      <div className="col-span-2 sm:col-span-1 text-center">Done</div>
+                    </div>
+                  ) : currentExercise.isCarryDistance ? (
+                    <div className="grid grid-cols-12 gap-2 text-[11px] font-bold text-zinc-400 uppercase tracking-wider px-2 py-1 items-center">
+                      <div className="col-span-1 text-center font-mono">Set</div>
+                      <div className="col-span-2 hidden sm:block">Previous</div>
+                      <div className="col-span-4 sm:col-span-3 text-center">Weight (lbs)</div>
+                      <div className="col-span-2 sm:col-span-2 text-center">Distance (m)</div>
+                      <div className="col-span-3 sm:col-span-2 text-center text-amber-400 font-mono">RPE</div>
+                      <div className="col-span-2 sm:col-span-2 text-center">Done</div>
+                    </div>
                   ) : currentExercise.isBodyweight ? (
                     <div className="grid grid-cols-12 gap-2 text-[11px] font-bold text-zinc-400 uppercase tracking-wider px-2 py-1 items-center">
                       <div className="col-span-2 sm:col-span-1 text-center font-mono">Set</div>
@@ -2187,7 +2304,9 @@ export const ActiveWorkoutModal: React.FC<ActiveWorkoutModalProps> = ({
                                     <div className="text-xs font-bold text-white truncate">{entry.name}</div>
                                     <div className="text-[10px] font-mono text-zinc-400 tabular-nums">
                                       Target: {entry.targetReps}
-                                      {!entryBW && entry.prevWeightLbs !== undefined && entry.prevWeightLbs > 0
+                                      {entry.isCarryDistance && entry.prevWeightLbs !== undefined && entry.prevWeightLbs > 0
+                                        ? ` · Prev ${entry.prevWeightLbs} lbs × ${entry.prevDistanceMeters || entry.distanceMeters || entry.reps}m`
+                                        : !entryBW && entry.prevWeightLbs !== undefined && entry.prevWeightLbs > 0
                                         ? ` · Prev ${entry.prevWeightLbs}×${entry.prevReps || entry.reps}`
                                         : entryBW && entry.prevReps && !entryTimed
                                         ? ` · Prev ${entry.prevReps} reps`
@@ -2269,6 +2388,26 @@ export const ActiveWorkoutModal: React.FC<ActiveWorkoutModalProps> = ({
                                     >
                                       {isEntryTimerActive ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
                                     </button>
+                                  </div>
+                                ) : entry.isCarryDistance ? (
+                                  <div className="col-span-6 sm:col-span-3 flex items-center gap-1.5">
+                                    <span className="text-[10px] font-mono text-amber-400 font-bold">DIST (m)</span>
+                                    <input
+                                      type="number"
+                                      step="5"
+                                      value={entry.distanceMeters ?? entry.reps ?? ''}
+                                      onChange={(e) =>
+                                        handleUpdateSupersetEntry(
+                                          activeExerciseIndex,
+                                          setIdx,
+                                          entryIdx,
+                                          'distanceMeters',
+                                          parseInt(e.target.value, 10) || 0
+                                        )
+                                      }
+                                      placeholder="25"
+                                      className="w-full text-center font-mono font-bold text-xs sm:text-sm bg-[#090b0d] border border-zinc-700 rounded-lg py-1.5 text-white focus:outline-none focus:border-amber-500 tabular-nums"
+                                    />
                                   </div>
                                 ) : (
                                   <div className={`${entryBW ? 'col-span-7 sm:col-span-4' : 'col-span-6 sm:col-span-3'} flex items-center gap-1.5`}>
@@ -2702,6 +2841,244 @@ export const ActiveWorkoutModal: React.FC<ActiveWorkoutModalProps> = ({
                       );
                     }
 
+                    // 5. INTERVAL REPEAT SET ROW (Log Distance in meters & Time It Took + Live Split Stopwatch)
+                    if (currentExercise.isIntervalRun) {
+                      return (
+                        <div
+                          key={set.id}
+                          className={`grid grid-cols-12 gap-2 items-center p-2 sm:p-2.5 rounded-xl border transition-all ${
+                            set.completed
+                              ? 'bg-emerald-950/20 border-emerald-500/40 text-emerald-200'
+                              : 'bg-[#090b0d] border-zinc-800 hover:border-zinc-700 text-zinc-200'
+                          }`}
+                        >
+                          <div className="col-span-1 text-center font-bold font-mono text-sm text-zinc-400 tabular-nums">
+                            {set.setNumber}
+                          </div>
+
+                          <div className="col-span-2 hidden sm:block text-xs text-zinc-400 truncate font-mono tabular-nums">
+                            {set.prevTimeFormatted || set.prevDistanceMeters ? (
+                              <span>
+                                {set.prevDistanceMeters || set.distanceMeters || set.reps}m
+                                {set.prevTimeFormatted ? ` in ${set.prevTimeFormatted}` : ''}
+                              </span>
+                            ) : (
+                              <span className="text-zinc-600">—</span>
+                            )}
+                          </div>
+
+                          <div className="col-span-3 sm:col-span-3 flex flex-col items-center justify-center">
+                            <input
+                              type="number"
+                              step="50"
+                              placeholder="400"
+                              value={set.distanceMeters ?? set.reps ?? ''}
+                              onChange={(e) =>
+                                handleUpdateSet(
+                                  activeExerciseIndex,
+                                  setIdx,
+                                  'distanceMeters',
+                                  parseInt(e.target.value, 10) || 0
+                                )
+                              }
+                              className="w-full max-w-[4.8rem] text-center font-mono font-bold text-xs sm:text-sm bg-[#141a21] border border-zinc-700 rounded-lg py-1.5 text-white focus:outline-none focus:border-amber-500 tabular-nums"
+                            />
+                          </div>
+
+                          <div className="col-span-4 sm:col-span-3 flex items-center justify-center gap-1.5">
+                            <input
+                              type="text"
+                              placeholder="01:25"
+                              value={
+                                isStopwatchActive
+                                  ? formatElapsed(activeSetStopwatch.seconds)
+                                  : set.timeFormatted || ''
+                              }
+                              onChange={(e) =>
+                                handleUpdateSet(activeExerciseIndex, setIdx, 'timeFormatted', e.target.value)
+                              }
+                              className={`w-full max-w-[4.8rem] text-center font-mono font-bold text-xs sm:text-sm border rounded-lg py-1.5 text-white focus:outline-none focus:border-amber-500 tabular-nums ${
+                                isStopwatchActive
+                                  ? 'bg-amber-950/60 border-amber-500 text-amber-300'
+                                  : 'bg-[#141a21] border-zinc-700'
+                              }`}
+                            />
+
+                            <button
+                              type="button"
+                              onClick={() => handleToggleSetStopwatch(activeExerciseIndex, setIdx)}
+                              className={`p-1.5 rounded-lg border transition-all cursor-pointer shrink-0 ${
+                                isStopwatchActive
+                                  ? 'bg-amber-500 text-black font-black border-amber-400'
+                                  : 'bg-zinc-800 hover:bg-zinc-700 text-amber-400 border-zinc-700'
+                              }`}
+                              title={isStopwatchActive ? 'Stop & record interval split time' : 'Start interval repeat stopwatch'}
+                            >
+                              {isStopwatchActive ? (
+                                <Pause className="w-3.5 h-3.5" />
+                              ) : (
+                                <Play className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          </div>
+
+                          <div className="col-span-2 sm:col-span-2 flex items-center justify-center">
+                            <input
+                              type="number"
+                              step="0.5"
+                              min="1"
+                              max="10"
+                              placeholder="8"
+                              value={set.rpe !== undefined ? set.rpe : ''}
+                              onChange={(e) => {
+                                const raw = e.target.value;
+                                handleUpdateSet(activeExerciseIndex, setIdx, 'rpe', raw === '' ? undefined : parseFloat(raw));
+                              }}
+                              className="w-full max-w-[3.4rem] text-center font-mono font-bold text-xs bg-[#141a21] border border-zinc-700 rounded-lg py-1.5 text-white focus:outline-none focus:border-amber-500 tabular-nums"
+                            />
+                          </div>
+
+                          <div className="col-span-2 sm:col-span-1 flex items-center justify-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleCompleteSet(activeExerciseIndex, setIdx)}
+                              className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold transition-all cursor-pointer ${
+                                set.completed
+                                  ? 'bg-emerald-500 text-black font-black shadow'
+                                  : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white border border-zinc-700'
+                              }`}
+                              title={set.completed ? 'Mark incomplete' : 'Log interval & start walk recovery timer'}
+                            >
+                              <Check className="w-4 h-4 stroke-[2.5]" />
+                            </button>
+                            {currentExercise.sets.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveSet(activeExerciseIndex, setIdx)}
+                                className="p-1 text-zinc-600 hover:text-red-400 transition-colors hidden sm:block cursor-pointer"
+                                title="Delete interval set"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // 5A-CARRY. LOADED CARRY SET ROW (Log Weight Used in lbs & Distance Gone in meters)
+                    if (currentExercise.isCarryDistance) {
+                      return (
+                        <div
+                          key={set.id}
+                          className={`grid grid-cols-12 gap-2 items-center p-2 sm:p-2.5 rounded-xl border transition-all ${
+                            set.completed
+                              ? 'bg-emerald-950/20 border-emerald-500/40 text-emerald-200'
+                              : 'bg-[#090b0d] border-zinc-800 hover:border-zinc-700 text-zinc-200'
+                          }`}
+                        >
+                          <div className="col-span-1 text-center font-bold font-mono text-sm text-zinc-400 tabular-nums">
+                            {set.setNumber}
+                          </div>
+
+                          <div className="col-span-2 hidden sm:block text-xs text-zinc-400 truncate font-mono tabular-nums">
+                            {set.prevWeightLbs ? (
+                              <span>
+                                {set.prevWeightLbs} <span className="text-[10px] text-zinc-500">lbs</span> × {set.prevDistanceMeters || set.distanceMeters || set.reps}m
+                              </span>
+                            ) : (
+                              <span className="text-zinc-600">—</span>
+                            )}
+                          </div>
+
+                          <div className="col-span-4 sm:col-span-3 flex flex-col items-center justify-center">
+                            <input
+                              type="number"
+                              step="5"
+                              value={set.weightLbs || ''}
+                              onChange={(e) =>
+                                handleUpdateSet(
+                                  activeExerciseIndex,
+                                  setIdx,
+                                  'weightLbs',
+                                  parseFloat(e.target.value) || 0
+                                )
+                              }
+                              placeholder="50"
+                              className="w-full max-w-[5.2rem] text-center font-mono font-bold text-xs sm:text-sm bg-[#141a21] border border-zinc-700 rounded-lg py-1.5 text-white focus:outline-none focus:border-amber-500 tabular-nums"
+                            />
+                            {set.prevWeightLbs ? (
+                              <span className="text-[9px] font-mono text-zinc-500 sm:hidden truncate mt-0.5 tabular-nums">
+                                Prev: {set.prevWeightLbs} lbs × {set.prevDistanceMeters || set.distanceMeters || set.reps}m
+                              </span>
+                            ) : null}
+                          </div>
+
+                          <div className="col-span-2 sm:col-span-2 flex items-center justify-center">
+                            <input
+                              type="number"
+                              step="5"
+                              value={set.distanceMeters ?? set.reps ?? ''}
+                              onChange={(e) =>
+                                handleUpdateSet(
+                                  activeExerciseIndex,
+                                  setIdx,
+                                  'distanceMeters',
+                                  parseInt(e.target.value, 10) || 0
+                                )
+                              }
+                              placeholder="30"
+                              className="w-full max-w-[4.2rem] text-center font-mono font-bold text-xs sm:text-sm bg-[#141a21] border border-zinc-700 rounded-lg py-1.5 text-white focus:outline-none focus:border-amber-500 tabular-nums"
+                            />
+                          </div>
+
+                          <div className="col-span-3 sm:col-span-2 flex items-center justify-center">
+                            <input
+                              type="number"
+                              step="0.5"
+                              min="1"
+                              max="10"
+                              placeholder="8"
+                              value={set.rpe !== undefined ? set.rpe : ''}
+                              onChange={(e) => {
+                                const raw = e.target.value;
+                                const val = raw === '' ? undefined : parseFloat(raw);
+                                handleUpdateSet(activeExerciseIndex, setIdx, 'rpe', val);
+                              }}
+                              className="w-full max-w-[3.6rem] text-center font-mono font-bold text-xs sm:text-sm rounded-lg py-1.5 bg-[#141a21] border border-zinc-700 text-white focus:outline-none focus:border-amber-500 tabular-nums"
+                              title="Rate of Perceived Exertion (1 to 10 scale)"
+                            />
+                          </div>
+
+                          <div className="col-span-2 sm:col-span-2 flex items-center justify-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleCompleteSet(activeExerciseIndex, setIdx)}
+                              className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center font-bold transition-all cursor-pointer ${
+                                set.completed
+                                  ? 'bg-emerald-500 text-black font-black shadow'
+                                  : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white border border-zinc-700'
+                              }`}
+                              title={set.completed ? 'Mark incomplete' : 'Log carry set & start rest timer'}
+                            >
+                              <Check className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.5]" />
+                            </button>
+
+                            {currentExercise.sets.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveSet(activeExerciseIndex, setIdx)}
+                                className="p-1 text-zinc-600 hover:text-red-400 transition-colors hidden sm:block cursor-pointer"
+                                title="Delete set"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }
+
                     // 5A. BODYWEIGHT REP SET ROW (No Weight input column!)
                     if (currentExercise.isBodyweight) {
                       return (
@@ -2905,7 +3282,11 @@ export const ActiveWorkoutModal: React.FC<ActiveWorkoutModalProps> = ({
 
                 {/* Set Actions & Peak 1RM Summary */}
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2.5 border-t border-zinc-800/80">
-                  {currentExercise.format !== 'amrap' ? (
+                  {currentExercise.isTimed && currentExercise.hasDistance ? (
+                    <div className="text-[11px] font-mono text-sky-400/90">
+                      Distance &amp; Time Log — Record your total distance (mi) and duration above.
+                    </div>
+                  ) : currentExercise.format !== 'amrap' ? (
                     <button
                       type="button"
                       onClick={() => handleAddSet(activeExerciseIndex)}
