@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   X, Plus, Trash2, Check, Layers, Clock, Dumbbell, Zap,
-  Flame, Calendar, ArrowUp, ArrowDown, ShieldCheck, Save, Sparkles, Copy
+  Flame, Calendar, ArrowUp, ArrowDown, ShieldCheck, Save, Copy
 } from 'lucide-react';
 import {
   WorkoutProgram,
@@ -489,7 +489,7 @@ export const CoachProgramBuilderModal: React.FC<CoachProgramBuilderModalProps> =
                 />
                 <div>
                   <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    <Flame className="w-3.5 h-3.5 text-amber-400" />
                     Allow AI Adaptation Engine
                   </div>
                   <div className="text-[11px] text-zinc-400 mt-0.5">

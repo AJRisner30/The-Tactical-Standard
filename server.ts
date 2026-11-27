@@ -1906,7 +1906,7 @@ RULES:
      * Elite: Undulating periodization, cluster sets, and heavy tactical load carriage`;
 
       let response: any = null;
-      const candidateModels = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-3.8-flash'];
+      const candidateModels = ['gemini-4-hydrogen', 'gemini-3.1-flash-lite'];
       let lastModelError: any = null;
 
       for (const modelName of candidateModels) {
@@ -2046,7 +2046,7 @@ RULES:
         success: true,
         data: sanitizedFallback,
         source: 'local_engine_fallback',
-        warning: err?.message || 'Gemini service note: delivered calibrated tactical template.',
+        warning: err?.message || 'Adaptation service note: delivered calibrated tactical template.',
       });
     }
   });
@@ -2209,9 +2209,8 @@ RULES:
 8. recommendedWarmupId should be one of: 'warmup-dime-mandatory', 'warmup-apex-sop', 'warmup-upper-primer', 'warmup-lower-prep', 'warmup-universal-tactical', 'warmup-express-primer'.`;
 
       const candidateModels = [
-        'gemini-2.5-flash',
-        'gemini-2.0-flash',
-        'gemini-3.8-flash',
+        'gemini-4-hydrogen',
+        'gemini-3.1-flash-lite',
       ];
 
       let lastModelError: any = null;
@@ -2332,7 +2331,144 @@ RULES:
         success: true,
         data: fallback,
         source: 'local_engine_fallback',
-        warning: err?.message || 'Gemini service note: delivered calibrated tactical template.',
+        warning: err?.message || 'Adaptation service note: delivered calibrated tactical template.',
+      });
+    }
+  });
+
+  // POST /api/gemini/flex-block — Adapts today's workout using active track, volume_tier, constraint_mode, and global benchmarks
+  app.post('/api/gemini/flex-block', async (req, res) => {
+    const {
+      trackId,
+      trackTitle,
+      volumeTier,
+      constraintMode,
+      sequentialDayIndex,
+      sessionTitle,
+      sessionFocus,
+      exercises,
+      benchmarks,
+      customNote,
+    } = req.body || {};
+
+    if (!trackId || !Array.isArray(exercises) || exercises.length === 0) {
+      return res.status(400).json({ error: 'Missing required trackId or exercises payload.' });
+    }
+
+    const ai = getGeminiClient();
+    if (!ai) {
+      return res.status(503).json({
+        error: 'Flex Block adaptation service is not configured on the server.',
+      });
+    }
+
+    try {
+      const prompt = [
+        `You are the Head Tactical Strength & Conditioning Coach for "The Tactical Standard".`,
+        `Adapt today's sequential training session ("Flex Block") while strictly respecting the athlete's active track, volume tier, readiness/constraint mode, and preserved global movement benchmarks.`,
+        ``,
+        `ACTIVE CONTEXT:`,
+        `- Track: ${trackTitle} (${trackId})`,
+        `- Sequential Day: Day ${sequentialDayIndex || 1} (Non-punitive sequential progression; NEVER reference Monday-Sunday calendar days)`,
+        `- Volume Tier: ${volumeTier === 'standard' ? 'Standard (3-4 Days/wk; trim accessory sets by ~20-25% for recovery & shift sustainability)' : 'High Volume (5 Days/wk; full tactical capacity)'}`,
+        `- Readiness / Constraint Mode: ${constraintMode === 'low_impact_rehab' ? 'Low-Impact / Joint Safe (ZERO jumping, running, burpees, or deep painful flexion; prefer SkiErg, RowErg, Assault Bike, sled drags, controlled step-ups, Pallof/dead-bug core)' : constraintMode === 'minimal_gear' ? 'Minimal Gear (Dumbbells, kettlebells, pull-up bar, and bodyweight only)' : 'Full Duty (Unrestricted tactical gym & field)'}`,
+        `- Base Session: ${sessionTitle || 'Tactical Session'} — ${sessionFocus || ''}`,
+        customNote ? `- Operator Flex Request: ${String(customNote).slice(0, 400)}` : '',
+        ``,
+        `CURRENT EXERCISES:`,
+        JSON.stringify(
+          exercises.slice(0, 12).map((e: any) => ({
+            movement_id: e.movement_id,
+            name: e.name,
+            blockType: e.blockType,
+            sets: e.sets,
+            reps: e.reps,
+            targetRpe: e.targetRpe,
+            restSeconds: e.restSeconds,
+            prescribedWeightLbs: e.prescribedWeightLbs,
+          }))
+        ),
+        ``,
+        `PRESERVED GLOBAL USER BENCHMARKS (DECOUPLED FROM TRACK):`,
+        JSON.stringify(
+          (Array.isArray(benchmarks) ? benchmarks : []).slice(0, 15).map((b: any) => ({
+            movement_id: b.movement_id,
+            movement_name: b.movement_name,
+            best_weight_lbs: b.best_weight_lbs,
+            estimated_1rm_lbs: b.estimated_1rm_lbs,
+            best_time_formatted: b.best_time_formatted,
+            best_reps: b.best_reps,
+            last_rpe: b.last_rpe,
+          }))
+        ),
+        ``,
+        `Return a crisp, immediately actionable adapted Flex Block workout in JSON matching the response schema. Keep canonical movement_ids where applicable so PR history remains connected. Include concise load targets derived from the user's benchmarks when available.`,
+      ]
+        .filter(Boolean)
+        .join('\n');
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-4-hydrogen',
+        contents: prompt,
+        config: {
+          systemInstruction:
+            'You are an elite military & law enforcement strength and conditioning architect. Produce precise, safe, high-signal tactical training adaptations. Never mention weekday names (Monday-Sunday).',
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              title: { type: Type.STRING, description: 'Adapted session title' },
+              rationale: { type: Type.STRING, description: 'Concise 1-2 sentence explanation of how volume, constraints, and benchmarks shaped this Flex Block' },
+              estimatedMinutes: { type: Type.INTEGER, description: 'Estimated duration in minutes' },
+              exercises: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    movement_id: { type: Type.STRING },
+                    name: { type: Type.STRING },
+                    blockType: {
+                      type: Type.STRING,
+                      enum: ['Strength', 'Power', 'Engine', 'Accessory', 'Carry', 'Core', 'Mobility'],
+                    },
+                    sets: { type: Type.INTEGER },
+                    reps: { type: Type.STRING },
+                    targetRpe: { type: Type.NUMBER },
+                    restSeconds: { type: Type.INTEGER },
+                    prescribedLoadNote: { type: Type.STRING, description: 'Working weight or pace target derived from user benchmarks' },
+                    notes: { type: Type.STRING },
+                    adaptationReason: { type: Type.STRING },
+                  },
+                  required: ['movement_id', 'name', 'blockType', 'sets', 'reps', 'targetRpe', 'restSeconds', 'notes'],
+                },
+              },
+            },
+            required: ['title', 'rationale', 'estimatedMinutes', 'exercises'],
+          },
+        },
+      });
+
+      const rawText = (response.text ?? '').trim();
+      if (!rawText) {
+        return res.status(502).json({ error: 'Flex Block adaptation returned an empty response.' });
+      }
+      const parsed = JSON.parse(rawText);
+      return res.json({
+        success: true,
+        data: {
+          ...parsed,
+          volumeTier,
+          constraintMode,
+          trackId,
+          sequentialDayIndex: sequentialDayIndex || 1,
+          generatedAt: new Date().toISOString(),
+        },
+      });
+    } catch (err: any) {
+      console.error('[Server] Flex Block Gemini adaptation failed:', err);
+      const status = err?.status && err.status >= 400 && err.status < 600 ? err.status : 500;
+      return res.status(status).json({
+        error: err?.message || 'Failed to generate Flex Block adaptation.',
       });
     }
   });
@@ -2346,7 +2482,7 @@ RULES:
 
     const ai = getGeminiClient();
     if (!ai) {
-      return res.status(503).json({ error: 'Gemini API key is not configured.' });
+      return res.status(503).json({ error: 'Adaptation streaming service is not configured.' });
     }
 
     res.setHeader('Content-Type', 'text/event-stream');
@@ -2355,7 +2491,7 @@ RULES:
 
     try {
       const stream = await ai.models.generateContentStream({
-        model: 'gemini-3.8-flash',
+        model: 'gemini-4-hydrogen',
         contents: prompt,
         config: systemInstruction ? { systemInstruction } : undefined,
       });

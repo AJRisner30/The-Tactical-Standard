@@ -1,15 +1,39 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
-  Dumbbell, Flame, Calculator, History, TrendingUp, Mail,
-  Instagram, ExternalLink, Zap, UserCheck, Cloud, LogOut, Award, ShieldCheck, Lock,
-  ChevronLeft, ChevronRight, Compass
+  Dumbbell,
+  Flame,
+  Calculator,
+  History,
+  TrendingUp,
+  Mail,
+  Instagram,
+  ExternalLink,
+  Zap,
+  UserCheck,
+  Cloud,
+  LogOut,
+  Award,
+  ShieldCheck,
+  Lock,
+  Compass,
+  ChevronDown,
+  SlidersHorizontal,
+  Wrench,
+  CreditCard,
 } from 'lucide-react';
 import { TacticalStandardCompanyEmblem } from './BrandingLogos';
 import { AthleteProfile } from '../utils/athleteAuth';
 import { useFirebase } from '../context/FirebaseContext';
 import { useUserTier } from '../hooks/useUserTier';
 
-export type TabType = 'workouts' | 'officer_portal' | 'warmups' | 'calculator' | 'logs' | 'graphs' | 'contact';
+export type TabType =
+  | 'workouts'
+  | 'officer_portal'
+  | 'warmups'
+  | 'calculator'
+  | 'logs'
+  | 'graphs'
+  | 'contact';
 
 interface NavbarProps {
   activeTab: TabType;
@@ -21,6 +45,7 @@ interface NavbarProps {
   onOpenPricingModal?: () => void;
   onOpenAndroidAppModal?: () => void;
   onOpenAIGenerator?: () => void;
+  onOpenSingleDayWorkout?: () => void;
   onOpenGuidedTour?: () => void;
   readinessScore?: number;
   readinessTier?: string;
@@ -35,6 +60,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenQuestionnaire,
   onOpenPricingModal,
   onOpenAIGenerator,
+  onOpenSingleDayWorkout,
   onOpenGuidedTour,
   readinessScore,
   readinessTier,
@@ -43,392 +69,408 @@ export const Navbar: React.FC<NavbarProps> = ({
   const { user, isCloudConnected, authError, signOutUser } = useFirebase();
   const { tier, hasActiveAccess, isTrialActive, isTrialExpired, isExempt } = useUserTier();
 
+  const [openMenu, setOpenMenu] = useState<'tools' | 'account' | null>(null);
+  const menuContainerRef = useRef<HTMLDivElement>(null);
+
   const isCoach = Boolean(
     user?.email && user.email.trim().toLowerCase() === 'risneraryan@gmail.com'
   );
 
-  const tabs: Array<{ id: TabType; label: string; icon: any; highlight?: boolean }> = [
+  const tabs: Array<{ id: TabType; label: string; icon: React.ComponentType<{ className?: string }> }> = [
     { id: 'workouts', label: 'Workouts', icon: Dumbbell },
     ...(isCoach
-      ? [{ id: 'officer_portal' as TabType, label: 'Command Portal', icon: ShieldCheck, highlight: true }]
+      ? [{ id: 'officer_portal' as TabType, label: 'Command', icon: ShieldCheck }]
       : hasOfficerProgram
-      ? [{ id: 'officer_portal' as TabType, label: 'My Mission Protocol', icon: ShieldCheck, highlight: true }]
+      ? [{ id: 'officer_portal' as TabType, label: 'Protocol', icon: ShieldCheck }]
       : []),
     { id: 'warmups', label: 'Warm-Ups', icon: Flame },
     { id: 'calculator', label: 'Calculators', icon: Calculator },
-    { id: 'logs', label: 'Workout Logs', icon: History },
+    { id: 'logs', label: 'Logs', icon: History },
     { id: 'graphs', label: 'Progress', icon: TrendingUp },
-    { id: 'contact', label: 'Contact Me', icon: Mail },
+    { id: 'contact', label: 'Contact', icon: Mail },
   ];
 
-  const tier1ScrollRef = useRef<HTMLDivElement>(null);
-  const navScrollRef = useRef<HTMLElement>(null);
-  const [canScrollTier1Left, setCanScrollTier1Left] = useState(false);
-  const [canScrollTier1Right, setCanScrollTier1Right] = useState(false);
-  const [canScrollNavLeft, setCanScrollNavLeft] = useState(false);
-  const [canScrollNavRight, setCanScrollNavRight] = useState(false);
-
-  const handleWheelScroll = (e: React.WheelEvent<HTMLElement>) => {
-    if (Math.abs(e.deltaY) > 0) {
-      e.currentTarget.scrollLeft += e.deltaY;
-    }
-  };
-
-  const checkScrollStates = useCallback(() => {
-    if (tier1ScrollRef.current) {
-      const { scrollLeft, scrollWidth, clientWidth } = tier1ScrollRef.current;
-      setCanScrollTier1Left(scrollLeft > 6);
-      setCanScrollTier1Right(scrollLeft + clientWidth < scrollWidth - 6);
-    }
-    if (navScrollRef.current) {
-      const { scrollLeft, scrollWidth, clientWidth } = navScrollRef.current;
-      setCanScrollNavLeft(scrollLeft > 6);
-      setCanScrollNavRight(scrollLeft + clientWidth < scrollWidth - 6);
-    }
-  }, []);
-
+  // Close dropdown menus on click outside or Escape
   useEffect(() => {
-    checkScrollStates();
-    const t1 = tier1ScrollRef.current;
-    const nav = navScrollRef.current;
-
-    const onResize = () => checkScrollStates();
-    window.addEventListener('resize', onResize);
-    t1?.addEventListener('scroll', checkScrollStates, { passive: true });
-    nav?.addEventListener('scroll', checkScrollStates, { passive: true });
-
-    return () => {
-      window.removeEventListener('resize', onResize);
-      t1?.removeEventListener('scroll', checkScrollStates);
-      nav?.removeEventListener('scroll', checkScrollStates);
+    if (!openMenu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuContainerRef.current && !menuContainerRef.current.contains(e.target as Node)) {
+        setOpenMenu(null);
+      }
     };
-  }, [checkScrollStates, tabs.length]);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpenMenu(null);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [openMenu]);
 
-  const scrollTier1 = (direction: 'left' | 'right') => {
-    if (tier1ScrollRef.current) {
-      tier1ScrollRef.current.scrollBy({
-        left: direction === 'left' ? -220 : 220,
-        behavior: 'smooth',
-      });
-    }
-  };
-
-  const scrollNav = (direction: 'left' | 'right') => {
-    if (navScrollRef.current) {
-      navScrollRef.current.scrollBy({
-        left: direction === 'left' ? -220 : 220,
-        behavior: 'smooth',
-      });
-    }
-  };
+  const isLocked = !hasActiveAccess && !isExempt;
+  const tierLabel = isTrialExpired
+    ? 'Trial Ended'
+    : isLocked
+    ? 'Activate Trial'
+    : isTrialActive
+    ? 'Trial Pro'
+    : tier.charAt(0).toUpperCase() + tier.slice(1);
 
   return (
-    <header className="sticky top-0 z-30 bg-[#0b0f14]/98 backdrop-blur-md border-b border-amber-500/25 shadow-lg">
-      <div className="max-w-7xl mx-auto">
-        {/* Tier 1: Brand & Operator Controls Bar */}
-        <div className="relative group/tier1">
-          {canScrollTier1Left && (
+    <header className="sticky top-0 z-30 bg-[#0B0E14]/95 backdrop-blur-md border-b border-[#1E2635]">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-4 lg:gap-8">
+        {/* Zone 1: Clean Single-Line Brand Wordmark */}
+        <button
+          type="button"
+          onClick={() => onSelectTab('workouts')}
+          className="flex items-center gap-2.5 shrink-0 select-none cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 rounded-lg"
+        >
+          <TacticalStandardCompanyEmblem size="xs" className="h-7 w-auto" />
+          <span className="font-athletic font-bold tracking-wide text-white text-base sm:text-lg leading-none whitespace-nowrap">
+            The Tactical <span className="text-amber-400">Standard</span>
+          </span>
+        </button>
+
+        {/* Zone 2: Clean Unboxed Primary Navigation Links (Desktop / Tablet) */}
+        <nav
+          aria-label="Main Navigation"
+          className="hidden md:flex items-center gap-1 lg:gap-5 overflow-x-auto no-scrollbar"
+        >
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => {
+                  if (isLocked) {
+                    onOpenPricingModal?.();
+                    return;
+                  }
+                  onSelectTab(tab.id);
+                }}
+                aria-current={isActive ? 'page' : undefined}
+                className={`relative h-14 sm:h-16 px-2.5 text-sm font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                  isActive
+                    ? 'text-white font-semibold'
+                    : isLocked
+                    ? 'text-slate-500 hover:text-amber-300'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                {isLocked && <Lock className="w-3 h-3 text-amber-400/70 shrink-0" />}
+                <span>{tab.label}</span>
+                {isActive && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute bottom-0 left-2 right-2 h-0.5 bg-amber-400 rounded-full"
+                  />
+                )}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Zone 3: Minimal Right Controls (Tools Menu + Account Menu) */}
+        <div ref={menuContainerRef} className="flex items-center gap-2 shrink-0 relative">
+          {/* Urgent Lock / Trial CTA only when locked or expired */}
+          {(isTrialExpired || isLocked) && onOpenPricingModal && (
             <button
               type="button"
-              onClick={() => scrollTier1('left')}
-              aria-label="Scroll top bar left"
-              className="absolute left-0 top-0 bottom-0 z-20 px-1 bg-gradient-to-r from-[#0b0f14] via-[#0b0f14]/95 to-transparent flex items-center justify-center text-zinc-300 hover:text-white transition cursor-pointer"
+              onClick={onOpenPricingModal}
+              className={`min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
+                isTrialExpired
+                  ? 'bg-red-500 hover:bg-red-400 text-white'
+                  : 'bg-amber-400 hover:bg-amber-300 text-[#0B0E14]'
+              }`}
             >
-              <ChevronLeft className="w-4 h-4 bg-zinc-800/90 hover:bg-amber-500 hover:text-black rounded-full p-0.5 border border-zinc-700 shadow" />
+              <Lock className="w-3.5 h-3.5 shrink-0" />
+              <span>{isTrialExpired ? 'Subscribe' : 'Activate Trial'}</span>
             </button>
           )}
 
-          <div
-            ref={tier1ScrollRef}
-            onWheel={handleWheelScroll}
-            className="flex items-center justify-between px-3 sm:px-4 py-2 gap-2 topbar-scroll"
-          >
-            {/* Brand Logo & Title */}
-            <div className="flex items-center gap-2 shrink-0 select-none">
-              <TacticalStandardCompanyEmblem size="xs" className="h-8 w-auto drop-shadow-sm" />
-              <div className="flex items-baseline gap-1">
-                <span className="font-athletic font-black uppercase tracking-wider text-white text-sm sm:text-base leading-none whitespace-nowrap">
-                  The Tactical
-                </span>
-                <span className="font-athletic font-black uppercase tracking-wider text-amber-400 text-sm sm:text-base leading-none whitespace-nowrap">
-                  Standard
-                </span>
-              </div>
-              <span className="hidden xl:inline text-[10px] text-amber-300/80 font-mono pl-2 border-l border-zinc-700 whitespace-nowrap">
-                Military Strength &amp; Combat Readiness
-              </span>
-            </div>
-
-            {/* Top Quick Links & Controls */}
-            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-              {/* 50 Cal Labz Partner Link */}
-              <a
-                href="https://50callabz.com/risner55"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 px-2 sm:px-2.5 py-1 bg-[#141a21] hover:bg-amber-950/40 text-amber-200 hover:text-white border border-amber-500/40 hover:border-amber-400 rounded-lg text-[11px] font-black transition-all shadow-sm shrink-0 cursor-pointer whitespace-nowrap"
-                title="Official Supplement Partner: 50 Cal Labz (Discount Code: TACTICALSTANDARD)"
-              >
-                <Zap className="w-3 h-3 text-amber-400 fill-amber-400 shrink-0" />
-                <span className="hidden sm:inline font-bold">50 Cal Labz</span>
-                <span className="text-[9px] bg-amber-500 text-black px-1 rounded font-mono font-black">
-                  Code: TACTICALSTANDARD
-                </span>
-                <ExternalLink className="w-2.5 h-2.5 text-amber-400/80 shrink-0" />
-              </a>
-
-              {/* Instagram: AJ Risner */}
-              <a
-                href="https://www.instagram.com/ajrisner"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 px-2 sm:px-2.5 py-1 bg-[#141a21] hover:bg-zinc-800 text-zinc-200 hover:text-white border border-zinc-700 hover:border-amber-500/50 rounded-lg text-[11px] font-bold transition-all shadow-sm shrink-0 cursor-pointer whitespace-nowrap"
-                title="Follow Instagram: AJ Risner"
-              >
-                <Instagram className="w-3 h-3 text-amber-400 shrink-0" />
-                <span className="hidden md:inline">@ajrisner</span>
-                <ExternalLink className="w-2.5 h-2.5 text-zinc-400 shrink-0" />
-              </a>
-
-              {/* Cloud Sync Status */}
-              <button
-                type="button"
-                onClick={onOpenAthleteModal}
-                className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer shrink-0 ${
-                  authError
-                    ? 'bg-red-950/40 border border-red-500/50 hover:border-red-400 text-red-300'
-                    : 'bg-[#141a21] hover:bg-zinc-800 border border-zinc-700/80 hover:border-amber-500/50'
+          {/* Tools Dropdown Trigger */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setOpenMenu((prev) => (prev === 'tools' ? null : 'tools'))}
+              aria-expanded={openMenu === 'tools'}
+              aria-haspopup="menu"
+              className={`min-h-[40px] px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                openMenu === 'tools'
+                  ? 'bg-[#182030] text-white'
+                  : 'text-slate-300 hover:text-white hover:bg-[#141923]'
+              }`}
+            >
+              <Wrench className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span className="hidden sm:inline">Tools</span>
+              <ChevronDown
+                className={`w-3.5 h-3.5 text-slate-400 transition-transform ${
+                  openMenu === 'tools' ? 'rotate-180' : ''
                 }`}
-                title={
-                  authError
-                    ? 'Sign-In Notice: Click to view details'
-                    : user
-                    ? `Cloud Synced: ${user.email}`
-                    : isCloudConnected
-                    ? 'Cloud Synced'
-                    : 'Syncing Data...'
-                }
+              />
+            </button>
+
+            {openMenu === 'tools' && (
+              <div
+                role="menu"
+                className="absolute right-0 mt-2 w-64 rounded-xl bg-[#141923] border border-[#262F40] shadow-2xl py-1.5 z-50"
               >
-                <span
-                  className={`inline-block rounded-full h-2 w-2 shrink-0 ${
-                    authError
-                      ? 'bg-red-400'
-                      : user
-                      ? 'bg-emerald-400'
-                      : isCloudConnected
-                      ? 'bg-amber-400'
-                      : 'bg-zinc-500'
-                  }`}
-                />
-                <Cloud className={`w-3 h-3 ${authError ? 'text-red-400' : 'text-zinc-300'}`} />
-              </button>
-
-              {/* Ability Matcher Quick Action */}
-              {onOpenQuestionnaire && (
-                <button
-                  type="button"
-                  onClick={onOpenQuestionnaire}
-                  className="flex items-center gap-1 px-2 sm:px-2.5 py-1 bg-[#141a21] hover:bg-amber-500/15 text-amber-300 hover:text-amber-200 border border-amber-500/35 hover:border-amber-400 rounded-lg text-[11px] font-bold transition-all shadow-sm cursor-pointer shrink-0 whitespace-nowrap"
-                  title="Take Physical Ability Assessment & Match Recommended Program"
-                >
-                  <Award className="w-3 h-3 text-amber-400 shrink-0" />
-                  <span className="hidden sm:inline">Program Matcher</span>
-                </button>
-              )}
-
-              {/* Adaptive Program Action */}
-              {onOpenAIGenerator && (
-                <button
-                  type="button"
-                  onClick={onOpenAIGenerator}
-                  className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 bg-amber-500/15 hover:bg-amber-500/25 text-amber-200 hover:text-white border border-amber-500/45 hover:border-amber-400 rounded-lg text-[11px] font-bold transition-all shadow-sm cursor-pointer shrink-0 whitespace-nowrap"
-                  title="Adapt Coach Risner's Core Programs for Injuries & Ability"
-                >
-                  <Zap className="w-3 h-3 text-amber-400 shrink-0" />
-                  <span className="hidden sm:inline">Adapt Program</span>
-                </button>
-              )}
-
-              {/* Guided App Tour Action */}
-              {onOpenGuidedTour && (
-                <button
-                  type="button"
-                  onClick={onOpenGuidedTour}
-                  className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 bg-[#141a21] hover:bg-emerald-950/60 text-emerald-300 hover:text-white border border-emerald-500/40 hover:border-emerald-400 rounded-lg text-[11px] font-bold transition-all shadow-sm cursor-pointer shrink-0 whitespace-nowrap"
-                  title="Guided App Tour & Feature Showcase"
-                >
-                  <Compass className="w-3 h-3 text-emerald-400 shrink-0" />
-                  <span>App Tour</span>
-                </button>
-              )}
-
-              {/* Service Member Profile Chip */}
-              <button
-                type="button"
-                onClick={onOpenAthleteModal}
-                className="flex items-center gap-1.5 px-2.5 py-1 bg-[#141a21] hover:bg-zinc-800 text-white border border-amber-500/40 hover:border-amber-400 rounded-lg text-[11px] font-black transition-all shadow-sm cursor-pointer active:scale-95 shrink-0 whitespace-nowrap"
-                title={`View service member profile and combat readiness score (${readinessScore ?? 85}% ${readinessTier || ''})`}
-              >
-                <div className={`w-4 h-4 rounded-full bg-gradient-to-tr ${currentAthlete?.avatarColor || 'from-amber-600 to-amber-400'} flex items-center justify-center text-[9px] font-black text-black shrink-0`}>
-                  {currentAthlete ? currentAthlete.name.charAt(0).toUpperCase() : 'T'}
+                <div className="px-3 py-1.5 text-[11px] font-medium text-slate-500">
+                  Training Tools
                 </div>
-                <span className="font-bold text-white whitespace-nowrap truncate max-w-[80px] sm:max-w-none">
-                  {currentAthlete ? currentAthlete.name : 'Service Member'}
-                </span>
-                {readinessScore !== undefined && (
-                  <span className={`text-[9px] font-mono font-bold tabular-nums px-1.5 py-0.5 rounded border ${
-                    readinessScore >= 85
-                      ? 'bg-emerald-950/80 border-emerald-500/40 text-emerald-300'
-                      : readinessScore >= 70
-                      ? 'bg-amber-950/80 border-amber-500/40 text-amber-300'
-                      : 'bg-red-950/80 border-red-500/40 text-red-300'
-                  }`}>
-                    {readinessScore}% Ready
-                  </span>
-                )}
-                <UserCheck className="w-3 h-3 text-amber-400 shrink-0" />
-              </button>
 
-              {/* Membership Tier Badge */}
-              <button
-                type="button"
-                onClick={onOpenPricingModal}
-                className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-[11px] font-black font-mono transition-all shadow-sm cursor-pointer border shrink-0 whitespace-nowrap ${
-                  isTrialExpired
-                    ? 'bg-red-950/90 hover:bg-red-900 text-red-200 border-red-500'
-                    : !hasActiveAccess && !isExempt
-                    ? 'bg-amber-950/90 hover:bg-amber-900 text-amber-200 border-amber-500'
-                    : tier === 'pro'
-                    ? 'bg-amber-950/80 hover:bg-amber-900/80 text-amber-300 border-amber-500/50'
-                    : tier === 'enterprise'
-                    ? 'bg-emerald-950/80 hover:bg-emerald-900/80 text-emerald-300 border-emerald-500/50'
-                    : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-400 border-zinc-700'
-                }`}
-                title={
-                  isTrialExpired
-                    ? 'Trial Ended: Access locked. Click to subscribe.'
-                    : !hasActiveAccess && !isExempt
-                    ? 'Trial Not Activated: Click to activate your 14-day free trial.'
-                    : `Membership: ${tier.toUpperCase()} Tier. Click to inspect pricing tiers & plans.`
-                }
-              >
-                {isTrialExpired ? (
-                  <Lock className="w-3 h-3 text-red-400 shrink-0" />
-                ) : !hasActiveAccess && !isExempt ? (
-                  <Lock className="w-3 h-3 text-amber-400 shrink-0" />
-                ) : (
-                  <Zap className="w-3 h-3 text-amber-400 shrink-0" />
+                {onOpenAIGenerator && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setOpenMenu(null);
+                      onOpenAIGenerator();
+                    }}
+                    className="w-full px-3 py-2.5 text-left hover:bg-[#1C2333] transition-colors flex items-center gap-2.5 cursor-pointer"
+                  >
+                    <SlidersHorizontal className="w-4 h-4 text-amber-400 shrink-0" />
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold text-white">Adapt Core Program</div>
+                      <div className="text-[11px] text-slate-400 truncate">
+                        Adjust for injuries, schedule &amp; gear
+                      </div>
+                    </div>
+                  </button>
                 )}
-                <span className="uppercase">
-                  {isTrialExpired
-                    ? 'Locked • Subscribe'
-                    : !hasActiveAccess && !isExempt
-                    ? 'Activate Trial'
-                    : isTrialActive
-                    ? 'Trial Pro'
-                    : tier}
-                </span>
-              </button>
 
-              {/* Quick Sign Out Button */}
-              {user && (
-                <button
-                  type="button"
-                  onClick={signOutUser}
-                  className="flex items-center gap-1 px-2 py-1 bg-[#141a21] hover:bg-red-950/50 text-zinc-400 hover:text-red-300 border border-zinc-700/80 hover:border-red-500/50 rounded-lg text-[11px] font-bold transition-all shadow-sm cursor-pointer shrink-0 whitespace-nowrap"
-                  title={`Signed in as ${user.email}. Click to sign out.`}
+                {onOpenSingleDayWorkout && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setOpenMenu(null);
+                      onOpenSingleDayWorkout();
+                    }}
+                    className="w-full px-3 py-2.5 text-left hover:bg-[#1C2333] transition-colors flex items-center gap-2.5 cursor-pointer"
+                  >
+                    <Zap className="w-4 h-4 text-amber-400 shrink-0" />
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold text-white">Single-Day Workout</div>
+                      <div className="text-[11px] text-slate-400 truncate">
+                        On-demand session for today
+                      </div>
+                    </div>
+                  </button>
+                )}
+
+                {onOpenQuestionnaire && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setOpenMenu(null);
+                      onOpenQuestionnaire();
+                    }}
+                    className="w-full px-3 py-2.5 text-left hover:bg-[#1C2333] transition-colors flex items-center gap-2.5 cursor-pointer"
+                  >
+                    <Award className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold text-white">Program Matcher</div>
+                      <div className="text-[11px] text-slate-400 truncate">
+                        {currentAthlete?.questionnaire?.recommendedProgramTitle
+                          ? `Matched: ${currentAthlete.questionnaire.recommendedProgramTitle}`
+                          : '2-minute physical assessment'}
+                      </div>
+                    </div>
+                  </button>
+                )}
+
+                {onOpenGuidedTour && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setOpenMenu(null);
+                      onOpenGuidedTour();
+                    }}
+                    className="w-full px-3 py-2.5 text-left hover:bg-[#1C2333] transition-colors flex items-center gap-2.5 cursor-pointer"
+                  >
+                    <Compass className="w-4 h-4 text-sky-400 shrink-0" />
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold text-white">Guided App Tour</div>
+                      <div className="text-[11px] text-slate-400 truncate">
+                        Walkthrough of all app features
+                      </div>
+                    </div>
+                  </button>
+                )}
+
+                <div className="my-1.5 border-t border-[#262F40]" />
+
+                <div className="px-3 py-1 text-[11px] font-medium text-slate-500">
+                  Community &amp; Partner
+                </div>
+
+                <a
+                  href="https://50callabz.com/risner55"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setOpenMenu(null)}
+                  className="w-full px-3 py-2 hover:bg-[#1C2333] transition-colors flex items-center justify-between gap-2 text-xs text-amber-300"
                 >
-                  <LogOut className="w-3 h-3 text-red-400 shrink-0" />
-                  <span className="hidden md:inline">Sign Out</span>
-                </button>
-              )}
-            </div>
+                  <span className="flex items-center gap-2 min-w-0">
+                    <Zap className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">50 Cal Labz · TACTICALSTANDARD</span>
+                  </span>
+                  <ExternalLink className="w-3 h-3 text-slate-500 shrink-0" />
+                </a>
+
+                <a
+                  href="https://www.instagram.com/ajrisner"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setOpenMenu(null)}
+                  className="w-full px-3 py-2 hover:bg-[#1C2333] transition-colors flex items-center justify-between gap-2 text-xs text-slate-300 hover:text-white"
+                >
+                  <span className="flex items-center gap-2">
+                    <Instagram className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <span>@ajrisner</span>
+                  </span>
+                  <ExternalLink className="w-3 h-3 text-slate-500 shrink-0" />
+                </a>
+              </div>
+            )}
           </div>
 
-          {canScrollTier1Right && (
+          {/* Account / Profile Dropdown Trigger */}
+          <div className="relative">
             <button
               type="button"
-              onClick={() => scrollTier1('right')}
-              aria-label="Scroll top bar right"
-              className="absolute right-0 top-0 bottom-0 z-20 px-1 bg-gradient-to-l from-[#0b0f14] via-[#0b0f14]/95 to-transparent flex items-center justify-center text-zinc-300 hover:text-white transition cursor-pointer"
+              onClick={() => setOpenMenu((prev) => (prev === 'account' ? null : 'account'))}
+              aria-expanded={openMenu === 'account'}
+              aria-haspopup="menu"
+              className={`min-h-[40px] pl-1.5 pr-2.5 py-1 rounded-lg border transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap shrink-0 ${
+                openMenu === 'account'
+                  ? 'bg-[#182030] border-amber-400/60 text-white'
+                  : 'bg-[#141923] border-[#262F40] hover:border-slate-500 text-slate-200'
+              }`}
             >
-              <ChevronRight className="w-4 h-4 bg-zinc-800/90 hover:bg-amber-500 hover:text-black rounded-full p-0.5 border border-zinc-700 shadow" />
+              <div
+                className={`w-6 h-6 rounded-full bg-gradient-to-tr ${
+                  currentAthlete?.avatarColor || 'from-amber-600 to-amber-400'
+                } flex items-center justify-center text-[11px] font-bold text-[#0B0E14] shrink-0`}
+              >
+                {currentAthlete ? currentAthlete.name.charAt(0).toUpperCase() : 'T'}
+              </div>
+              <span className="text-xs font-semibold text-white truncate max-w-[90px] hidden sm:inline">
+                {currentAthlete ? currentAthlete.name.split(' ')[0] : 'Account'}
+              </span>
+              {readinessScore !== undefined && (
+                <span className="text-[11px] font-mono tabular-nums text-slate-400 hidden lg:inline">
+                  {readinessScore}%
+                </span>
+              )}
+              <ChevronDown
+                className={`w-3.5 h-3.5 text-slate-400 transition-transform ${
+                  openMenu === 'account' ? 'rotate-180' : ''
+                }`}
+              />
             </button>
-          )}
-        </div>
 
-        {/* Tier 2: Streamlined Single-Line Tab Rail (Desktop/Tablet only) */}
-        <div className="relative group/nav border-t border-zinc-800/80 bg-[#080a0d]/95 hidden md:block">
-          {canScrollNavLeft && (
-            <button
-              type="button"
-              onClick={() => scrollNav('left')}
-              aria-label="Scroll tabs left"
-              className="absolute left-0 top-0 bottom-0 z-20 px-1 bg-gradient-to-r from-[#080a0d] via-[#080a0d]/95 to-transparent flex items-center justify-center text-zinc-300 hover:text-white transition cursor-pointer"
-            >
-              <ChevronLeft className="w-4 h-4 bg-zinc-800/90 hover:bg-amber-500 hover:text-black rounded-full p-0.5 border border-zinc-700 shadow" />
-            </button>
-          )}
-
-          <nav
-            ref={navScrollRef}
-            onWheel={handleWheelScroll}
-            className="px-2 sm:px-4 py-1.5 topbar-scroll"
-            aria-label="Main Navigation"
-          >
-            <div className="flex items-center gap-1 sm:gap-1.5 min-w-max justify-start md:justify-center">
-              {tabs.map((tab) => {
-                const Icon = tab.icon;
-                const isActive = activeTab === tab.id;
-                const isLocked = !hasActiveAccess && !isExempt;
-
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => {
-                      if (isLocked) {
-                        if (onOpenPricingModal) onOpenPricingModal();
-                        return;
-                      }
-                      onSelectTab(tab.id as TabType);
-                    }}
-                    className={`nav-tab-interactive group relative flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider whitespace-nowrap cursor-pointer select-none shrink-0 ${
-                      isActive
-                        ? 'bg-amber-500 text-black shadow-md border border-amber-400'
-                        : isLocked
-                        ? 'bg-[#0e1217] opacity-70 hover:opacity-100 text-zinc-400 hover:text-amber-300 border border-zinc-800 hover:border-amber-500/40'
-                        : 'bg-[#141a21] hover:bg-[#1c242e] text-zinc-300 hover:text-white border border-zinc-800 hover:border-amber-500/40'
-                    }`}
-                    title={isLocked ? 'Access Locked: Activate 14-day free trial or subscribe to access' : tab.label}
-                  >
-                    {isLocked ? (
-                      <Lock className="w-3 h-3 text-amber-400/80 shrink-0" />
-                    ) : (
-                      <Icon
-                        className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ease-out ${
-                          isActive
-                            ? 'text-black stroke-[2.5] scale-105'
-                            : 'text-amber-400 stroke-[2] group-hover:scale-105'
+            {openMenu === 'account' && (
+              <div
+                role="menu"
+                className="absolute right-0 mt-2 w-64 rounded-xl bg-[#141923] border border-[#262F40] shadow-2xl py-2 z-50"
+              >
+                {/* Account Header Summary */}
+                <div className="px-3.5 pb-2.5 border-b border-[#262F40] space-y-1">
+                  <div className="text-sm font-semibold text-white truncate">
+                    {currentAthlete ? currentAthlete.name : 'Service Member'}
+                  </div>
+                  {user?.email && (
+                    <div className="text-[11px] text-slate-400 truncate">{user.email}</div>
+                  )}
+                  <div className="flex items-center gap-2 text-[11px] font-mono tabular-nums pt-0.5 text-slate-400">
+                    {readinessScore !== undefined && (
+                      <span
+                        className={
+                          readinessScore >= 85
+                            ? 'text-emerald-400'
+                            : readinessScore >= 70
+                            ? 'text-amber-400'
+                            : 'text-red-400'
+                        }
+                      >
+                        {readinessScore}% {readinessTier || 'Ready'}
+                      </span>
+                    )}
+                    <span aria-hidden="true">·</span>
+                    <span className="inline-flex items-center gap-1">
+                      <Cloud
+                        className={`w-3 h-3 ${
+                          authError
+                            ? 'text-red-400'
+                            : user || isCloudConnected
+                            ? 'text-emerald-400'
+                            : 'text-slate-500'
                         }`}
                       />
-                    )}
-                    <span className="whitespace-nowrap transition-colors duration-200">{tab.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </nav>
+                      <span>{authError ? 'Sync issue' : 'Synced'}</span>
+                    </span>
+                  </div>
+                </div>
 
-          {canScrollNavRight && (
-            <button
-              type="button"
-              onClick={() => scrollNav('right')}
-              aria-label="Scroll tabs right"
-              className="absolute right-0 top-0 bottom-0 z-20 px-1 bg-gradient-to-l from-[#080a0d] via-[#080a0d]/95 to-transparent flex items-center justify-center text-zinc-300 hover:text-white transition cursor-pointer"
-            >
-              <ChevronRight className="w-4 h-4 bg-zinc-800/90 hover:bg-amber-500 hover:text-black rounded-full p-0.5 border border-zinc-700 shadow" />
-            </button>
-          )}
+                <div className="py-1">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setOpenMenu(null);
+                      onOpenAthleteModal();
+                    }}
+                    className="w-full px-3.5 py-2 text-left text-xs text-slate-200 hover:bg-[#1C2333] hover:text-white flex items-center gap-2.5 cursor-pointer"
+                  >
+                    <UserCheck className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>Profile &amp; Readiness</span>
+                  </button>
+
+                  {onOpenPricingModal && (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setOpenMenu(null);
+                        onOpenPricingModal();
+                      }}
+                      className="w-full px-3.5 py-2 text-left text-xs text-slate-200 hover:bg-[#1C2333] hover:text-white flex items-center justify-between gap-2 cursor-pointer"
+                    >
+                      <span className="flex items-center gap-2.5">
+                        <CreditCard className="w-4 h-4 text-amber-400 shrink-0" />
+                        <span>Membership</span>
+                      </span>
+                      <span className="text-[11px] font-mono text-amber-300">{tierLabel}</span>
+                    </button>
+                  )}
+                </div>
+
+                {user && (
+                  <div className="pt-1 border-t border-[#262F40]">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setOpenMenu(null);
+                        signOutUser();
+                      }}
+                      className="w-full px-3.5 py-2 text-left text-xs text-red-300 hover:bg-red-950/40 hover:text-red-200 flex items-center gap-2.5 cursor-pointer"
+                    >
+                      <LogOut className="w-4 h-4 shrink-0" />
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </header>

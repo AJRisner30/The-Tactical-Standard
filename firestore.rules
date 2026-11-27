@@ -85,7 +85,8 @@ service cloud.firestore {
     }
 
     match /athletes/{athleteId} {
-      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow get: if isSignedIn() && isValidId(athleteId) &&
+        (athleteId == request.auth.uid || (resource != null && resource.data.userId == request.auth.uid) || isAdmin());
       allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
       allow create: if isSignedIn() && isValidId(athleteId) && isValidAthlete(incoming());
       allow update: if isSignedIn() && isValidId(athleteId) &&
@@ -335,6 +336,74 @@ service cloud.firestore {
     match /trial_codes/{codeId} {
       allow get, list: if isSignedIn();
       allow write: if isAdmin();
+    }
+
+    // ----------------------------------------------------
+    // Decoupled User Active Program State (`user_active_program`)
+    // ----------------------------------------------------
+    function isValidActiveProgram(data) {
+      return data.keys().hasAll(['user_id', 'active_track_id', 'volume_tier', 'constraint_mode', 'sequential_day_index']) &&
+        data.keys().hasOnly(['user_id', 'active_track_id', 'volume_tier', 'constraint_mode', 'sequential_day_index', 'completed_sessions_count', 'last_completed_date', 'updated_at']) &&
+        data.user_id is string && data.user_id == request.auth.uid &&
+        data.active_track_id is string && data.active_track_id.size() > 0 && data.active_track_id.size() <= 100 &&
+        data.active_track_id.matches('^[a-zA-Z0-9_\\-:]+$') &&
+        data.volume_tier in ['standard', 'high_volume'] &&
+        data.constraint_mode in ['full_duty', 'low_impact_rehab', 'minimal_gear'] &&
+        data.sequential_day_index is number && data.sequential_day_index >= 1 && data.sequential_day_index <= 3650 &&
+        (!('completed_sessions_count' in data) || data.completed_sessions_count == null || (data.completed_sessions_count is number && data.completed_sessions_count >= 0 && data.completed_sessions_count <= 10000)) &&
+        (!('last_completed_date' in data) || data.last_completed_date == null || (data.last_completed_date is string && data.last_completed_date.size() <= 40)) &&
+        (!('updated_at' in data) || data.updated_at == null || (data.updated_at is string && data.updated_at.size() <= 100));
+    }
+
+    match /user_active_program/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && (userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.user_id == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidId(userId) && userId == request.auth.uid && isValidActiveProgram(incoming());
+      allow update: if isSignedIn() && isValidId(userId) && userId == request.auth.uid &&
+        isValidActiveProgram(incoming()) &&
+        incoming().user_id == existing().user_id;
+      allow delete: if isSignedIn() && isValidId(userId) && (userId == request.auth.uid || isAdmin());
+    }
+
+    // ----------------------------------------------------
+    // Decoupled Global Benchmarks & PR History (`user_benchmarks_and_logs`)
+    // Strictly keyed by user_id + movement_id (never track_id)
+    // ----------------------------------------------------
+    function isValidBenchmarkLog(data) {
+      return data.keys().hasAll(['id', 'user_id', 'movement_id', 'movement_name', 'metric_type', 'last_logged_date']) &&
+        data.keys().hasOnly([
+          'id', 'user_id', 'movement_id', 'movement_name', 'metric_type',
+          'best_weight_lbs', 'best_reps', 'estimated_1rm_lbs',
+          'best_time_seconds', 'best_time_formatted', 'best_distance_meters',
+          'last_rpe', 'last_logged_date', 'session_count', 'history', 'updated_at'
+        ]) &&
+        data.id is string && isValidId(data.id) &&
+        data.user_id is string && data.user_id == request.auth.uid &&
+        data.movement_id is string && data.movement_id.size() > 0 && data.movement_id.size() <= 80 &&
+        data.movement_name is string && data.movement_name.size() > 0 && data.movement_name.size() <= 120 &&
+        data.metric_type in ['load_pr', 'bodyweight_reps', 'time_trial', 'erg_split', 'carry_load'] &&
+        data.last_logged_date is string && data.last_logged_date.size() >= 8 && data.last_logged_date.size() <= 30 &&
+        (!('best_weight_lbs' in data) || data.best_weight_lbs == null || (data.best_weight_lbs is number && data.best_weight_lbs >= 0 && data.best_weight_lbs <= 2500)) &&
+        (!('best_reps' in data) || data.best_reps == null || (data.best_reps is number && data.best_reps >= 0 && data.best_reps <= 2000)) &&
+        (!('estimated_1rm_lbs' in data) || data.estimated_1rm_lbs == null || (data.estimated_1rm_lbs is number && data.estimated_1rm_lbs >= 0 && data.estimated_1rm_lbs <= 2500)) &&
+        (!('best_time_seconds' in data) || data.best_time_seconds == null || (data.best_time_seconds is number && data.best_time_seconds >= 0 && data.best_time_seconds <= 86400)) &&
+        (!('best_time_formatted' in data) || data.best_time_formatted == null || (data.best_time_formatted is string && data.best_time_formatted.size() <= 24)) &&
+        (!('best_distance_meters' in data) || data.best_distance_meters == null || (data.best_distance_meters is number && data.best_distance_meters >= 0 && data.best_distance_meters <= 100000)) &&
+        (!('last_rpe' in data) || data.last_rpe == null || (data.last_rpe is number && data.last_rpe >= 1 && data.last_rpe <= 10)) &&
+        (!('session_count' in data) || data.session_count == null || (data.session_count is number && data.session_count >= 0 && data.session_count <= 10000)) &&
+        (!('history' in data) || data.history == null || (data.history is list && data.history.size() <= 50)) &&
+        (!('updated_at' in data) || data.updated_at == null || (data.updated_at is string && data.updated_at.size() <= 100));
+    }
+
+    match /user_benchmarks_and_logs/{docId} {
+      allow get: if isSignedIn() && isValidId(docId) && (resource.data.user_id == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.user_id == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidId(docId) && isValidBenchmarkLog(incoming());
+      allow update: if isSignedIn() && isValidId(docId) &&
+        isValidBenchmarkLog(incoming()) &&
+        existing().user_id == request.auth.uid &&
+        incoming().user_id == existing().user_id;
+      allow delete: if isSignedIn() && isValidId(docId) && (existing().user_id == request.auth.uid || isAdmin());
     }
 
     // ----------------------------------------------------

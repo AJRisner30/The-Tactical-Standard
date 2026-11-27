@@ -178,6 +178,62 @@
         "updatedAt": { "type": "string", "maxLength": 100, "description": "Last update timestamp" }
       },
       "required": ["id", "userId", "testType", "standard", "sex", "ageBracket", "date", "tag", "events", "totalScore", "maxScore", "passed"]
+    },
+    "UserActiveProgram": {
+      "title": "UserActiveProgram",
+      "description": "Decoupled active program track state storing active_track_id, volume_tier, constraint_mode, and non-punitive sequential_day_index independently of user performance benchmarks.",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string", "maxLength": 128, "description": "Firebase Auth user ID of the athlete" },
+        "active_track_id": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Currently active tactical program track identifier (hybrid_db, apex_protocol, tactical_hypertrophy, hybrid_protocol, aft_protocol, universal_pat, custom_ai, or coach:<id>)"
+        },
+        "volume_tier": {
+          "type": "string",
+          "enum": ["standard", "high_volume"],
+          "description": "Selected weekly frequency and accessory volume tier"
+        },
+        "constraint_mode": {
+          "type": "string",
+          "enum": ["full_duty", "low_impact_rehab", "minimal_gear"],
+          "description": "Operational readiness or equipment constraint mode"
+        },
+        "sequential_day_index": { "type": "number", "description": "1-based non-punitive sequential day index" },
+        "completed_sessions_count": { "type": "number", "description": "Total completed sessions across all tracks" },
+        "last_completed_date": { "type": "string", "maxLength": 40, "description": "ISO date of last completed session" },
+        "updated_at": { "type": "string", "maxLength": 100, "description": "Last update ISO timestamp" }
+      },
+      "required": ["user_id", "active_track_id", "volume_tier", "constraint_mode", "sequential_day_index"]
+    },
+    "GlobalBenchmarkLog": {
+      "title": "GlobalBenchmarkLog",
+      "description": "Decoupled global movement benchmark record tied strictly to user_id and movement_id (never track_id) so PRs, working weights, and erg/run times persist across track switches.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "description": "Unique document ID (user_id + movement_id)" },
+        "user_id": { "type": "string", "maxLength": 128, "description": "Firebase Auth user ID of the owning athlete" },
+        "movement_id": { "type": "string", "maxLength": 80, "description": "Canonical global movement identifier" },
+        "movement_name": { "type": "string", "maxLength": 120, "description": "Human-readable movement name" },
+        "metric_type": {
+          "type": "string",
+          "enum": ["load_pr", "bodyweight_reps", "time_trial", "erg_split", "carry_load"],
+          "description": "Primary performance metric classification"
+        },
+        "best_weight_lbs": { "type": "number", "description": "Best logged load in pounds" },
+        "best_reps": { "type": "number", "description": "Best logged reps" },
+        "estimated_1rm_lbs": { "type": "number", "description": "Estimated 1-rep max in pounds" },
+        "best_time_seconds": { "type": "number", "description": "Best benchmark time in seconds" },
+        "best_time_formatted": { "type": "string", "maxLength": 24, "description": "Formatted benchmark time string" },
+        "best_distance_meters": { "type": "number", "description": "Best logged distance in meters" },
+        "last_rpe": { "type": "number", "description": "Most recent RPE (1-10)" },
+        "last_logged_date": { "type": "string", "maxLength": 30, "description": "Date of most recent entry" },
+        "session_count": { "type": "number", "description": "Number of logged sessions for this movement" },
+        "history": { "type": "array", "description": "Bounded recent history entries (max 50)" },
+        "updated_at": { "type": "string", "maxLength": 100, "description": "Last update ISO timestamp" }
+      },
+      "required": ["id", "user_id", "movement_id", "movement_name", "metric_type", "last_logged_date"]
     }
   },
   "firestore": {
@@ -208,6 +264,14 @@
     "/coachPrograms/{programId}": {
       "schema": "CoachProgram",
       "description": "Shared custom programs and standalone workouts created exclusively by Coach Aryan Risner and readable by all signed-in athletes when published."
+    },
+    "/user_active_program/{userId}": {
+      "schema": "UserActiveProgram",
+      "description": "Active tactical track, volume tier, constraint mode, and sequential day index per user."
+    },
+    "/user_benchmarks_and_logs/{docId}": {
+      "schema": "GlobalBenchmarkLog",
+      "description": "Decoupled global movement PRs, erg splits, run times, and RPE history keyed strictly to user_id and movement_id."
     }
   }
 }

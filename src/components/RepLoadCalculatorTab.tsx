@@ -26,16 +26,17 @@ export interface SavedLift {
 }
 
 const DEFAULT_SAVED_LIFTS: SavedLift[] = [
-  { id: 'lift-1', name: 'Barbell Bench Press', category: 'Barbell', estimated1RM: 225, sourceNote: 'Standard Upper Push Benchmark' },
-  { id: 'lift-2', name: 'Barbell Back Squat', category: 'Barbell', estimated1RM: 315, sourceNote: 'Posterior & Quad Driver' },
-  { id: 'lift-3', name: 'Barbell Conventional Deadlift', category: 'Barbell', estimated1RM: 365, sourceNote: 'Max Posterior Chain Pull' },
-  { id: 'lift-4', name: 'Overhead Press (OHP)', category: 'Barbell', estimated1RM: 135, sourceNote: 'Vertical Pressing Benchmark' },
-  { id: 'lift-5', name: 'Bent-Over Barbell Row', category: 'Barbell', estimated1RM: 185, sourceNote: 'Horizontal Pulling Mass' },
-  { id: 'lift-6', name: 'Incline DB Press (Per Hand)', category: 'Dumbbell', estimated1RM: 80, sourceNote: 'Upper Clavicular DB Focus' },
-  { id: 'lift-7', name: 'Dumbbell Floor Press (Per Hand)', category: 'Dumbbell', estimated1RM: 75, sourceNote: 'Triceps & Chest Lockout' },
+  { id: 'lift-1', name: 'Barbell Bench Press', category: 'Barbell', estimated1RM: 0, sourceNote: 'Not established — log a session or enter 1RM' },
+  { id: 'lift-2', name: 'Barbell Back Squat', category: 'Barbell', estimated1RM: 0, sourceNote: 'Not established — log a session or enter 1RM' },
+  { id: 'lift-3', name: 'Barbell Conventional Deadlift', category: 'Barbell', estimated1RM: 0, sourceNote: 'Not established — log a session or enter 1RM' },
+  { id: 'lift-4', name: 'Overhead Press (OHP)', category: 'Barbell', estimated1RM: 0, sourceNote: 'Not established — log a session or enter 1RM' },
+  { id: 'lift-5', name: 'Bent-Over Barbell Row', category: 'Barbell', estimated1RM: 0, sourceNote: 'Not established — log a session or enter 1RM' },
+  { id: 'lift-6', name: 'Incline DB Press (Per Hand)', category: 'Dumbbell', estimated1RM: 0, sourceNote: 'Not established — log a session or enter 1RM' },
+  { id: 'lift-7', name: 'Dumbbell Floor Press (Per Hand)', category: 'Dumbbell', estimated1RM: 0, sourceNote: 'Not established — log a session or enter 1RM' },
 ];
 
-const STORAGE_SAVED_LIFTS_KEY = 'rpa_saved_1rm_lifts_v1';
+const STORAGE_SAVED_LIFTS_KEY = 'rpa_saved_1rm_lifts_v2';
+const LEGACY_STORAGE_SAVED_LIFTS_KEY = 'rpa_saved_1rm_lifts_v1';
 
 interface RepLoadCalculatorTabProps {
   logs?: WorkoutSessionLog[];
@@ -49,28 +50,56 @@ export const RepLoadCalculatorTab: React.FC<RepLoadCalculatorTabProps> = ({ logs
   const [unit, setUnit] = useState<WeightUnit>('lbs');
   const [formula, setFormula] = useState<CalculationFormula>('consensus');
   
-  // Core Calculator Inputs
-  const [estimated1RM, setEstimated1RM] = useState<number>(225);
+  // Core Calculator Inputs — always start at 0 until established or manually inputted
+  const [estimated1RM, setEstimated1RM] = useState<number>(0);
   const [targetReps, setTargetReps] = useState<number>(5);
   const [targetRpe, setTargetRpe] = useState<number>(10); // RPE 10 = 0 RIR (Max Effort)
   const [exerciseTitle, setExerciseTitle] = useState<string>('Barbell Bench Press');
 
   // Reverse 1RM Estimator (Calculate 1RM from set first)
   const [showEstimatorModal, setShowEstimatorModal] = useState<boolean>(false);
-  const [estimatorWeight, setEstimatorWeight] = useState<number>(185);
-  const [estimatorReps, setEstimatorReps] = useState<number>(8);
+  const [estimatorWeight, setEstimatorWeight] = useState<number>(0);
+  const [estimatorReps, setEstimatorReps] = useState<number>(5);
   const [estimatorRpe, setEstimatorRpe] = useState<number>(9); // 1 RIR
 
   // Barbell Plate Visualizer toggle & bar weight
   const [showPlateLoader, setShowPlateLoader] = useState<boolean>(true);
   const [barWeightLbs, setBarWeightLbs] = useState<number>(45);
 
-  // Saved lifts state
+  // Saved lifts state — purge legacy pre-seeded defaults while preserving any real user-created or synced PRs
   const [savedLifts, setSavedLifts] = useState<SavedLift[]>(() => {
     if (typeof window === 'undefined') return DEFAULT_SAVED_LIFTS;
     try {
-      const data = localStorage.getItem(STORAGE_SAVED_LIFTS_KEY);
-      return data ? JSON.parse(data) : DEFAULT_SAVED_LIFTS;
+      const v2Data = localStorage.getItem(STORAGE_SAVED_LIFTS_KEY);
+      if (v2Data) {
+        return JSON.parse(v2Data);
+      }
+      const legacyRaw = localStorage.getItem(LEGACY_STORAGE_SAVED_LIFTS_KEY);
+      localStorage.removeItem(LEGACY_STORAGE_SAVED_LIFTS_KEY);
+      if (legacyRaw) {
+        const legacyParsed = JSON.parse(legacyRaw) as SavedLift[];
+        const userEstablishedOnly = legacyParsed.filter(
+          (l) =>
+            l.estimated1RM > 0 &&
+            (l.id.startsWith('custom-lift-') ||
+              l.id.startsWith('lift-pr-') ||
+              l.sourceNote?.startsWith('Auto-Synced') ||
+              l.sourceNote?.startsWith('Custom'))
+        );
+        if (userEstablishedOnly.length > 0) {
+          const merged = DEFAULT_SAVED_LIFTS.map((def) => {
+            const match = userEstablishedOnly.find(
+              (u) => u.name.toLowerCase() === def.name.toLowerCase()
+            );
+            return match || def;
+          });
+          const extras = userEstablishedOnly.filter(
+            (u) => !merged.some((m) => m.name.toLowerCase() === u.name.toLowerCase())
+          );
+          return [...extras, ...merged];
+        }
+      }
+      return DEFAULT_SAVED_LIFTS;
     } catch {
       return DEFAULT_SAVED_LIFTS;
     }
@@ -78,7 +107,7 @@ export const RepLoadCalculatorTab: React.FC<RepLoadCalculatorTabProps> = ({ logs
 
   const [isAddingCustomLift, setIsAddingCustomLift] = useState<boolean>(false);
   const [customLiftName, setCustomLiftName] = useState<string>('');
-  const [customLift1RM, setCustomLift1RM] = useState<number>(185);
+  const [customLift1RM, setCustomLift1RM] = useState<number>(0);
   const [customLiftCategory, setCustomLiftCategory] = useState<SavedLift['category']>('Barbell');
 
   // Save lifts to localStorage
@@ -273,7 +302,7 @@ export const RepLoadCalculatorTab: React.FC<RepLoadCalculatorTabProps> = ({ logs
     return commonReps.map((reps) => {
       const wExact = calculateWeightForReps(estimated1RM, reps, formula);
       const wRound = Math.round(wExact / step) * step;
-      const pct = Math.round((wExact / estimated1RM) * 1000) / 10;
+      const pct = estimated1RM > 0 ? Math.round((wExact / estimated1RM) * 1000) / 10 : 0;
       
       let category = 'Max Strength';
       let tagBg = 'bg-amber-950/60 text-amber-400 border-amber-700/50';
@@ -300,6 +329,38 @@ export const RepLoadCalculatorTab: React.FC<RepLoadCalculatorTabProps> = ({ logs
   const loggedPRs = useMemo(() => {
     return extractPersonalRecords(logs);
   }, [logs]);
+
+  // Automatically sync established PRs from logged sessions without inventing defaults
+  useEffect(() => {
+    if (loggedPRs.length === 0) return;
+    setSavedLifts((prev) => {
+      const updated = prev.map((l) => ({ ...l }));
+      let changed = false;
+      loggedPRs.forEach((pr) => {
+        if (pr.estimated1RM <= 0) return;
+        const idx = updated.findIndex(
+          (l) => l.name.toLowerCase() === pr.exerciseName.toLowerCase()
+        );
+        if (idx !== -1) {
+          if (pr.estimated1RM > updated[idx].estimated1RM) {
+            updated[idx].estimated1RM = pr.estimated1RM;
+            updated[idx].sourceNote = `Auto-Synced from Logged PR: ${pr.maxWeightLbs} lbs × ${pr.repsAtMax} reps (${pr.date})`;
+            changed = true;
+          }
+        } else {
+          updated.push({
+            id: `lift-pr-${pr.exerciseName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+            name: pr.exerciseName,
+            category: 'Barbell',
+            estimated1RM: pr.estimated1RM,
+            sourceNote: `Auto-Synced from Logged PR: ${pr.maxWeightLbs} lbs × ${pr.repsAtMax} reps (${pr.date})`,
+          });
+          changed = true;
+        }
+      });
+      return changed ? updated : prev;
+    });
+  }, [loggedPRs]);
 
   // Handler to load a saved lift into active calculator
   const handleSelectSavedLift = (lift: SavedLift) => {

@@ -6,6 +6,7 @@ import {
   getCurrentAthlete, 
   updateAthleteProfile, 
   isMasterExemptAccount, 
+  isPaymentExemptAccount,
   getAthleteTrialState, 
   startAthleteFreeTrial,
   resetAthleteTrial,
@@ -98,9 +99,10 @@ export function useUserTier(): UserTierState {
       const tokenResult: IdTokenResult = await currentUser.getIdTokenResult(forceRefresh);
       const userClaims = tokenResult.claims || {};
       const userEmail = currentUser.email || '';
+      const userUid = currentUser.uid || auth.currentUser?.uid || '';
 
-      // 1. MASTER EXEMPT ACCOUNT CHECK: risneraryan@gmail.com has permanent full unrestricted access
-      if (isMasterExemptAccount(userEmail)) {
+      // 1. PAYMENT EXEMPT ACCOUNT CHECK: Coach AJ (risneraryan@gmail.com) and explicitly exempted UIDs have permanent full unrestricted access
+      if (isPaymentExemptAccount(userEmail, userUid)) {
         setUser(currentUser);
         setClaims(userClaims);
         setTier('pro');
@@ -109,8 +111,43 @@ export function useUserTier(): UserTierState {
         setHasSelectedPlan(true);
         setLoading(false);
 
-        // One-time Admin Cloud Sync: Reset test profile risnerathletics@gmail.com in Firestore
-        if (auth.currentUser) {
+        // If this is an explicitly exempted Firebase user UID (non-Coach), sync permanent active Pro status to their Firestore doc
+        if (auth.currentUser && !isMasterExemptAccount(userEmail) && userUid) {
+          (async () => {
+            try {
+              const exemptTrial = {
+                startedAtMs: Date.now() - 86400000,
+                trialEndMs: Date.now() + 3650 * 24 * 60 * 60 * 1000,
+                hasSelectedPlan: true,
+                tier: 'pro' as const,
+                status: 'active_subscriber' as const,
+                note: 'Permanent payment exemption granted by Coach',
+              };
+              const safeEmail = (auth.currentUser?.email || userEmail || '').slice(0, 150);
+              const safeName = (auth.currentUser?.displayName || safeEmail.split('@')[0] || 'Service Member').slice(0, 100);
+              await setDoc(doc(db, 'athletes', userUid), {
+                id: userUid,
+                userId: userUid,
+                name: safeName,
+                email: safeEmail,
+                experienceLevel: 'Intermediate',
+                primaryGoal: 'Hybrid Athlete',
+                subscription: {
+                  tier: 'pro',
+                  status: 'active_subscriber',
+                  activatedAt: new Date().toISOString(),
+                  provider: 'exempt_grant',
+                },
+                trialActivation: exemptTrial,
+                trialState: exemptTrial,
+                updatedAt: new Date().toISOString(),
+              }, { merge: true });
+            } catch {}
+          })();
+        }
+
+        // One-time Admin Cloud Sync: Reset test profile risnerathletics@gmail.com in Firestore (Coach AJ only)
+        if (auth.currentUser && isMasterExemptAccount(userEmail)) {
           (async () => {
             try {
               const q = query(collection(db, 'athletes'), where('email', '==', RESETTABLE_TEST_PROFILE_EMAIL));
@@ -351,7 +388,7 @@ export function useUserTier(): UserTierState {
       const effectiveUser = currentUser || getEffectiveCurrentUser();
       await evaluateClaims(effectiveUser, false);
 
-      if (currentUser?.uid && !isMasterExemptAccount(currentUser.email)) {
+      if (currentUser?.uid && !isPaymentExemptAccount(currentUser.email, currentUser.uid)) {
         try {
           unsubscribeDoc = onSnapshot(doc(db, 'athletes', currentUser.uid), () => {
             evaluateClaims(getEffectiveCurrentUser(), false);
@@ -560,8 +597,10 @@ export function useUserTier(): UserTierState {
     await evaluateClaims(getEffectiveCurrentUser(), true);
   }, [evaluateClaims]);
 
-  // Master exempt account calculation
-  const isExempt = Boolean(user?.email && isMasterExemptAccount(user.email));
+  // Payment exempt account calculation (Coach AJ + explicitly exempted UIDs)
+  const isExempt = Boolean(
+    isPaymentExemptAccount(user?.email, user?.uid)
+  );
 
   // Compute live trial time calculations based on the live clock
   const now = currentTimeMs;

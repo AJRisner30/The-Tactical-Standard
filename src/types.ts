@@ -1,3 +1,5 @@
+export * from './types/trainingTracks';
+
 export type MuscleGroup =
   | 'Chest'
   | 'Back'

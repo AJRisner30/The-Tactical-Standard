@@ -41,13 +41,29 @@ export const COACH_PROFILE: AthleteProfile = {
 };
 
 export const MASTER_EXEMPT_EMAIL = 'risneraryan@gmail.com';
+export const EXEMPT_USER_UIDS: string[] = [
+  'FPU34ZCXKcOGkJRX6jnZbcfCAko2',
+];
 
 /**
- * Checks if an email is the single exempt Coach/Owner account with permanent full access
+ * Checks if an email is the single exempt Coach/Owner account with permanent full admin & app access
  */
 export function isMasterExemptAccount(email?: string | null): boolean {
   if (!email) return false;
   return email.trim().toLowerCase() === MASTER_EXEMPT_EMAIL.toLowerCase();
+}
+
+/**
+ * Checks if a user account (by email or Firebase Auth UID) is permanently exempt from paying.
+ * Includes Coach AJ (risneraryan@gmail.com) and explicitly exempted user UIDs.
+ */
+export function isPaymentExemptAccount(email?: string | null, uid?: string | null): boolean {
+  if (isMasterExemptAccount(email)) return true;
+  if (email && EXEMPT_USER_UIDS.includes(email.trim())) return true;
+  if (uid && EXEMPT_USER_UIDS.includes(uid.trim())) return true;
+  const activeUid = auth.currentUser?.uid;
+  if (activeUid && EXEMPT_USER_UIDS.includes(activeUid)) return true;
+  return false;
 }
 
 export const TRIAL_STORAGE_PREFIX = 'rpa_trial_v2_';
@@ -126,7 +142,7 @@ export function getAthleteTrialState(athleteId: string, email?: string): {
   resetVersion?: number;
 } | null {
   if (typeof window === 'undefined') return null;
-  if (email && isMasterExemptAccount(email)) {
+  if (isPaymentExemptAccount(email, athleteId)) {
     return {
       startedAtMs: Date.now() - 86400000,
       trialEndMs: Date.now() + 365 * 86400000,

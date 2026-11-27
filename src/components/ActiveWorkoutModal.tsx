@@ -1084,7 +1084,7 @@ export const ActiveWorkoutModal: React.FC<ActiveWorkoutModalProps> = ({
       const newSet: LiveSet = {
         id: `set-${ex.exerciseId}-${Date.now()}`,
         setNumber: ex.sets.length + 1,
-        weightLbs: ex.isBodyweight ? 0 : (lastSet ? lastSet.weightLbs : ex.isTimed ? 0 : 95),
+        weightLbs: ex.isBodyweight ? 0 : (lastSet ? lastSet.weightLbs : 0),
         reps: lastSet ? lastSet.reps : 8,
         rpe: lastSet?.rpe || 8,
         completed: false,

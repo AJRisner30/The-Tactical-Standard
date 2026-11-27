@@ -439,7 +439,7 @@ export default function App() {
   // Mandatory Once-Daily Readiness Questionnaire at First Login of the Day for Everyone
   useEffect(() => {
     if (loading || !user || !isAthleteCloudLoaded) return;
-    if (!hasActiveAccess && !isMasterExempt) return;
+    if (!hasActiveAccess && !isMasterExempt && !isExempt) return;
 
     const alreadyCompletedToday = hasCompletedDailyReadinessToday(
       currentAthlete,
@@ -459,6 +459,7 @@ export default function App() {
     isAthleteCloudLoaded,
     hasActiveAccess,
     isMasterExempt,
+    isExempt,
     currentAthlete,
   ]);
 
@@ -507,7 +508,7 @@ export default function App() {
   };
 
   const handleStartWorkout = (program: WorkoutProgram) => {
-    if (!hasActiveAccess && !isMasterExempt) {
+    if (!hasActiveAccess && !isMasterExempt && !isExempt) {
       if (isTrialExpired) {
         setIsPricingModalOpen(true);
       }
@@ -589,11 +590,11 @@ export default function App() {
       if (pendingTour === 'true') {
         setIsGuidedTourOpen(true);
         localStorage.removeItem('patrol_ready_show_tour');
-      } else if (!tourCompleted && (hasSelectedPlan || isTrialActive || isMasterExempt)) {
+      } else if (!tourCompleted && (hasSelectedPlan || isTrialActive || isMasterExempt || isExempt)) {
         setIsGuidedTourOpen(true);
       }
     } catch {}
-  }, [user, hasSelectedPlan, isTrialActive, isMasterExempt]);
+  }, [user, hasSelectedPlan, isTrialActive, isMasterExempt, isExempt]);
 
   const handleActivateFreeTrial = async () => {
     await startFreeTrial(14);
@@ -650,6 +651,7 @@ export default function App() {
         onOpenPricingModal={() => setIsPricingModalOpen(true)}
         onOpenAndroidAppModal={() => setIsAndroidModalOpen(true)}
         onOpenAIGenerator={() => setIsAIGeneratorOpen(true)}
+        onOpenSingleDayWorkout={() => setIsSingleDayModalOpen(true)}
         onOpenGuidedTour={() => setIsGuidedTourOpen(true)}
         readinessScore={readiness.overallScore}
         readinessTier={readiness.tier}
@@ -667,12 +669,12 @@ export default function App() {
 
         {/* STRICT TRIAL ACCESS GATE & TRIAL LOCKER:
             Non-exempt users MUST start their 14-day free trial or subscribe before gaining access to anything.
-            - If !hasActiveAccess && !isMasterExempt:
+            - If !hasActiveAccess && !isMasterExempt && !isExempt:
               1) If isTrialExpired: render the expired lockdown screen.
               2) If !hasSelectedPlan: render the 14-day free trial required gate.
-            - Only render workout protocols and tabs when access is active or user is master exempt!
+            - Only render workout protocols and tabs when access is active or user is exempt!
         */}
-        {!hasActiveAccess && !isMasterExempt ? (
+        {!hasActiveAccess && !isMasterExempt && !isExempt ? (
           isTrialExpired ? (
             /* 14-DAY TRIAL EXPIRED LOCKDOWN */
             <div className="rounded-3xl border-2 border-red-500/60 bg-gradient-to-b from-[#18080c] via-[#12161d] to-[#090b0d] p-6 sm:p-10 text-center shadow-2xl relative overflow-hidden my-4 animate-in fade-in duration-200">
@@ -895,6 +897,8 @@ export default function App() {
                 onAdaptCustomProgram={handleOpenCustomProgramAdapter}
                 onOpenCoachBuilder={isMasterExempt ? handleOpenCoachBuilder : undefined}
                 onDeleteCoachProgram={isMasterExempt ? handleDeleteCoachProgram : undefined}
+                workoutLogs={logs}
+                userId={user?.uid}
               />
             )}
 
@@ -974,7 +978,7 @@ export default function App() {
 
       {/* Plan Selection Onboarding Gate: Prompts everyone upon sign in to pick a free trial or subscription */}
       <PlanSelectionModal
-        isOpen={!isMasterExempt && !hasSelectedPlan && !loading}
+        isOpen={!isMasterExempt && !isExempt && !hasSelectedPlan && !loading}
         onStartTrial={handleActivateFreeTrial}
         onOpenPricingModal={() => setIsPricingModalOpen(true)}
         onOpenCodeModal={() => setIsCodeModalOpen(true)}
@@ -1013,76 +1017,40 @@ export default function App() {
         }}
       />
 
-      {/* Footer Branded with The Tactical Standard */}
-      <footer className="mt-auto border-t border-amber-500/20 bg-[#0e1217] py-8 px-4 sm:px-6 lg:px-8 relative">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-[1px] bg-gradient-to-r from-transparent via-amber-400 to-transparent" />
-        <div className="max-w-7xl mx-auto flex flex-col gap-6">
-          <div className="flex flex-col lg:flex-row items-center justify-between gap-4 text-xs text-zinc-400">
-            <div className="flex items-center gap-3">
-              <TacticalStandardCompanyEmblem size="sm" />
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-athletic font-black tracking-wider uppercase text-white">
-                  The Tactical Standard
-                </span>
-                <span className="text-zinc-600">·</span>
-                <span className="text-amber-400 font-bold tracking-wide">Tactical Readiness for the Modern Warfighter.</span>
-                <span className="text-zinc-600 hidden sm:inline">·</span>
-                <span className="hidden sm:inline text-zinc-400">Combat Readiness &amp; Armor Chassis</span>
-              </div>
-            </div>
-
-            {/* Quick Contact & Social Links in Footer */}
-            <div className="flex items-center gap-4 flex-wrap justify-center text-xs">
-              <a
-                href="mailto:risnerathletics@gmail.com"
-                className="flex items-center gap-1.5 text-zinc-300 hover:text-amber-400 transition-colors font-medium cursor-pointer"
-                title="Email The Tactical Standard"
-              >
-                <Mail className="w-3.5 h-3.5 text-amber-400" />
-                <span>risnerathletics@gmail.com</span>
-              </a>
-
-              <span className="text-zinc-700 hidden sm:inline">·</span>
-
-              <a
-                href="https://www.instagram.com/ajrisner"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-zinc-300 hover:text-amber-400 transition-colors font-medium cursor-pointer"
-                title="Instagram: @ajrisner"
-              >
-                <Instagram className="w-3.5 h-3.5 text-amber-400" />
-                <span>@ajrisner</span>
-                <ExternalLink className="w-3 h-3 text-zinc-500" />
-              </a>
-
-              <span className="text-zinc-700 hidden sm:inline">·</span>
-
-              <a
-                href="https://50callabz.com/risner55"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-amber-400 hover:text-amber-300 transition-colors font-bold cursor-pointer"
-                title="Official Supplement Partner: 50 Cal Labz (Use Code: TACTICALSTANDARD)"
-              >
-                <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-                <span>50 Cal Labz Supps (Code: TACTICALSTANDARD)</span>
-                <ExternalLink className="w-3 h-3 text-amber-400/60" />
-              </a>
-            </div>
-
-            <div className="flex items-center gap-2 text-zinc-400">
-              <ShieldCheck className="w-4 h-4 text-amber-400" />
-              <span>The Tactical Standard · Military Readiness</span>
-            </div>
+      {/* Quiet Single-Row Footer */}
+      <footer className="mt-auto border-t border-[#1E2635] bg-[#0B0E14] py-5 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
+          <div className="flex items-center gap-2.5">
+            <TacticalStandardCompanyEmblem size="xs" className="h-5 w-auto opacity-90" />
+            <span className="font-semibold text-slate-200">The Tactical Standard</span>
+            <PWAInstallButton variant="pill" withPrefixDivider />
           </div>
 
-          <div className="pt-4 border-t border-zinc-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-zinc-400 font-mono">
-            <div className="flex items-center gap-3">
-              <span>The Tactical Standard · Tactical Readiness for the Modern Warfighter. · All Rights Reserved</span>
-              <PWAInstallButton variant="pill" withPrefixDivider />
-            </div>
-            <span className="text-amber-400/80">Mission Ready · Armor-Plated · Combat Velocity</span>
+          <div className="flex items-center gap-3 flex-wrap justify-center">
+            <a
+              href="mailto:risnerathletics@gmail.com"
+              className="hover:text-white transition-colors"
+            >
+              risnerathletics@gmail.com
+            </a>
+            <span aria-hidden="true" className="text-slate-700">·</span>
+            <a
+              href="https://www.instagram.com/ajrisner"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-white transition-colors"
+            >
+              @ajrisner
+            </a>
+            <span aria-hidden="true" className="text-slate-700">·</span>
+            <a
+              href="https://50callabz.com/risner55"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-amber-400 hover:text-amber-300 transition-colors"
+            >
+              50 Cal Labz (Code: TACTICALSTANDARD)
+            </a>
           </div>
         </div>
       </footer>

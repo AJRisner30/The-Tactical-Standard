@@ -87,6 +87,15 @@ h1, h2, h3, .font-athletic {
   background: #f59e0b;
 }
 
+/* Hide native scrollbar on horizontal snap-scroll carousels */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* Subtle Entry Animations & Tab Content Fade-In */
 @keyframes tabContentFadeIn {
   from {

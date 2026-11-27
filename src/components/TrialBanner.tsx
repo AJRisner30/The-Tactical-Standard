@@ -150,43 +150,35 @@ export const TrialBanner: React.FC<TrialBannerProps> = ({
     }
 
     return (
-      <div className={`w-full bg-[#0e1217] border-y sm:border border-amber-500/30 sm:rounded-2xl p-2.5 sm:p-3 shadow-md ${className}`}>
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs">
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500/15 text-amber-400 border border-amber-500/30 shrink-0">
-              <ShieldCheck className="w-3.5 h-3.5" />
+      <div className={`w-full rounded-xl bg-[#11161F] border border-[#222B3B] px-4 py-2 ${className}`}>
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2 text-slate-300">
+            <ShieldCheck className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span>
+              <strong className="text-white font-semibold">Pro Trial Active</strong>
+              <span className="text-slate-500 mx-1.5">·</span>
+              <span className="font-mono tabular-nums text-amber-300">
+                {trialDaysRemaining} {trialDaysRemaining === 1 ? 'day' : 'days'} left
+              </span>
             </span>
-            <div className="text-zinc-300">
-              <span className="font-bold text-white font-mono uppercase text-[11px]">
-                14-Day Risk-Free Pro Trial Active
-              </span>
-              <span className="text-zinc-400 ml-2 hidden md:inline">
-                All Pro features unlocked (Auto-Overload Engine &amp; Firestore Performance Metrics).
-              </span>
-            </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0 flex-wrap justify-end">
-            <span className="font-mono text-[11px] font-bold text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30 tabular-nums">
-              {trialDaysRemaining} Days Left
-            </span>
+          <div className="flex items-center gap-3 shrink-0">
             {onOpenCodeModal && (
               <button
                 type="button"
                 onClick={onOpenCodeModal}
-                className="text-[11px] font-mono font-bold text-amber-300 hover:text-white px-2 py-0.5 rounded bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 flex items-center gap-1 cursor-pointer transition whitespace-nowrap"
-                title="Redeem trial or unit code"
+                className="text-xs text-slate-400 hover:text-white transition-colors cursor-pointer whitespace-nowrap"
               >
-                <KeyRound className="w-3 h-3 text-amber-400" />
-                <span>Have Code?</span>
+                Redeem Code
               </button>
             )}
             <button
               type="button"
               onClick={onOpenCheckout}
-              className="text-xs font-bold text-amber-400 hover:text-amber-300 hover:underline flex items-center gap-1 cursor-pointer whitespace-nowrap tabular-nums"
+              className="text-xs font-semibold text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer whitespace-nowrap"
             >
-              <span>View Pricing ($30/mo)</span>
+              <span>View Plans</span>
               <ArrowRight className="w-3 h-3" />
             </button>
           </div>
